@@ -50,7 +50,7 @@ namespace FlowithRealizationAPI.Services
         {
             var stopwatch = Stopwatch.StartNew();
             string tempFilePath = "";
-            
+            WhisperTranscriptionResult result = null;
             try
             {
                 _logger.LogInformation("开始语音转文本，文件: {FileName}, 大小: {Size} bytes", 
@@ -73,7 +73,7 @@ namespace FlowithRealizationAPI.Services
                 }
 
                 // 3. 执行Whisper转录
-                var result = await TranscribeFileAsync(tempFilePath);
+                result = await TranscribeFileAsync(tempFilePath);
                 
                 stopwatch.Stop();
                 result.ProcessingTime = stopwatch.ElapsedMilliseconds;
@@ -99,8 +99,13 @@ namespace FlowithRealizationAPI.Services
             }
             finally
             {
-                // 4. 清理临时文件
-                await CleanupTempFilesAsync(tempFilePath);
+                // 4. 清理临时文件（仅在Whisper命令和输出解析后再清理）
+                if (!string.IsNullOrEmpty(tempFilePath) && File.Exists(tempFilePath))
+                {
+                    try { File.Delete(tempFilePath); } catch { }
+                }
+                // 清理Whisper输出目录和过期文件
+                await CleanupTempFilesAsync(null);
             }
         }
 
@@ -111,7 +116,7 @@ namespace FlowithRealizationAPI.Services
         {
             var stopwatch = Stopwatch.StartNew();
             string tempFilePath = "";
-            
+            WhisperTranscriptionResult result = null;
             try
             {
                 _logger.LogInformation("开始语音转文本，文件: {FileName}", fileName);
@@ -133,7 +138,7 @@ namespace FlowithRealizationAPI.Services
                 }
 
                 // 3. 执行Whisper转录
-                var result = await TranscribeFileAsync(tempFilePath);
+                result = await TranscribeFileAsync(tempFilePath);
                 
                 stopwatch.Stop();
                 result.ProcessingTime = stopwatch.ElapsedMilliseconds;
@@ -156,8 +161,13 @@ namespace FlowithRealizationAPI.Services
             }
             finally
             {
-                // 4. 清理临时文件
-                await CleanupTempFilesAsync(tempFilePath);
+                // 4. 清理临时文件（仅在Whisper命令和输出解析后再清理）
+                if (!string.IsNullOrEmpty(tempFilePath) && File.Exists(tempFilePath))
+                {
+                    try { File.Delete(tempFilePath); } catch { }
+                }
+                // 清理Whisper输出目录和过期文件
+                await CleanupTempFilesAsync(null);
             }
         }
 
@@ -619,13 +629,6 @@ namespace FlowithRealizationAPI.Services
         {
             try
             {
-                // 清理输入文件
-                if (!string.IsNullOrEmpty(tempFilePath) && File.Exists(tempFilePath))
-                {
-                    File.Delete(tempFilePath);
-                    _logger.LogDebug("已清理临时输入文件: {FilePath}", tempFilePath);
-                }
-
                 // 清理Whisper输出目录
                 var outputDir = Path.Combine(_tempPath, "whisper_output");
                 if (Directory.Exists(outputDir))
