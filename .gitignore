@@ -1,0 +1,55 @@
+# Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+arm64/
+artifacts/
+**/bin/
+**/obj/
+**/xunit.runner.visualstudio.testadapter/
+
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.vspscc
+*.vssscc
+
+# Rider
+.idea/
+*.sln.iml
+*.iws
+
+# Resharper
+_ReSharper*/
+*.DotSettings.user
+
+# NuGet
+packages/
+*.nupkg
+*.snupkg
+*.nuspec
+nuget.exe
+NuGet.Config
+
+# Environment files
+.env
+.env.local
+*.local.env
+
+# Editor files
+*.swp
+*.swo
+*.bak
+*.tmp
+*~
+
+# macOS / Linux temp files
+.DS_Store
+Thumbs.db
+
+# VS Code
+.vscode/

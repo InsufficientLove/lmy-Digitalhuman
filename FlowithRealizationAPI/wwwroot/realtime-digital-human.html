@@ -1,0 +1,1401 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>实时数字人对话系统</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px 0;
+            margin: 0;
+            overflow-x: hidden;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            width: 90%;
+            max-width: 1200px;
+            backdrop-filter: blur(10px);
+            margin: 0 auto;
+            margin-top: 20px;
+            margin-bottom: 40px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            color: #333;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 1.1em;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .video-section {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .video-container {
+            position: relative;
+            width: 100%;
+            height: 300px;
+            background: #000;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+
+        .video-player {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .video-placeholder {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #666;
+            font-size: 1.2em;
+        }
+
+        .avatar-selector {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+
+        .avatar-option {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            border: 3px solid transparent;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            object-fit: cover;
+        }
+
+        .avatar-option:hover {
+            transform: scale(1.1);
+        }
+
+        .avatar-option.active {
+            border-color: #667eea;
+            box-shadow: 0 0 15px rgba(102, 126, 234, 0.5);
+        }
+
+        .avatar-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 15px;
+        }
+
+        .avatar-actions button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 20px;
+            background: #667eea;
+            color: white;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.3s ease;
+        }
+
+        .avatar-actions button:hover {
+            background: #5a6fd8;
+            transform: translateY(-2px);
+        }
+
+        .control-section {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 20px;
+        }
+
+        .input-methods {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .method-tab {
+            flex: 1;
+            padding: 10px;
+            background: #e9ecef;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .method-tab.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .input-panel {
+            display: none;
+        }
+
+        .input-panel.active {
+            display: block;
+        }
+
+        .text-input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            font-size: 1.1em;
+            resize: vertical;
+            min-height: 100px;
+            margin-bottom: 15px;
+        }
+
+        .text-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .voice-input {
+            text-align: center;
+            padding: 20px;
+        }
+
+        .record-button {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            border: none;
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            color: white;
+            font-size: 1.2em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 15px;
+        }
+
+        .record-button:hover {
+            transform: scale(1.1);
+        }
+
+        .record-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .record-button.recording {
+            background: linear-gradient(45deg, #ff4757, #ff3838);
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .settings-panel {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .setting-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .setting-label {
+            min-width: 80px;
+            font-weight: bold;
+        }
+
+        .setting-select {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-primary {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .status-panel {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .status-item:last-child {
+            border-bottom: none;
+        }
+
+        .status-label {
+            font-weight: bold;
+            color: #333;
+        }
+
+        .status-value {
+            color: #666;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            background: #ff4757;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            display: none;
+        }
+
+        .success-message {
+            background: #2ed573;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            display: none;
+        }
+
+        .warning-message {
+            background: #ffa502;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            display: none;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            overflow-y: auto;
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: 20px auto;
+            padding: 20px;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 500px;
+            position: relative;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal-form {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .modal-actions {
+            flex-shrink: 0;
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid #e9ecef;
+            background: #fefefe;
+        }
+
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close:hover {
+            color: black;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .upload-area {
+            border: 2px dashed #ddd;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .upload-area:hover {
+            border-color: #667eea;
+            background-color: #f8f9ff;
+        }
+
+        .upload-area.dragover {
+            border-color: #667eea;
+            background-color: #f0f8ff;
+        }
+
+        .preview-image {
+            max-width: 100%;
+            max-height: 200px;
+            border-radius: 10px;
+            margin-top: 10px;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .container {
+                padding: 20px;
+                margin: 10px;
+            }
+            
+            .avatar-selector {
+                justify-content: center;
+            }
+            
+            .modal-content {
+                width: 95%;
+                margin: 10px auto;
+                padding: 15px;
+                max-height: 95vh;
+            }
+            
+            .form-group {
+                margin-bottom: 12px;
+            }
+            
+            .upload-area {
+                padding: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 自定义数字人对话系统</h1>
+            <p>上传头像 • 创建专属数字人 • 实时对话</p>
+        </div>
+
+        <div class="main-content">
+            <!-- 视频播放区域 -->
+            <div class="video-section">
+                <div class="video-container">
+                    <video id="videoPlayer" class="video-player" controls style="display: none;"></video>
+                    <div id="videoPlaceholder" class="video-placeholder">
+                        <div>
+                            <div style="font-size: 3em; margin-bottom: 10px;">🎭</div>
+                            <div>创建自定义数字人开始对话</div>
+                            <div style="font-size: 0.9em; color: #888; margin-top: 10px;">点击"📤 上传头像"创建您的专属数字人</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="avatar-selector" id="avatarSelector">
+                    <!-- 头像将通过JavaScript动态加载 -->
+                </div>
+
+                <div class="avatar-actions">
+                    <button id="uploadAvatarBtn">📤 上传头像</button>
+                    <button id="manageTemplatesBtn">📋 管理模板</button>
+                    <button id="refreshAvatarsBtn">🔄 刷新</button>
+                </div>
+
+                <div class="status-panel">
+                    <div class="status-item">
+                        <span class="status-label">响应模式:</span>
+                        <span class="status-value" id="currentMode">立即响应</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">处理时间:</span>
+                        <span class="status-value" id="processingTime">-</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">视频质量:</span>
+                        <span class="status-value" id="videoQuality">中等</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">录音权限:</span>
+                        <span class="status-value" id="microphoneStatus">检查中...</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 控制面板 -->
+            <div class="control-section">
+                <div class="input-methods">
+                    <button class="method-tab active" data-method="text">💬 文本输入</button>
+                    <button class="method-tab" data-method="voice">🎤 语音输入</button>
+                </div>
+
+                <div class="error-message" id="errorMessage"></div>
+                <div class="success-message" id="successMessage"></div>
+                <div class="warning-message" id="warningMessage"></div>
+
+                <!-- 文本输入面板 -->
+                <div class="input-panel active" id="textPanel">
+                    <textarea class="text-input" id="textInput" placeholder="请输入您想说的话..."></textarea>
+                    
+                    <div class="settings-panel">
+                        <div class="setting-group">
+                            <span class="setting-label">响应模式:</span>
+                            <select class="setting-select" id="responseMode">
+                                <option value="instant">立即响应 (< 1秒)</option>
+                                <option value="fast">快速响应 (1-3秒)</option>
+                                <option value="quality">高质量 (3-5秒)</option>
+                            </select>
+                        </div>
+                        <div class="setting-group">
+                            <span class="setting-label">视频质量:</span>
+                            <select class="setting-select" id="videoQuality">
+                                <option value="low">低质量 (640x480)</option>
+                                <option value="medium" selected>中等 (1280x720)</option>
+                                <option value="high">高质量 (1920x1080)</option>
+                                <option value="ultra">超高清 (2560x1440)</option>
+                            </select>
+                        </div>
+                        <div class="setting-group">
+                            <span class="setting-label">情感表达:</span>
+                            <select class="setting-select" id="emotionMode">
+                                <option value="true" selected>启用</option>
+                                <option value="false">禁用</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="action-buttons">
+                        <button class="btn btn-primary" id="sendTextBtn">发送消息</button>
+                        <button class="btn btn-secondary" id="clearTextBtn">清空</button>
+                    </div>
+                </div>
+
+                <!-- 语音输入面板 -->
+                <div class="input-panel" id="voicePanel">
+                    <div class="voice-input">
+                        <button class="record-button" id="recordBtn" disabled>
+                            <div id="recordIcon">🎤</div>
+                            <div style="font-size: 0.8em; margin-top: 5px;">点击录音</div>
+                        </button>
+                        <div id="recordingStatus">检查麦克风权限...</div>
+                        
+                        <!-- 语音识别结果文本框 -->
+                        <div class="form-group" style="margin-top: 20px;">
+                            <label for="voiceResultText">识别结果:</label>
+                            <textarea id="voiceResultText" class="text-input" placeholder="语音识别结果将显示在这里..." readonly style="min-height: 80px; background-color: #f8f9fa;"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="action-buttons">
+                        <button class="btn btn-primary" id="sendVoiceTextBtn" disabled>发送识别内容</button>
+                        <button class="btn btn-secondary" id="clearVoiceBtn">清空</button>
+                    </div>
+                </div>
+
+                <div class="loading" id="loadingPanel">
+                    <div class="spinner"></div>
+                    <div id="loadingText">正在处理中...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 上传头像模态框 -->
+    <div id="uploadModal" class="modal">
+        <div class="modal-content">
+            <span class="close" id="closeModal">&times;</span>
+            <h2>上传自定义数字人头像</h2>
+            <form id="uploadForm">
+                <div class="modal-form">
+                    <div class="form-group">
+                        <label for="templateName">模板名称:</label>
+                        <input type="text" id="templateName" name="templateName" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="description">描述:</label>
+                        <textarea id="description" name="description" placeholder="请描述这个数字人的特点..."></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="gender">性别:</label>
+                        <select id="gender" name="gender">
+                            <option value="female">女性</option>
+                            <option value="male">男性</option>
+                            <option value="neutral">中性</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="style">风格:</label>
+                        <select id="style" name="style">
+                            <option value="professional">专业</option>
+                            <option value="friendly">友好</option>
+                            <option value="casual">休闲</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>头像图片:</label>
+                        <div class="upload-area" id="uploadArea">
+                            <p>点击或拖拽图片到此处</p>
+                            <p style="font-size: 0.9em; color: #666;">支持 JPG、PNG 格式，建议 512x512 像素</p>
+                            <input type="file" id="imageFile" accept="image/*" style="display: none;">
+                            <img id="previewImage" class="preview-image" style="display: none;">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="modal-actions">
+                    <div class="action-buttons">
+                        <button type="submit" class="btn btn-primary">创建模板</button>
+                        <button type="button" class="btn btn-secondary" id="cancelUpload">取消</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        class RealtimeDigitalHuman {
+            constructor() {
+                this.currentAvatar = null;
+                this.isRecording = false;
+                this.mediaRecorder = null;
+                this.audioChunks = [];
+                this.currentMethod = 'text';
+                this.availableAvatars = [];
+                this.microphonePermission = 'unknown';
+                
+                this.initializeElements();
+                this.bindEvents();
+                this.checkMicrophonePermission();
+                this.loadAvailableAvatars();
+                this.checkSystemHealth();
+            }
+
+            initializeElements() {
+                this.videoPlayer = document.getElementById('videoPlayer');
+                this.videoPlaceholder = document.getElementById('videoPlaceholder');
+                this.textInput = document.getElementById('textInput');
+                this.recordBtn = document.getElementById('recordBtn');
+                this.loadingPanel = document.getElementById('loadingPanel');
+                this.errorMessage = document.getElementById('errorMessage');
+                this.successMessage = document.getElementById('successMessage');
+                this.warningMessage = document.getElementById('warningMessage');
+                this.avatarSelector = document.getElementById('avatarSelector');
+                this.uploadModal = document.getElementById('uploadModal');
+                this.uploadForm = document.getElementById('uploadForm');
+            }
+
+            bindEvents() {
+                // 输入方式切换
+                document.querySelectorAll('.method-tab').forEach(tab => {
+                    tab.addEventListener('click', (e) => {
+                        document.querySelectorAll('.method-tab').forEach(t => t.classList.remove('active'));
+                        document.querySelectorAll('.input-panel').forEach(p => p.classList.remove('active'));
+                        
+                        e.target.classList.add('active');
+                        this.currentMethod = e.target.dataset.method;
+                        document.getElementById(`${this.currentMethod}Panel`).classList.add('active');
+                    });
+                });
+
+                // 文本输入
+                document.getElementById('sendTextBtn').addEventListener('click', () => {
+                    this.sendTextMessage();
+                });
+
+                document.getElementById('clearTextBtn').addEventListener('click', () => {
+                    this.textInput.value = '';
+                });
+
+                // 语音输入
+                document.getElementById('recordBtn').addEventListener('click', () => {
+                    this.toggleRecording();
+                });
+
+                document.getElementById('sendVoiceTextBtn').addEventListener('click', () => {
+                    this.sendVoiceTextMessage();
+                });
+
+                document.getElementById('clearVoiceBtn').addEventListener('click', () => {
+                    this.clearVoiceResult();
+                });
+
+                // 头像管理
+                document.getElementById('uploadAvatarBtn').addEventListener('click', () => {
+                    this.showUploadModal();
+                });
+
+                document.getElementById('manageTemplatesBtn').addEventListener('click', () => {
+                    this.showTemplateManager();
+                });
+
+                document.getElementById('refreshAvatarsBtn').addEventListener('click', () => {
+                    this.loadAvailableAvatars();
+                });
+
+                // 模态框事件
+                document.getElementById('closeModal').addEventListener('click', () => {
+                    this.hideUploadModal();
+                });
+
+                document.getElementById('cancelUpload').addEventListener('click', () => {
+                    this.hideUploadModal();
+                });
+
+                // 上传表单
+                this.uploadForm.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    this.createCustomAvatar();
+                });
+
+                // 文件上传区域
+                this.setupFileUpload();
+
+                // 回车发送
+                this.textInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        this.sendTextMessage();
+                    }
+                });
+
+                // 模态框外部点击关闭
+                window.addEventListener('click', (e) => {
+                    if (e.target === this.uploadModal) {
+                        this.hideUploadModal();
+                    }
+                });
+            }
+
+            async checkMicrophonePermission() {
+                try {
+                    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                        this.microphonePermission = 'unsupported';
+                        this.updateMicrophoneStatus('不支持');
+                        this.showWarning('您的浏览器不支持录音功能');
+                        return;
+                    }
+
+                    // 检查是否在安全上下文中
+                    if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+                        this.microphonePermission = 'insecure';
+                        this.updateMicrophoneStatus('需要HTTPS');
+                        this.showWarning('录音功能需要HTTPS环境。请使用 https://localhost:7135 访问，或在浏览器中手动允许HTTP录音权限。');
+                        return;
+                    }
+
+                    // 对于localhost的HTTP，也给出提示
+                    if (location.protocol === 'http:' && (location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
+                        this.showWarning('建议使用HTTPS访问以获得最佳录音体验：https://localhost:7135');
+                    }
+
+                    // 检查权限
+                    const permission = await navigator.permissions.query({name: 'microphone'});
+                    
+                    if (permission.state === 'granted') {
+                        this.microphonePermission = 'granted';
+                        this.updateMicrophoneStatus('已授权');
+                        this.recordBtn.disabled = false;
+                        document.getElementById('recordingStatus').textContent = '准备录音';
+                    } else if (permission.state === 'denied') {
+                        this.microphonePermission = 'denied';
+                        this.updateMicrophoneStatus('已拒绝');
+                        this.showWarning('麦克风权限被拒绝，请在浏览器设置中允许访问麦克风');
+                    } else {
+                        this.microphonePermission = 'prompt';
+                        this.updateMicrophoneStatus('需要授权');
+                        this.recordBtn.disabled = false;
+                        document.getElementById('recordingStatus').textContent = '点击录音按钮授权';
+                    }
+
+                    // 监听权限变化
+                    permission.onchange = () => {
+                        this.checkMicrophonePermission();
+                    };
+
+                } catch (error) {
+                    console.error('检查麦克风权限失败:', error);
+                    this.microphonePermission = 'error';
+                    this.updateMicrophoneStatus('检查失败');
+                    this.showWarning('无法检查麦克风权限，请手动授权');
+                }
+            }
+
+            updateMicrophoneStatus(status) {
+                document.getElementById('microphoneStatus').textContent = status;
+            }
+
+            async loadAvailableAvatars() {
+                try {
+                    this.showLoading('正在加载数字人头像...');
+                    console.log('[Avatar] 请求头像列表...');
+                    
+                    // 获取可用头像列表
+                    const response = await fetch('/api/RealtimeDigitalHuman/avatars');
+                    const result = await response.json();
+                    console.log('[Avatar] 返回:', result);
+                    
+                    if (result.success) {
+                        this.availableAvatars = result.avatars;
+                        this.renderAvatars();
+                    } else {
+                        // 如果API失败，显示空状态
+                        this.availableAvatars = [];
+                        this.renderAvatars();
+                    }
+                } catch (error) {
+                    console.error('[Avatar] 加载头像失败:', error);
+                    // 网络错误时显示空状态
+                    this.availableAvatars = [];
+                    this.renderAvatars();
+                } finally {
+                    this.hideLoading();
+                }
+            }
+
+            renderAvatars() {
+                this.avatarSelector.innerHTML = '';
+                if (this.availableAvatars.length === 0) {
+                    // 没有自定义数字人，显示引导提示
+                    this.avatarSelector.innerHTML = `
+                        <div style="color:#666;text-align:center;width:100%;padding:20px;">
+                            <div style="font-size:2em;margin-bottom:10px;">🎭</div>
+                            <div style="font-size:1.1em;margin-bottom:10px;">还没有自定义数字人</div>
+                            <div style="font-size:0.9em;color:#888;">点击下方"📤 上传头像"按钮创建您的第一个数字人</div>
+                        </div>
+                    `;
+                    document.getElementById('sendTextBtn').disabled = true;
+                    document.getElementById('sendVoiceTextBtn').disabled = true;
+                    return;
+                }
+                document.getElementById('sendTextBtn').disabled = false;
+                document.getElementById('sendVoiceTextBtn').disabled = false;
+                this.availableAvatars.forEach((avatar, index) => {
+                    const img = document.createElement('img');
+                    img.src = avatar.previewImageUrl;
+                    img.className = 'avatar-option';
+                    img.dataset.avatar = avatar.id;
+                    img.alt = avatar.name;
+                    img.title = avatar.name;
+                    if (index === 0) {
+                        img.classList.add('active');
+                        this.currentAvatar = avatar.id;
+                    }
+                    img.addEventListener('click', (e) => {
+                        document.querySelectorAll('.avatar-option').forEach(a => a.classList.remove('active'));
+                        e.target.classList.add('active');
+                        this.currentAvatar = e.target.dataset.avatar;
+                    });
+                    img.addEventListener('error', () => {
+                        // 如果图片加载失败，显示默认占位符
+                        img.style.display = 'none';
+                        const placeholder = document.createElement('div');
+                        placeholder.className = 'avatar-option';
+                        placeholder.style.cssText = 'width:60px;height:60px;border-radius:50%;border:3px solid #ddd;display:flex;align-items:center;justify-content:center;background:#f8f9fa;color:#666;font-size:1.5em;';
+                        placeholder.textContent = '🎭';
+                        placeholder.dataset.avatar = avatar.id;
+                        placeholder.title = avatar.name;
+                        img.parentNode.insertBefore(placeholder, img);
+                    });
+                    this.avatarSelector.appendChild(img);
+                });
+            }
+
+            async createCustomAvatar() {
+                const formData = new FormData();
+                const fileInput = document.getElementById('imageFile');
+                
+                if (!fileInput.files[0]) {
+                    this.showError('请选择头像图片');
+                    return;
+                }
+
+                const templateName = document.getElementById('templateName').value;
+                const description = document.getElementById('description').value;
+                const gender = document.getElementById('gender').value;
+                const style = document.getElementById('style').value;
+
+                console.log('[CreateAvatar] 表单数据:', {
+                    templateName,
+                    description,
+                    gender,
+                    style,
+                    fileName: fileInput.files[0].name
+                });
+
+                formData.append('ImageFile', fileInput.files[0]);
+                formData.append('TemplateName', templateName);
+                formData.append('Description', description);
+                formData.append('Gender', gender);
+                formData.append('Style', style);
+                formData.append('TemplateType', 'headshot');
+                formData.append('EnableEmotion', 'true');
+
+                try {
+                    this.showLoading('正在创建自定义数字人...');
+                    
+                    const response = await fetch('/api/RealtimeDigitalHuman/create-avatar', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const result = await response.json();
+                    console.log('[CreateAvatar] 返回结果:', result);
+                    
+                    if (result.success) {
+                        this.showSuccess('自定义数字人创建成功！');
+                        this.hideUploadModal();
+                        await this.loadAvailableAvatars(); // 重新加载头像列表
+                    } else {
+                        this.showError(result.message || result.error || '创建失败');
+                    }
+                } catch (error) {
+                    console.error('创建自定义数字人失败:', error);
+                    this.showError('创建失败，请检查网络连接');
+                } finally {
+                    this.hideLoading();
+                }
+            }
+
+            showTemplateManager() {
+                // 打开模板管理页面
+                window.open('/templates', '_blank');
+            }
+
+            async sendTextMessage() {
+                const text = this.textInput.value.trim();
+                if (!text) {
+                    this.showError('请输入文本内容');
+                    return;
+                }
+                this.showLoading('正在生成数字人视频...');
+                this.showPendingAvatar();
+                try {
+                    console.log('[SendText] 发送消息:', text, 'avatar:', this.currentAvatar);
+                    const response = await fetch('/api/RealtimeDigitalHuman/instant-chat', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            text: text,
+                            avatarId: this.currentAvatar,
+                            responseMode: document.getElementById('responseMode').value,
+                            quality: document.getElementById('videoQuality').value,
+                            enableEmotion: document.getElementById('emotionMode').value === 'true'
+                        })
+                    });
+                    if (!response.ok) {
+                        throw new Error(`HTTP错误: ${response.status}`);
+                    }
+                    const result = await response.json();
+                    console.log('[SendText] 返回:', result);
+                    if (result.success) {
+                        this.playVideo(result.videoUrl);
+                        this.updateStatus(result.metadata);
+                        this.showSuccess('消息发送成功！');
+                        this.textInput.value = '';
+                    } else {
+                        this.showError(result.message || result.error || '发送失败，请重试');
+                        console.error('API返回错误:', result);
+                    }
+                } catch (error) {
+                    console.error('发送消息失败:', error);
+                    this.showError('网络错误，请检查连接和服务状态');
+                } finally {
+                    this.hideLoading();
+                }
+            }
+
+            async toggleRecording() {
+                if (!this.isRecording) {
+                    await this.startRecording();
+                } else {
+                    this.stopRecording();
+                }
+            }
+
+            async startRecording() {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    this.mediaRecorder = new MediaRecorder(stream);
+                    this.audioChunks = [];
+
+                    this.mediaRecorder.ondataavailable = (event) => {
+                        this.audioChunks.push(event.data);
+                    };
+
+                    this.mediaRecorder.onstop = () => {
+                        const audioBlob = new Blob(this.audioChunks, { type: 'audio/wav' });
+                        this.processVoiceInput(audioBlob);
+                    };
+
+                    this.mediaRecorder.start();
+                    this.isRecording = true;
+                    this.microphonePermission = 'granted';
+                    this.updateMicrophoneStatus('已授权');
+                    
+                    this.recordBtn.classList.add('recording');
+                    document.getElementById('recordIcon').textContent = '⏹️';
+                    document.getElementById('recordingStatus').textContent = '录音中... 点击停止';
+                    
+                } catch (error) {
+                    console.error('启动录音失败:', error);
+                    this.microphonePermission = 'denied';
+                    this.updateMicrophoneStatus('权限被拒绝');
+                    this.showError('无法访问麦克风，请检查权限设置');
+                }
+            }
+
+            stopRecording() {
+                if (this.mediaRecorder && this.isRecording) {
+                    this.mediaRecorder.stop();
+                    this.isRecording = false;
+                    
+                    this.recordBtn.classList.remove('recording');
+                    document.getElementById('recordIcon').textContent = '🎤';
+                    document.getElementById('recordingStatus').textContent = '处理中...';
+                }
+            }
+
+            async processVoiceInput(audioBlob) {
+                this.showLoading('正在识别语音...');
+
+                try {
+                    const formData = new FormData();
+                    formData.append('audioFile', audioBlob, 'recording.wav');
+
+                    const response = await fetch('/api/RealtimeDigitalHuman/speech-to-text', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const result = await response.json();
+                    
+                    if (result.success && result.text) {
+                        // 显示识别结果在文本框中
+                        document.getElementById('voiceResultText').value = result.text;
+                        document.getElementById('sendVoiceTextBtn').disabled = false;
+                        document.getElementById('recordingStatus').textContent = '识别完成，可以发送';
+                        
+                        // 显示识别信息
+                        this.showSuccess(`语音识别成功！置信度: ${(result.confidence * 100).toFixed(1)}%`);
+                        
+                        // 自动填充到文本输入框
+                        this.textInput.value = result.text;
+                    } else {
+                        this.showError('语音识别失败，请重试');
+                        document.getElementById('recordingStatus').textContent = '识别失败';
+                    }
+                } catch (error) {
+                    console.error('语音识别失败:', error);
+                    this.showError('语音识别服务异常');
+                    document.getElementById('recordingStatus').textContent = '识别失败';
+                } finally {
+                    this.hideLoading();
+                }
+            }
+
+            async sendVoiceTextMessage() {
+                const text = document.getElementById('voiceResultText').value.trim();
+                if (!text) {
+                    this.showError('没有可发送的识别内容');
+                    return;
+                }
+
+                this.showLoading('正在生成数字人视频...');
+
+                try {
+                    const response = await fetch('/api/RealtimeDigitalHuman/instant-chat', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            text: text,
+                            avatarId: this.currentAvatar,
+                            responseMode: document.getElementById('responseMode').value,
+                            quality: document.getElementById('videoQuality').value,
+                            enableEmotion: document.getElementById('emotionMode').value === 'true'
+                        })
+                    });
+
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        this.playVideo(result.videoUrl);
+                        this.updateStatus(result.metadata);
+                        this.showSuccess('语音消息发送成功！');
+                        this.clearVoiceResult();
+                    } else {
+                        this.showError(result.message || '发送失败，请重试');
+                    }
+                } catch (error) {
+                    console.error('发送语音消息失败:', error);
+                    this.showError('网络错误，请检查连接');
+                } finally {
+                    this.hideLoading();
+                }
+            }
+
+            clearVoiceResult() {
+                document.getElementById('voiceResultText').value = '';
+                document.getElementById('sendVoiceTextBtn').disabled = true;
+                document.getElementById('recordingStatus').textContent = '准备录音';
+            }
+
+            playVideo(videoUrl) {
+                this.videoPlayer.src = videoUrl;
+                this.videoPlayer.style.display = 'block';
+                this.videoPlaceholder.style.display = 'none';
+                this.videoPlayer.play();
+            }
+
+            updateStatus(metadata) {
+                document.getElementById('currentMode').textContent = this.getModeText(metadata.responseType);
+                document.getElementById('processingTime').textContent = `${metadata.processingTime}ms`;
+                document.getElementById('videoQuality').textContent = this.getQualityText(metadata.quality?.resolution);
+            }
+
+            getModeText(responseType) {
+                const modeMap = {
+                    'prerendered': '预渲染视频',
+                    'instant': '立即响应',
+                    'realtime': '实时合成',
+                    'quality': '高质量模式'
+                };
+                return modeMap[responseType] || responseType;
+            }
+
+            getQualityText(resolution) {
+                const qualityMap = {
+                    '640x480': '低质量',
+                    '1280x720': '中等',
+                    '1920x1080': '高质量',
+                    '2560x1440': '超高清'
+                };
+                return qualityMap[resolution] || '中等';
+            }
+
+            showLoading(text) {
+                console.log('[Loading]', text);
+                document.getElementById('loadingText').textContent = text;
+                this.loadingPanel.style.display = 'block';
+                // 全屏遮罩
+                if (!document.getElementById('globalLoadingMask')) {
+                    const mask = document.createElement('div');
+                    mask.id = 'globalLoadingMask';
+                    mask.style.position = 'fixed';
+                    mask.style.left = '0';
+                    mask.style.top = '0';
+                    mask.style.width = '100vw';
+                    mask.style.height = '100vh';
+                    mask.style.background = 'rgba(0,0,0,0.25)';
+                    mask.style.zIndex = '9999';
+                    mask.innerHTML = `<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;">
+                        <div class="spinner" style="margin:0 auto 20px;"></div>
+                        <div style="color:#fff;font-size:1.2em;">${text}</div>
+                    </div>`;
+                    document.body.appendChild(mask);
+                } else {
+                    document.getElementById('globalLoadingMask').style.display = 'block';
+                    document.getElementById('globalLoadingMask').querySelector('div[style*="font-size:1.2em;"]').textContent = text;
+                }
+            }
+
+            hideLoading() {
+                this.loadingPanel.style.display = 'none';
+                const mask = document.getElementById('globalLoadingMask');
+                if (mask) mask.style.display = 'none';
+            }
+
+            showError(message) {
+                console.error('[Error]', message);
+                this.errorMessage.textContent = message;
+                this.errorMessage.style.display = 'block';
+                this.successMessage.style.display = 'none';
+                this.warningMessage.style.display = 'none';
+                // 增加关闭按钮
+                if (!this.errorMessage.querySelector('.close-error')) {
+                    const closeBtn = document.createElement('span');
+                    closeBtn.textContent = '×';
+                    closeBtn.className = 'close-error';
+                    closeBtn.style.cssText = 'float:right;cursor:pointer;font-size:1.2em;margin-left:10px;';
+                    closeBtn.onclick = () => { this.errorMessage.style.display = 'none'; };
+                    this.errorMessage.appendChild(closeBtn);
+                }
+                setTimeout(() => {
+                    this.errorMessage.style.display = 'none';
+                }, 6000);
+            }
+
+            showSuccess(message) {
+                console.log('[Success]', message);
+                this.successMessage.textContent = message;
+                this.successMessage.style.display = 'block';
+                this.errorMessage.style.display = 'none';
+                this.warningMessage.style.display = 'none';
+                setTimeout(() => {
+                    this.successMessage.style.display = 'none';
+                }, 3000);
+            }
+
+            showWarning(message) {
+                console.warn('[Warning]', message);
+                this.warningMessage.textContent = message;
+                this.warningMessage.style.display = 'block';
+                this.errorMessage.style.display = 'none';
+                this.successMessage.style.display = 'none';
+                setTimeout(() => {
+                    this.warningMessage.style.display = 'none';
+                }, 8000);
+            }
+
+            async checkSystemHealth() {
+                try {
+                    const response = await fetch('/api/RealtimeDigitalHuman/health');
+                    const health = await response.json();
+                    
+                    if (!health.isHealthy) {
+                        this.showError('系统状态异常，部分功能可能受限');
+                    }
+                } catch (error) {
+                    console.error('健康检查失败:', error);
+                }
+            }
+
+            showPendingAvatar() {
+                // 显示等待中的头像状态
+                this.videoPlayer.style.display = 'none';
+                this.videoPlaceholder.style.display = 'flex';
+                this.videoPlaceholder.innerHTML = `
+                    <div>
+                        <div style="font-size: 3em; margin-bottom: 10px;">⏳</div>
+                        <div>正在生成数字人视频...</div>
+                    </div>
+                `;
+            }
+
+            setupFileUpload() {
+                const uploadArea = document.getElementById('uploadArea');
+                const imageFile = document.getElementById('imageFile');
+                const previewImage = document.getElementById('previewImage');
+
+                // 点击上传区域触发文件选择
+                uploadArea.addEventListener('click', () => {
+                    imageFile.click();
+                });
+
+                // 拖拽上传
+                uploadArea.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    uploadArea.classList.add('dragover');
+                });
+
+                uploadArea.addEventListener('dragleave', (e) => {
+                    e.preventDefault();
+                    uploadArea.classList.remove('dragover');
+                });
+
+                uploadArea.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    uploadArea.classList.remove('dragover');
+                    
+                    const files = e.dataTransfer.files;
+                    if (files.length > 0) {
+                        imageFile.files = files;
+                        this.handleImageSelection(files[0]);
+                    }
+                });
+
+                // 文件选择处理
+                imageFile.addEventListener('change', (e) => {
+                    if (e.target.files.length > 0) {
+                        this.handleImageSelection(e.target.files[0]);
+                    }
+                });
+            }
+
+            handleImageSelection(file) {
+                // 验证文件类型
+                const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+                if (!allowedTypes.includes(file.type)) {
+                    this.showError('请选择JPG、PNG或WebP格式的图片');
+                    return;
+                }
+
+                // 验证文件大小 (最大10MB)
+                if (file.size > 10 * 1024 * 1024) {
+                    this.showError('图片文件过大，最大支持10MB');
+                    return;
+                }
+
+                // 预览图片
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const previewImage = document.getElementById('previewImage');
+                    previewImage.src = e.target.result;
+                    previewImage.style.display = 'block';
+                    
+                    // 隐藏上传提示
+                    const uploadArea = document.getElementById('uploadArea');
+                    uploadArea.querySelector('p').style.display = 'none';
+                };
+                reader.readAsDataURL(file);
+            }
+
+            showUploadModal() {
+                this.uploadModal.style.display = 'block';
+                // 重置表单
+                this.uploadForm.reset();
+                document.getElementById('previewImage').style.display = 'none';
+                document.getElementById('uploadArea').querySelector('p').style.display = 'block';
+            }
+
+            hideUploadModal() {
+                this.uploadModal.style.display = 'none';
+            }
+        }
+
+        // 初始化应用
+        document.addEventListener('DOMContentLoaded', () => {
+            new RealtimeDigitalHuman();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,875 @@
+using FlowithRealizationAPI.Models;
+using System.Diagnostics;
+using System.Text.Json;
+using System.Text.RegularExpressions;
+using System.Collections.Concurrent;
+using Microsoft.Extensions.Caching.Memory;
+
+namespace FlowithRealizationAPI.Services
+{
+    public class DigitalHumanTemplateService : IDigitalHumanTemplateService
+    {
+        private readonly ILogger<DigitalHumanTemplateService> _logger;
+        private readonly IMemoryCache _cache;
+        private readonly IConfiguration _configuration;
+        private readonly ILocalLLMService _llmService;
+        private readonly IWhisperService _whisperService;
+        private readonly HttpClient _httpClient;
+        
+        private readonly ConcurrentDictionary<string, DigitalHumanTemplate> _templates = new();
+        private readonly string _templatesPath;
+        private readonly string _outputPath;
+        private readonly string _tempPath;
+        private readonly string _sadTalkerPath;
+
+        public DigitalHumanTemplateService(
+            ILogger<DigitalHumanTemplateService> logger,
+            IMemoryCache cache,
+            IConfiguration configuration,
+            ILocalLLMService llmService,
+            IWhisperService whisperService,
+            HttpClient httpClient)
+        {
+            _logger = logger;
+            _cache = cache;
+            _configuration = configuration;
+            _llmService = llmService;
+            _whisperService = whisperService;
+            _httpClient = httpClient;
+            
+            _templatesPath = _configuration["DigitalHumanTemplate:TemplatesPath"] ?? "wwwroot/templates";
+            _outputPath = _configuration["DigitalHumanTemplate:OutputPath"] ?? "wwwroot/videos";
+            _tempPath = _configuration["DigitalHumanTemplate:TempPath"] ?? "temp";
+            _sadTalkerPath = _configuration["RealtimeDigitalHuman:SadTalker:Path"] ?? "C:\\AI\\SadTalker";
+            
+            Directory.CreateDirectory(_templatesPath);
+            Directory.CreateDirectory(_outputPath);
+            Directory.CreateDirectory(_tempPath);
+            
+            // 初始化默认模板
+            InitializeDefaultTemplates();
+        }
+
+        public async Task<CreateDigitalHumanTemplateResponse> CreateTemplateAsync(CreateDigitalHumanTemplateRequest request)
+        {
+            var startTime = DateTime.Now;
+            
+            try
+            {
+                _logger.LogInformation("开始创建数字人模板: {TemplateName}", request.TemplateName);
+
+                // 生成模板ID
+                var templateId = Guid.NewGuid().ToString("N");
+                
+                // 保存头像图片
+                var imageFileName = $"{templateId}.jpg";
+                var imagePath = Path.Combine(_templatesPath, imageFileName);
+                
+                using (var stream = new FileStream(imagePath, FileMode.Create))
+                {
+                    await request.ImageFile.CopyToAsync(stream);
+                }
+
+                // 创建模板对象
+                var template = new DigitalHumanTemplate
+                {
+                    TemplateId = templateId,
+                    TemplateName = request.TemplateName,
+                    Description = request.Description,
+                    TemplateType = request.TemplateType,
+                    Gender = request.Gender,
+                    AgeRange = request.AgeRange,
+                    Style = request.Style,
+                    EnableEmotion = request.EnableEmotion,
+                    ImagePath = $"/templates/{imageFileName}",
+                    DefaultVoiceSettings = request.DefaultVoiceSettings ?? new VoiceSettings(),
+                    CustomParameters = request.CustomParameters ?? new Dictionary<string, object>(),
+                    CreatedAt = DateTime.Now,
+                    UpdatedAt = DateTime.Now,
+                    IsActive = true,
+                    Status = "processing"
+                };
+
+                // 保存模板
+                _templates[templateId] = template;
+                await SaveTemplateToFileAsync(template);
+
+                // 生成预览视频（使用默认欢迎语）
+                try
+                {
+                    var previewText = "你好，我是明懿，欢迎咨询";
+                    var audioUrl = await GenerateAudioAsync(previewText, template.DefaultVoiceSettings);
+                    var videoUrl = await GenerateVideoWithSadTalkerAsync(template.ImagePath, audioUrl, "medium", "neutral");
+                    template.PreviewVideoPath = videoUrl;
+                    _logger.LogInformation("预览视频生成成功: {VideoUrl}", videoUrl);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "生成预览视频失败，但模板创建继续");
+                    // 预览视频生成失败不影响模板创建
+                }
+
+                template.Status = "ready";
+                template.UpdatedAt = DateTime.Now;
+
+                // 重新保存包含预览视频信息的模板
+                await SaveTemplateToFileAsync(template);
+
+                var processingTime = DateTime.Now - startTime;
+
+                return new CreateDigitalHumanTemplateResponse
+                {
+                    Success = true,
+                    TemplateId = templateId,
+                    Message = "数字人模板创建成功",
+                    Template = template,
+                    ProcessingTime = $"{processingTime.TotalMilliseconds:F0}ms"
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "创建数字人模板失败: {TemplateName}", request.TemplateName);
+                return new CreateDigitalHumanTemplateResponse
+                {
+                    Success = false,
+                    Message = $"创建失败: {ex.Message}",
+                    ProcessingTime = $"{(DateTime.Now - startTime).TotalMilliseconds:F0}ms"
+                };
+            }
+        }
+
+        public async Task<GetTemplatesResponse> GetTemplatesAsync(GetTemplatesRequest request)
+        {
+            try
+            {
+                var templates = _templates.Values.AsEnumerable();
+
+                // 过滤条件
+                if (!string.IsNullOrEmpty(request.TemplateType))
+                {
+                    templates = templates.Where(t => t.TemplateType == request.TemplateType);
+                }
+
+                if (!string.IsNullOrEmpty(request.Gender))
+                {
+                    templates = templates.Where(t => t.Gender == request.Gender);
+                }
+
+                if (!string.IsNullOrEmpty(request.Style))
+                {
+                    templates = templates.Where(t => t.Style == request.Style);
+                }
+
+                if (!string.IsNullOrEmpty(request.SearchKeyword))
+                {
+                    templates = templates.Where(t => 
+                        t.TemplateName.Contains(request.SearchKeyword, StringComparison.OrdinalIgnoreCase) ||
+                        t.Description.Contains(request.SearchKeyword, StringComparison.OrdinalIgnoreCase));
+                }
+
+                // 排序
+                templates = request.SortBy switch
+                {
+                    "usage_desc" => templates.OrderByDescending(t => t.UsageCount),
+                    "name_asc" => templates.OrderBy(t => t.TemplateName),
+                    _ => templates.OrderByDescending(t => t.CreatedAt)
+                };
+
+                var totalCount = templates.Count();
+                var totalPages = (int)Math.Ceiling((double)totalCount / request.PageSize);
+
+                // 分页
+                var pagedTemplates = templates
+                    .Skip((request.Page - 1) * request.PageSize)
+                    .Take(request.PageSize)
+                    .ToList();
+
+                return new GetTemplatesResponse
+                {
+                    Success = true,
+                    Templates = pagedTemplates,
+                    TotalCount = totalCount,
+                    Page = request.Page,
+                    PageSize = request.PageSize,
+                    TotalPages = totalPages
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "获取模板列表失败");
+                return new GetTemplatesResponse
+                {
+                    Success = false,
+                    Templates = new List<DigitalHumanTemplate>()
+                };
+            }
+        }
+
+        public async Task<DigitalHumanTemplate?> GetTemplateByIdAsync(string templateId)
+        {
+            return _templates.TryGetValue(templateId, out var template) ? template : null;
+        }
+
+        public async Task<bool> UpdateTemplateAsync(string templateId, CreateDigitalHumanTemplateRequest request)
+        {
+            try
+            {
+                if (!_templates.TryGetValue(templateId, out var template))
+                {
+                    return false;
+                }
+
+                template.TemplateName = request.TemplateName;
+                template.Description = request.Description;
+                template.TemplateType = request.TemplateType;
+                template.Gender = request.Gender;
+                template.AgeRange = request.AgeRange;
+                template.Style = request.Style;
+                template.EnableEmotion = request.EnableEmotion;
+                template.DefaultVoiceSettings = request.DefaultVoiceSettings ?? template.DefaultVoiceSettings;
+                template.CustomParameters = request.CustomParameters ?? template.CustomParameters;
+                template.UpdatedAt = DateTime.Now;
+
+                await SaveTemplateToFileAsync(template);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "更新模板失败: {TemplateId}", templateId);
+                return false;
+            }
+        }
+
+        public async Task<bool> DeleteTemplateAsync(string templateId)
+        {
+            try
+            {
+                if (!_templates.TryRemove(templateId, out var template))
+                {
+                    return false;
+                }
+
+                // 删除相关文件
+                var templateFile = Path.Combine(_templatesPath, $"{templateId}.json");
+                if (File.Exists(templateFile))
+                {
+                    File.Delete(templateFile);
+                }
+
+                var imageFile = Path.Combine(_templatesPath, $"{templateId}.jpg");
+                if (File.Exists(imageFile))
+                {
+                    File.Delete(imageFile);
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "删除模板失败: {TemplateId}", templateId);
+                return false;
+            }
+        }
+
+        public async Task<GenerateWithTemplateResponse> GenerateWithTemplateAsync(GenerateWithTemplateRequest request)
+        {
+            var startTime = DateTime.Now;
+            
+            try
+            {
+                _logger.LogInformation("使用模板生成视频: {TemplateId}, 文本: {Text}", 
+                    request.TemplateId, request.Text);
+
+                if (!_templates.TryGetValue(request.TemplateId, out var template))
+                {
+                    return new GenerateWithTemplateResponse
+                    {
+                        Success = false,
+                        Message = "模板不存在"
+                    };
+                }
+
+                // 检查缓存
+                var cacheKey = $"video_{request.TemplateId}_{request.Text.GetHashCode()}_{request.Quality}_{request.Emotion}";
+                if (request.UseCache && _cache.TryGetValue(cacheKey, out string cachedVideoUrl))
+                {
+                    return new GenerateWithTemplateResponse
+                    {
+                        Success = true,
+                        VideoUrl = cachedVideoUrl,
+                        ProcessingTime = "0ms",
+                        ResponseMode = request.ResponseMode,
+                        FromCache = true,
+                        Template = template
+                    };
+                }
+
+                // 生成语音
+                var audioUrl = await GenerateAudioAsync(request.Text, 
+                    request.VoiceSettings ?? template.DefaultVoiceSettings);
+
+                // 生成视频
+                var videoUrl = await GenerateVideoWithSadTalkerAsync(
+                    template.ImagePath, audioUrl, request.Quality, request.Emotion);
+
+                // 更新使用次数
+                template.UsageCount++;
+                template.UpdatedAt = DateTime.Now;
+
+                // 缓存结果
+                if (request.UseCache)
+                {
+                    _cache.Set(cacheKey, videoUrl, TimeSpan.FromHours(24));
+                }
+
+                var processingTime = DateTime.Now - startTime;
+
+                return new GenerateWithTemplateResponse
+                {
+                    Success = true,
+                    VideoUrl = videoUrl,
+                    AudioUrl = audioUrl,
+                    ProcessingTime = $"{processingTime.TotalMilliseconds:F0}ms",
+                    ResponseMode = request.ResponseMode,
+                    FromCache = false,
+                    Template = template
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "使用模板生成视频失败");
+                return new GenerateWithTemplateResponse
+                {
+                    Success = false,
+                    Message = $"生成失败: {ex.Message}",
+                    ProcessingTime = $"{(DateTime.Now - startTime).TotalMilliseconds:F0}ms"
+                };
+            }
+        }
+
+        public async Task<RealtimeConversationResponse> RealtimeConversationAsync(RealtimeConversationRequest request)
+        {
+            var startTime = DateTime.Now;
+            
+            try
+            {
+                _logger.LogInformation("实时对话: {TemplateId}, 输入类型: {InputType}", 
+                    request.TemplateId, request.InputType);
+
+                if (!_templates.TryGetValue(request.TemplateId, out var template))
+                {
+                    return new RealtimeConversationResponse
+                    {
+                        Success = false,
+                        Message = "模板不存在"
+                    };
+                }
+
+                string userInput = request.Text ?? "";
+                string detectedEmotion = "neutral";
+
+                // 处理音频输入
+                if (request.InputType == "audio" && request.AudioFile != null)
+                {
+                    var transcriptionResult = await _whisperService.TranscribeAsync(request.AudioFile);
+                    userInput = transcriptionResult.Text;
+                    
+                    // 简单的情感检测
+                    if (request.EnableEmotionDetection)
+                    {
+                        detectedEmotion = DetectEmotionFromText(userInput);
+                    }
+                }
+
+                // 调用本地大模型获取回复
+                var llmResponse = await _llmService.ChatAsync(new LocalLLMRequest
+                {
+                    ModelName = _configuration["LocalLLM:DefaultModel"] ?? "qwen2.5:14b-instruct-q4_0",
+                    Message = userInput,
+                    ConversationId = request.ConversationId,
+                    Temperature = 0.7f,
+                    MaxTokens = 500,
+                    SystemPrompt = "你是一个友好、专业的AI助手。请用简洁、自然的语言回答问题。"
+                });
+
+                if (!llmResponse.Success)
+                {
+                    return new RealtimeConversationResponse
+                    {
+                        Success = false,
+                        Message = "大模型服务异常"
+                    };
+                }
+
+                // 生成数字人视频
+                var videoResponse = await GenerateWithTemplateAsync(new GenerateWithTemplateRequest
+                {
+                    TemplateId = request.TemplateId,
+                    Text = llmResponse.Response,
+                    ResponseMode = request.ResponseMode,
+                    Quality = request.Quality,
+                    Emotion = detectedEmotion,
+                    UseCache = true
+                });
+
+                var processingTime = DateTime.Now - startTime;
+
+                return new RealtimeConversationResponse
+                {
+                    Success = true,
+                    ConversationId = request.ConversationId ?? Guid.NewGuid().ToString("N"),
+                    RecognizedText = userInput,
+                    ResponseText = llmResponse.Response,
+                    VideoUrl = videoResponse.VideoUrl ?? "",
+                    AudioUrl = videoResponse.AudioUrl ?? "",
+                    DetectedEmotion = detectedEmotion,
+                    ProcessingTime = $"{processingTime.TotalMilliseconds:F0}ms",
+                    FromCache = videoResponse.FromCache,
+                    Template = template
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "实时对话失败");
+                return new RealtimeConversationResponse
+                {
+                    Success = false,
+                    Message = $"对话失败: {ex.Message}",
+                    ProcessingTime = $"{(DateTime.Now - startTime).TotalMilliseconds:F0}ms"
+                };
+            }
+        }
+
+        // 其他方法的实现...
+        public async Task<BatchPreRenderResponse> BatchPreRenderAsync(BatchPreRenderRequest request)
+        {
+            var startTime = DateTime.Now;
+            int successCount = 0;
+            var failedTexts = new List<string>();
+
+            try
+            {
+                if (!_templates.TryGetValue(request.TemplateId, out var template))
+                {
+                    return new BatchPreRenderResponse
+                    {
+                        Success = false,
+                        Message = "模板不存在"
+                    };
+                }
+
+                for (int i = 0; i < request.TextList.Count; i++)
+                {
+                    try
+                    {
+                        var text = request.TextList[i];
+                        var emotion = request.EmotionList?.ElementAtOrDefault(i) ?? "neutral";
+
+                        await GenerateWithTemplateAsync(new GenerateWithTemplateRequest
+                        {
+                            TemplateId = request.TemplateId,
+                            Text = text,
+                            Quality = request.Quality,
+                            Emotion = emotion,
+                            UseCache = true
+                        });
+
+                        successCount++;
+                    }
+                    catch
+                    {
+                        failedTexts.Add(request.TextList[i]);
+                    }
+                }
+
+                return new BatchPreRenderResponse
+                {
+                    Success = true,
+                    TotalCount = request.TextList.Count,
+                    SuccessCount = successCount,
+                    FailedCount = failedTexts.Count,
+                    FailedTexts = failedTexts,
+                    ProcessingTime = $"{(DateTime.Now - startTime).TotalMilliseconds:F0}ms"
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "批量预渲染失败");
+                return new BatchPreRenderResponse
+                {
+                    Success = false,
+                    Message = $"批量预渲染失败: {ex.Message}"
+                };
+            }
+        }
+
+        public async Task<TemplateStatistics> GetTemplateStatisticsAsync()
+        {
+            var templates = _templates.Values.ToList();
+            
+            return new TemplateStatistics
+            {
+                TotalTemplates = templates.Count,
+                ActiveTemplates = templates.Count(t => t.IsActive),
+                TotalUsage = templates.Sum(t => t.UsageCount),
+                TemplateTypeCount = templates.GroupBy(t => t.TemplateType)
+                    .ToDictionary(g => g.Key, g => g.Count()),
+                GenderCount = templates.GroupBy(t => t.Gender)
+                    .ToDictionary(g => g.Key, g => g.Count()),
+                StyleCount = templates.GroupBy(t => t.Style)
+                    .ToDictionary(g => g.Key, g => g.Count()),
+                MostUsedTemplates = templates.OrderByDescending(t => t.UsageCount).Take(5).ToList(),
+                RecentTemplates = templates.OrderByDescending(t => t.CreatedAt).Take(5).ToList()
+            };
+        }
+
+        public async Task<bool> ValidateTemplateAsync(string templateId)
+        {
+            return _templates.ContainsKey(templateId);
+        }
+
+        public async Task<string?> GetTemplatePreviewAsync(string templateId)
+        {
+            if (_templates.TryGetValue(templateId, out var template))
+            {
+                return template.PreviewVideoPath;
+            }
+            return null;
+        }
+
+        public async Task<CreateDigitalHumanTemplateResponse> CloneTemplateAsync(string templateId, string newName)
+        {
+            if (!_templates.TryGetValue(templateId, out var originalTemplate))
+            {
+                return new CreateDigitalHumanTemplateResponse
+                {
+                    Success = false,
+                    Message = "源模板不存在"
+                };
+            }
+
+            var newTemplateId = Guid.NewGuid().ToString("N");
+            var clonedTemplate = new DigitalHumanTemplate
+            {
+                TemplateId = newTemplateId,
+                TemplateName = newName,
+                Description = originalTemplate.Description,
+                TemplateType = originalTemplate.TemplateType,
+                Gender = originalTemplate.Gender,
+                AgeRange = originalTemplate.AgeRange,
+                Style = originalTemplate.Style,
+                EnableEmotion = originalTemplate.EnableEmotion,
+                ImagePath = originalTemplate.ImagePath, // 共享图片
+                DefaultVoiceSettings = originalTemplate.DefaultVoiceSettings,
+                CustomParameters = originalTemplate.CustomParameters,
+                CreatedAt = DateTime.Now,
+                UpdatedAt = DateTime.Now,
+                IsActive = true,
+                Status = "ready"
+            };
+
+            _templates[newTemplateId] = clonedTemplate;
+            await SaveTemplateToFileAsync(clonedTemplate);
+
+            return new CreateDigitalHumanTemplateResponse
+            {
+                Success = true,
+                TemplateId = newTemplateId,
+                Template = clonedTemplate,
+                Message = "模板复制成功"
+            };
+        }
+
+        public async Task<byte[]> ExportTemplateAsync(string templateId)
+        {
+            if (!_templates.TryGetValue(templateId, out var template))
+            {
+                return Array.Empty<byte>();
+            }
+
+            var json = JsonSerializer.Serialize(template, new JsonSerializerOptions { WriteIndented = true });
+            return System.Text.Encoding.UTF8.GetBytes(json);
+        }
+
+        public async Task<CreateDigitalHumanTemplateResponse> ImportTemplateAsync(IFormFile configFile)
+        {
+            try
+            {
+                using var stream = configFile.OpenReadStream();
+                var template = await JsonSerializer.DeserializeAsync<DigitalHumanTemplate>(stream);
+                
+                if (template == null)
+                {
+                    return new CreateDigitalHumanTemplateResponse
+                    {
+                        Success = false,
+                        Message = "配置文件格式错误"
+                    };
+                }
+
+                template.TemplateId = Guid.NewGuid().ToString("N");
+                template.CreatedAt = DateTime.Now;
+                template.UpdatedAt = DateTime.Now;
+
+                _templates[template.TemplateId] = template;
+                await SaveTemplateToFileAsync(template);
+
+                return new CreateDigitalHumanTemplateResponse
+                {
+                    Success = true,
+                    TemplateId = template.TemplateId,
+                    Template = template,
+                    Message = "模板导入成功"
+                };
+            }
+            catch (Exception ex)
+            {
+                return new CreateDigitalHumanTemplateResponse
+                {
+                    Success = false,
+                    Message = $"导入失败: {ex.Message}"
+                };
+            }
+        }
+
+        public async Task<Dictionary<string, object>> GetTemplateCacheStatusAsync(string templateId)
+        {
+            return new Dictionary<string, object>
+            {
+                ["template_id"] = templateId,
+                ["cache_size"] = 0,
+                ["cache_hits"] = 0,
+                ["cache_misses"] = 0
+            };
+        }
+
+        public async Task<bool> ClearTemplateCacheAsync(string templateId)
+        {
+            // 清理与模板相关的缓存
+            return true;
+        }
+
+        // 私有辅助方法
+        private void InitializeDefaultTemplates()
+        {
+            // 移除默认模板，只支持自定义数字人
+            // 不再初始化任何默认模板
+        }
+
+        private async Task SaveTemplateToFileAsync(DigitalHumanTemplate template)
+        {
+            var filePath = Path.Combine(_templatesPath, $"{template.TemplateId}.json");
+            var json = JsonSerializer.Serialize(template, new JsonSerializerOptions { WriteIndented = true });
+            await File.WriteAllTextAsync(filePath, json);
+        }
+
+        private async Task GeneratePreviewVideoAsync(DigitalHumanTemplate template)
+        {
+            try
+            {
+                var previewText = "你好，我是您的专属数字人助手，很高兴为您服务！";
+                var audioUrl = await GenerateAudioAsync(previewText, template.DefaultVoiceSettings);
+                var videoUrl = await GenerateVideoWithSadTalkerAsync(template.ImagePath, audioUrl, "medium", "neutral");
+                template.PreviewVideoPath = videoUrl;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "生成预览视频失败");
+            }
+        }
+
+        private async Task<string> GenerateAudioAsync(string text, VoiceSettings voiceSettings)
+        {
+            try
+            {
+                // 构建 TTS 命令 - 使用配置中的默认语音
+                var voice = _configuration["RealtimeDigitalHuman:EdgeTTS:DefaultVoice"] ?? "zh-CN-XiaoxiaoNeural";
+                var rate = voiceSettings?.Speed ?? 1.0f;
+                var pitch = voiceSettings?.Pitch ?? 0.0f;
+                var fileName = $"tts_{Guid.NewGuid()}.wav";
+                var outputPath = Path.Combine(_tempPath, fileName);
+
+                // 确保temp目录存在
+                Directory.CreateDirectory(_tempPath);
+
+                // 构造 edge-tts 命令
+                string ratePercent = rate == 1.0f ? "+0%" : (rate > 1.0f ? $"+{(int)((rate - 1.0f) * 100)}%" : $"-{(int)((1.0f - rate) * 100)}%");
+                var command = $"edge-tts --voice {voice} --rate {ratePercent} --pitch {pitch:+0}Hz --text \"{text}\" --write-media \"{outputPath}\"";
+
+                _logger.LogInformation("TTS命令: {Command}", command);
+
+                var processInfo = new ProcessStartInfo
+                {
+                    FileName = "cmd.exe",
+                    Arguments = $"/c {command}",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    WorkingDirectory = Directory.GetCurrentDirectory()
+                };
+
+                using var process = Process.Start(processInfo);
+                if (process == null)
+                {
+                    _logger.LogError("无法启动TTS进程");
+                    throw new Exception("无法启动TTS进程");
+                }
+
+                var output = await process.StandardOutput.ReadToEndAsync();
+                var error = await process.StandardError.ReadToEndAsync();
+                await process.WaitForExitAsync();
+
+                _logger.LogInformation("TTS标准输出: {Output}", output);
+                if (!string.IsNullOrWhiteSpace(error))
+                {
+                    _logger.LogError("TTS标准错误: {Error}", error);
+                }
+
+                // 检查文件是否生成
+                if (!File.Exists(outputPath))
+                {
+                    _logger.LogError("TTS输出文件不存在: {Path}", outputPath);
+                    throw new Exception($"语音合成失败，输出文件不存在: {outputPath}");
+                }
+
+                // 检查文件大小
+                var fileInfo = new FileInfo(outputPath);
+                if (fileInfo.Length == 0)
+                {
+                    _logger.LogError("TTS输出文件为空: {Path}", outputPath);
+                    throw new Exception("语音合成失败，输出文件为空");
+                }
+
+                _logger.LogInformation("TTS成功生成音频文件: {Path}, 大小: {Size} bytes", outputPath, fileInfo.Length);
+
+                return outputPath;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "GenerateAudioAsync 语音合成失败，text: {Text}", text);
+                throw new Exception("语音合成失败: " + ex.Message);
+            }
+        }
+
+        private async Task<string> GenerateVideoWithSadTalkerAsync(string imagePath, string audioPath, string quality, string emotion)
+        {
+            try
+            {
+                var videoFileName = $"video_{Guid.NewGuid():N}.mp4";
+                var videoPath = Path.Combine(_outputPath, videoFileName);
+
+                // 确保输出目录存在
+                Directory.CreateDirectory(_outputPath);
+
+                // 构建完整路径
+                var fullImagePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", imagePath.TrimStart('/'));
+                var fullAudioPath = audioPath; // audioPath已经是完整路径
+
+                // 检查文件是否存在
+                if (!File.Exists(fullImagePath))
+                {
+                    _logger.LogError("图片文件不存在: {Path}", fullImagePath);
+                    throw new Exception($"图片文件不存在: {fullImagePath}");
+                }
+
+                if (!File.Exists(fullAudioPath))
+                {
+                    _logger.LogError("音频文件不存在: {Path}", fullAudioPath);
+                    throw new Exception($"音频文件不存在: {fullAudioPath}");
+                }
+
+                _logger.LogInformation("开始生成视频，图片: {ImagePath}, 音频: {AudioPath}", fullImagePath, fullAudioPath);
+
+                // 检查SadTalker目录是否存在
+                if (!Directory.Exists(_sadTalkerPath))
+                {
+                    _logger.LogError("SadTalker目录不存在: {Path}", _sadTalkerPath);
+                    throw new Exception($"SadTalker目录不存在: {_sadTalkerPath}");
+                }
+
+                // 检查inference.py是否存在
+                var inferencePath = Path.Combine(_sadTalkerPath, "inference.py");
+                if (!File.Exists(inferencePath))
+                {
+                    _logger.LogError("SadTalker inference.py不存在: {Path}", inferencePath);
+                    throw new Exception($"SadTalker inference.py不存在: {inferencePath}");
+                }
+
+                var process = new Process
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = "python",
+                        Arguments = $"inference.py --driven_audio \"{fullAudioPath}\" --source_image \"{fullImagePath}\" --result_dir \"{_outputPath}\" --still --preprocess full --enhancer gfpgan",
+                        WorkingDirectory = _sadTalkerPath,
+                        UseShellExecute = false,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        CreateNoWindow = true
+                    }
+                };
+
+                _logger.LogInformation("执行SadTalker命令: python {Arguments}", process.StartInfo.Arguments);
+
+                process.Start();
+                
+                var output = await process.StandardOutput.ReadToEndAsync();
+                var error = await process.StandardError.ReadToEndAsync();
+                await process.WaitForExitAsync();
+
+                _logger.LogInformation("SadTalker标准输出: {Output}", output);
+                if (!string.IsNullOrWhiteSpace(error))
+                {
+                    _logger.LogError("SadTalker标准错误: {Error}", error);
+                }
+
+                if (process.ExitCode == 0)
+                {
+                    // 检查生成的视频文件
+                    var generatedVideoPath = Path.Combine(_outputPath, videoFileName);
+                    if (File.Exists(generatedVideoPath))
+                    {
+                        var fileInfo = new FileInfo(generatedVideoPath);
+                        _logger.LogInformation("视频生成成功: {Path}, 大小: {Size} bytes", generatedVideoPath, fileInfo.Length);
+                        return $"/videos/{videoFileName}";
+                    }
+                    else
+                    {
+                        _logger.LogError("视频文件未生成: {Path}", generatedVideoPath);
+                        throw new Exception("视频文件未生成");
+                    }
+                }
+                else
+                {
+                    var errorMessage = $"SadTalker视频生成失败，退出码: {process.ExitCode}";
+                    if (!string.IsNullOrWhiteSpace(error))
+                    {
+                        errorMessage += $", 错误: {error}";
+                    }
+                    throw new Exception(errorMessage);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "生成视频失败");
+                throw;
+            }
+        }
+
+        private string DetectEmotionFromText(string text)
+        {
+            // 简单的情感检测逻辑
+            if (text.Contains("高兴") || text.Contains("开心") || text.Contains("哈哈"))
+                return "happy";
+            if (text.Contains("生气") || text.Contains("愤怒") || text.Contains("讨厌"))
+                return "angry";
+            if (text.Contains("伤心") || text.Contains("难过") || text.Contains("哭"))
+                return "sad";
+            if (text.Contains("惊讶") || text.Contains("震惊") || text.Contains("哇"))
+                return "surprised";
+            
+            return "neutral";
+        }
+    }
+}
