@@ -259,9 +259,10 @@ namespace FlowithRealizationAPI.Services
                 // 构建Whisper命令参数
                 var model = _configuration["RealtimeDigitalHuman:Whisper:Model"] ?? "base";
                 var language = _configuration["RealtimeDigitalHuman:Whisper:Language"] ?? "zh";
+                var initial_prompt = _configuration["RealtimeDigitalHuman:Whisper:InitialPrompt"] ?? "以下是普通话的句子";  // 默认普通话
                 var outputFormat = "json";
-                
-                var arguments = BuildWhisperArguments(filePath, model, language, outputFormat, whisperCommand);
+
+                var arguments = BuildWhisperArguments(filePath, model, language, initial_prompt,outputFormat, whisperCommand);
                 
                 _logger.LogInformation("执行Whisper命令: {Command} {Arguments}", whisperCommand, arguments);
                 
@@ -525,7 +526,7 @@ namespace FlowithRealizationAPI.Services
         /// <summary>
         /// 构建Whisper命令参数
         /// </summary>
-        private string BuildWhisperArguments(string inputFile, string model, string language, string outputFormat, string whisperCommand)
+        private string BuildWhisperArguments(string inputFile, string model, string language, string initial_prompt, string outputFormat, string whisperCommand)
         {
             var outputDir = Path.Combine(_tempPath, "whisper_output");
             Directory.CreateDirectory(outputDir);
@@ -549,6 +550,7 @@ namespace FlowithRealizationAPI.Services
                 $"\"{absoluteInputFile}\"",
                 $"--model {model}",
                 $"--language {language}",
+                $"--initial_prompt {initial_prompt}",
                 $"--output_format {outputFormat}",
                 $"--output_dir \"{absoluteOutputDir}\"",
                 "--word_timestamps True",
