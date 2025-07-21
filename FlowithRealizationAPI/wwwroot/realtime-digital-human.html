@@ -569,6 +569,11 @@
                 <div class="input-panel active" id="textPanel">
                     <textarea class="text-input" id="textInput" placeholder="请输入您想说的话..."></textarea>
                     
+                    <!-- 语音转文本时间显示 -->
+                    <div id="speechToTextTime" style="display: none; padding: 8px 12px; background: #e3f2fd; border-radius: 5px; margin-bottom: 15px; font-size: 0.9em; color: #1976d2;">
+                        <span>🎤 语音转文本耗时: <strong id="speechTimeValue">-</strong></span>
+                    </div>
+                    
                     <div class="settings-panel">
                         <div class="setting-group">
                             <span class="setting-label">响应模式:</span>
@@ -740,6 +745,8 @@
 
                 document.getElementById('clearTextBtn').addEventListener('click', () => {
                     this.textInput.value = '';
+                    // 隐藏语音转文本时间显示
+                    document.getElementById('speechToTextTime').style.display = 'none';
                 });
 
                 // 语音输入
@@ -1030,6 +1037,8 @@
                         this.updateStatus(result.metadata);
                         this.showSuccess('消息发送成功！');
                         this.textInput.value = '';
+                        // 隐藏语音转文本时间显示
+                        document.getElementById('speechToTextTime').style.display = 'none';
                     } else {
                         this.showError(result.message || result.error || '发送失败，请重试');
                         console.error('API返回错误:', result);
@@ -1121,8 +1130,15 @@
                         // 显示识别信息，包含处理时间
                         this.showSuccess(`语音识别成功！置信度: ${(result.confidence * 100).toFixed(1)}% | 处理时间: ${processingTimeMs}ms`);
                         
+                        // 更新状态面板中的处理时间
+                        document.getElementById('processingTime').textContent = `${processingTimeMs}ms (语音识别)`;
+                        
                         // 自动填充到文本输入框
                         this.textInput.value = result.text;
+                        
+                        // 在文本输入面板显示语音转文本时间
+                        document.getElementById('speechTimeValue').textContent = `${processingTimeMs}ms`;
+                        document.getElementById('speechToTextTime').style.display = 'block';
                     } else {
                         this.showError('语音识别失败，请重试');
                         document.getElementById('recordingStatus').textContent = '识别失败';
@@ -1193,7 +1209,7 @@
 
             updateStatus(metadata) {
                 document.getElementById('currentMode').textContent = this.getModeText(metadata.responseType);
-                document.getElementById('processingTime').textContent = `${metadata.processingTime}ms`;
+                document.getElementById('processingTime').textContent = `${metadata.processingTime}ms (视频生成)`;
                 document.getElementById('videoQuality').textContent = this.getQualityText(metadata.quality?.resolution);
             }
 
