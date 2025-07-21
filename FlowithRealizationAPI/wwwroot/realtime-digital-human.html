@@ -1106,15 +1106,20 @@
                     });
 
                     const result = await response.json();
+                    console.log('[语音识别] API响应:', result);
                     
                     if (result.success && result.text) {
+                        // 获取处理时间
+                        const processingTimeMs = result.processingTime || 0;
+                        console.log(`[语音识别] 处理完成: 文本="${result.text}" 置信度=${result.confidence} 时间=${processingTimeMs}ms`);
+                        
                         // 显示识别结果在文本框中
                         document.getElementById('voiceResultText').value = result.text;
                         document.getElementById('sendVoiceTextBtn').disabled = false;
-                        document.getElementById('recordingStatus').textContent = '识别完成，可以发送';
+                        document.getElementById('recordingStatus').textContent = `识别完成，可以发送 (${processingTimeMs}ms)`;
                         
-                        // 显示识别信息
-                        this.showSuccess(`语音识别成功！置信度: ${(result.confidence * 100).toFixed(1)}%`);
+                        // 显示识别信息，包含处理时间
+                        this.showSuccess(`语音识别成功！置信度: ${(result.confidence * 100).toFixed(1)}% | 处理时间: ${processingTimeMs}ms`);
                         
                         // 自动填充到文本输入框
                         this.textInput.value = result.text;
