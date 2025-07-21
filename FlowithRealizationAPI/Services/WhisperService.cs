@@ -530,6 +530,10 @@ namespace FlowithRealizationAPI.Services
             var outputDir = Path.Combine(_tempPath, "whisper_output");
             Directory.CreateDirectory(outputDir);
             
+            // 确保输入文件路径是绝对路径
+            var absoluteInputFile = Path.IsPathRooted(inputFile) ? inputFile : Path.GetFullPath(inputFile);
+            var absoluteOutputDir = Path.GetFullPath(outputDir);
+            
             var args = new List<string>();
             
             // 检查是否使用python调用whisper模块
@@ -542,11 +546,11 @@ namespace FlowithRealizationAPI.Services
             
             args.AddRange(new[]
             {
-                $"\"{inputFile}\"",
+                $"\"{absoluteInputFile}\"",
                 $"--model {model}",
                 $"--language {language}",
                 $"--output_format {outputFormat}",
-                $"--output_dir \"{outputDir}\"",
+                $"--output_dir \"{absoluteOutputDir}\"",
                 "--word_timestamps True",
                 "--verbose False"
             });
@@ -581,7 +585,7 @@ namespace FlowithRealizationAPI.Services
         }
 
         /// <summary>
-        /// 判断是否为下载行
+        /// 判断是否为下载行或其他噪音信息
         /// </summary>
         private static bool IsDownloadLine(string line)
         {
@@ -593,7 +597,15 @@ namespace FlowithRealizationAPI.Services
                    line.Contains("exists, but the SHA256 checksum does not match") ||
                    line.Contains("iB/s") ||
                    line.Contains("MiB/s") ||
-                   line.Contains("kB/s");
+                   line.Contains("kB/s") ||
+                   line.Contains("ffmpeg version") ||
+                   line.Contains("built with gcc") ||
+                   line.Contains("configuration:") ||
+                   line.Contains("libav") ||
+                   line.Contains("libsw") ||
+                   line.Trim().StartsWith("--enable-") ||
+                   line.Contains("Copyright (c)") ||
+                   string.IsNullOrWhiteSpace(line);
         }
 
         /// <summary>
