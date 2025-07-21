@@ -34,9 +34,9 @@ namespace FlowithRealizationAPI.Services
             _logger = logger;
             _configuration = configuration;
             
-            _whisperPath = _configuration["Whisper:Path"] ?? "whisper";
-            _tempPath = _configuration["Temp:Path"] ?? "temp";
-            _modelPath = _configuration["Whisper:ModelPath"] ?? "models";
+            _whisperPath = _configuration["RealtimeDigitalHuman:Whisper:Path"] ?? "whisper";
+            _tempPath = _configuration["RealtimeDigitalHuman:Temp:Path"] ?? "temp";
+            _modelPath = _configuration["RealtimeDigitalHuman:Whisper:ModelPath"] ?? "models";
             
             // 确保临时目录存在
             Directory.CreateDirectory(_tempPath);
@@ -249,16 +249,23 @@ namespace FlowithRealizationAPI.Services
         {
             try
             {
-                // 构建Whisper命令
-                var model = _configuration["Whisper:Model"] ?? "base";
-                var language = _configuration["Whisper:Language"] ?? "zh";
+                // 首先获取可用的whisper命令
+                var whisperCommand = await FindWhisperCommandAsync();
+                if (string.IsNullOrEmpty(whisperCommand))
+                {
+                    throw new Exception("找不到可用的whisper命令");
+                }
+
+                // 构建Whisper命令参数
+                var model = _configuration["RealtimeDigitalHuman:Whisper:Model"] ?? "base";
+                var language = _configuration["RealtimeDigitalHuman:Whisper:Language"] ?? "zh";
                 var outputFormat = "json";
                 
-                var command = BuildWhisperCommand(filePath, model, language, outputFormat);
+                var arguments = BuildWhisperArguments(filePath, model, language, outputFormat, whisperCommand);
                 
-                _logger.LogInformation("执行Whisper命令: {Command}", command);
+                _logger.LogInformation("执行Whisper命令: {Command} {Arguments}", whisperCommand, arguments);
                 
-                var result = await RunWhisperCommandAsync(command);
+                var result = await RunWhisperCommandAsync(arguments);
                 
                 if (!result.Success)
                 {
@@ -303,6 +310,9 @@ namespace FlowithRealizationAPI.Services
                 // 设置环境变量
                 processInfo.Environment["PYTHONIOENCODING"] = "utf-8";
                 processInfo.Environment["PYTHONUNBUFFERED"] = "1";
+                processInfo.Environment["PYTHONUTF8"] = "1";
+
+                _logger.LogInformation("启动Whisper进程，命令: {Command} {Arguments}", whisperCommand, arguments);
 
                 using var process = Process.Start(processInfo);
                 if (process == null)
@@ -310,18 +320,61 @@ namespace FlowithRealizationAPI.Services
                     return (false, "", "无法启动Whisper进程");
                 }
 
-                var output = await process.StandardOutput.ReadToEndAsync();
-                var error = await process.StandardError.ReadToEndAsync();
+                var outputBuilder = new StringBuilder();
+                var errorBuilder = new StringBuilder();
+
+                // 使用异步读取输出，避免死锁
+                process.OutputDataReceived += (sender, e) =>
+                {
+                    if (e.Data != null)
+                    {
+                        outputBuilder.AppendLine(e.Data);
+                        _logger.LogDebug("Whisper输出: {Data}", e.Data);
+                    }
+                };
+
+                process.ErrorDataReceived += (sender, e) =>
+                {
+                    if (e.Data != null)
+                    {
+                        errorBuilder.AppendLine(e.Data);
+                        _logger.LogDebug("Whisper错误: {Data}", e.Data);
+                    }
+                };
+
+                process.BeginOutputReadLine();
+                process.BeginErrorReadLine();
+
+                // 设置超时时间（5分钟）
+                var timeoutMs = _configuration.GetValue<int>("RealtimeDigitalHuman:Whisper:TimeoutMs", 300000);
+                var completed = await process.WaitForExitAsync(TimeSpan.FromMilliseconds(timeoutMs));
                 
-                await process.WaitForExitAsync();
+                if (!completed)
+                {
+                    _logger.LogError("Whisper进程超时，正在终止进程");
+                    try
+                    {
+                        process.Kill(true);
+                    }
+                    catch (Exception killEx)
+                    {
+                        _logger.LogError(killEx, "终止Whisper进程失败");
+                    }
+                    return (false, "", "Whisper进程执行超时");
+                }
+
+                var output = outputBuilder.ToString();
+                var error = errorBuilder.ToString();
                 
                 _logger.LogInformation("Whisper命令执行完成，退出代码: {ExitCode}", process.ExitCode);
+                
                 if (process.ExitCode != 0)
                 {
                     _logger.LogError("Whisper命令执行失败，错误输出: {Error}", error);
+                    return (false, output, error);
                 }
                 
-                return (process.ExitCode == 0, output, error);
+                return (true, output, error);
             }
             catch (Exception ex)
             {
@@ -331,9 +384,6 @@ namespace FlowithRealizationAPI.Services
         }
 
         /// <summary>
-        /// 查找Whisper命令
-        /// </summary>
-                /// <summary>
         /// 查找Whisper命令
         /// </summary>
         private async Task<string> FindWhisperCommandAsync()
@@ -360,7 +410,7 @@ namespace FlowithRealizationAPI.Services
                 }
 
                 // 2. 尝试直接调用whisper
-                result = await TestCommandAsync("whisper");
+                result = await TestCommandAsync("whisper", "--help");
                 if (result)
                 {
                     _logger.LogInformation("找到whisper命令");
@@ -444,8 +494,17 @@ namespace FlowithRealizationAPI.Services
                 process.BeginOutputReadLine();
                 process.BeginErrorReadLine();
 
-                // 简单等待退出（无超时）
-                await process.WaitForExitAsync();
+                // 设置测试命令的超时时间（30秒）
+                var completed = await process.WaitForExitAsync(TimeSpan.FromSeconds(30));
+                if (!completed)
+                {
+                    try
+                    {
+                        process.Kill(true);
+                    }
+                    catch { }
+                    return false;
+                }
 
                 string output = outputBuilder.ToString();
                 string error = errorBuilder.ToString();
@@ -467,17 +526,16 @@ namespace FlowithRealizationAPI.Services
 
 
         /// <summary>
-        /// 构建Whisper命令
+        /// 构建Whisper命令参数
         /// </summary>
-        private string BuildWhisperCommand(string inputFile, string model, string language, string outputFormat)
+        private string BuildWhisperArguments(string inputFile, string model, string language, string outputFormat, string whisperCommand)
         {
             var outputDir = Path.Combine(_tempPath, "whisper_output");
             Directory.CreateDirectory(outputDir);
             
             var args = new List<string>();
             
-            // 检查是否使用python调用
-            var whisperCommand = _whisperPath;
+            // 检查是否使用python调用whisper模块
             if (whisperCommand == "python" || whisperCommand == "python3")
             {
                 args.Add("-m");
@@ -496,7 +554,7 @@ namespace FlowithRealizationAPI.Services
             });
 
             // 如果有GPU支持，启用GPU加速
-            if (_configuration.GetValue<bool>("Whisper:UseGPU"))
+            if (_configuration.GetValue<bool>("RealtimeDigitalHuman:Whisper:UseGPU"))
             {
                 args.Add("--device cuda");
             }
@@ -691,7 +749,7 @@ namespace FlowithRealizationAPI.Services
         }
     }
 
-    // 简单的 WaitForExitAsync 扩展方法
+    // 支持超时的 WaitForExitAsync 扩展方法
     public static class ProcessExtensions
     {
         public static Task WaitForExitAsync(this Process process)
@@ -701,6 +759,23 @@ namespace FlowithRealizationAPI.Services
             process.Exited += (sender, args) => tcs.TrySetResult(true);
             if (process.HasExited) tcs.TrySetResult(true);
             return tcs.Task;
+        }
+
+        public static async Task<bool> WaitForExitAsync(this Process process, TimeSpan timeout)
+        {
+            var tcs = new TaskCompletionSource<bool>();
+            process.EnableRaisingEvents = true;
+            process.Exited += (sender, args) => tcs.TrySetResult(true);
+            if (process.HasExited)
+            {
+                tcs.TrySetResult(true);
+                return true;
+            }
+            
+            using var cts = new CancellationTokenSource(timeout);
+            cts.Token.Register(() => tcs.TrySetResult(false));
+            
+            return await tcs.Task;
         }
     }
 } 
