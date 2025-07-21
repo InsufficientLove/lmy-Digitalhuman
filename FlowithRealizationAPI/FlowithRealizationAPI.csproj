@@ -23,6 +23,7 @@
 
   <ItemGroup>
     <Folder Include="logs\" />
+    <Folder Include="temp\" />
     <Folder Include="wwwroot\audio\" />
     <Folder Include="wwwroot\videos\" />
   </ItemGroup>
