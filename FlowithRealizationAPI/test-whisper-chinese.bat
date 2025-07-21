@@ -7,7 +7,7 @@ F:\AI\SadTalker\venv\Scripts\python.exe -c "import whisper; print('支持的语�
 
 echo.
 echo 当前配置测试：
-echo Language: chinese
+echo Language: zh
 echo Model: base
 
 pause
