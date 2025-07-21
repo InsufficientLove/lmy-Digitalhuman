@@ -329,7 +329,11 @@ namespace FlowithRealizationAPI.Services
                     if (e.Data != null)
                     {
                         outputBuilder.AppendLine(e.Data);
-                        _logger.LogDebug("Whisper输出: {Data}", e.Data);
+                        // 只记录重要的输出，忽略进度条
+                        if (!IsProgressLine(e.Data))
+                        {
+                            _logger.LogDebug("Whisper输出: {Data}", e.Data);
+                        }
                     }
                 };
 
@@ -338,7 +342,11 @@ namespace FlowithRealizationAPI.Services
                     if (e.Data != null)
                     {
                         errorBuilder.AppendLine(e.Data);
-                        _logger.LogDebug("Whisper错误: {Data}", e.Data);
+                        // 只记录错误和警告，忽略进度条和下载信息
+                        if (!IsProgressLine(e.Data) && !IsDownloadLine(e.Data))
+                        {
+                            _logger.LogDebug("Whisper错误: {Data}", e.Data);
+                        }
                     }
                 };
 
@@ -550,6 +558,42 @@ namespace FlowithRealizationAPI.Services
             }
 
             return string.Join(" ", args);
+        }
+
+        /// <summary>
+        /// 判断是否为进度条行
+        /// </summary>
+        private static bool IsProgressLine(string line)
+        {
+            if (string.IsNullOrEmpty(line)) return false;
+            
+            // 检查是否包含进度条字符
+            return line.Contains("%|") || 
+                   line.Contains("█") || 
+                   line.Contains("▌") || 
+                   line.Contains("▏") || 
+                   line.Contains("▎") || 
+                   line.Contains("▍") || 
+                   line.Contains("▋") || 
+                   line.Contains("▊") || 
+                   line.Contains("▉") ||
+                   (line.Contains("/") && line.Contains("[") && line.Contains("<"));
+        }
+
+        /// <summary>
+        /// 判断是否为下载行
+        /// </summary>
+        private static bool IsDownloadLine(string line)
+        {
+            if (string.IsNullOrEmpty(line)) return false;
+            
+            // 检查是否为下载相关的信息
+            return line.Contains("downloading") || 
+                   line.Contains("re-downloading") ||
+                   line.Contains("exists, but the SHA256 checksum does not match") ||
+                   line.Contains("iB/s") ||
+                   line.Contains("MiB/s") ||
+                   line.Contains("kB/s");
         }
 
         /// <summary>
