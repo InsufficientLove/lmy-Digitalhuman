@@ -413,7 +413,6 @@ namespace FlowithRealizationAPI.Services
                 result = await TestCommandAsync("whisper", "--help");
                 if (result)
                 {
-                    _logger.LogInformation("找到whisper命令");
                     return "whisper";
                 }
 
@@ -421,7 +420,6 @@ namespace FlowithRealizationAPI.Services
                 result = await TestCommandAsync("python", "-m whisper --help");
                 if (result)
                 {
-                    _logger.LogInformation("找到python -m whisper命令");
                     return "python";
                 }
 
@@ -429,21 +427,10 @@ namespace FlowithRealizationAPI.Services
                 result = await TestCommandAsync("python3", "-m whisper --help");
                 if (result)
                 {
-                    _logger.LogInformation("找到python3 -m whisper命令");
                     return "python3";
                 }
 
-                // 5. 尝试pip show检查是否安装
-                result = await TestCommandAsync("pip", "show openai-whisper");
-                if (!result)
-                {
-                    _logger.LogError("openai-whisper未安装，请运行: pip install openai-whisper");
-                }
-                else
-                {
-                    _logger.LogInformation("openai-whisper已安装，但无法找到可用的whisper命令");
-                }
-
+                _logger.LogError("未找到可用的Whisper命令，请确保已安装openai-whisper");
                 return "";
             }
             catch (Exception ex)
@@ -509,16 +496,18 @@ namespace FlowithRealizationAPI.Services
                 string output = outputBuilder.ToString();
                 string error = errorBuilder.ToString();
 
-                _logger.LogDebug($"命令测试结果: {command} {arguments}\n" +
-                                $"退出代码: {process.ExitCode}\n" +
-                                $"输出: {output}\n" +
-                                $"错误: {error}");
+                // 只在失败时记录详细日志
+                if (process.ExitCode != 0)
+                {
+                    _logger.LogDebug("命令测试失败: {Command} {Arguments}, 退出代码: {ExitCode}", 
+                        command, arguments, process.ExitCode);
+                }
 
                 return process.ExitCode == 0;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"命令测试失败: {command} {arguments}");
+                // 测试命令失败是正常的，不记录错误日志
                 return false;
             }
         }
@@ -536,7 +525,8 @@ namespace FlowithRealizationAPI.Services
             var args = new List<string>();
             
             // 检查是否使用python调用whisper模块
-            if (whisperCommand == "python" || whisperCommand == "python3")
+            // 如果命令包含python.exe或者就是python/python3，则需要添加-m whisper参数
+            if (whisperCommand.Contains("python.exe") || whisperCommand == "python" || whisperCommand == "python3")
             {
                 args.Add("-m");
                 args.Add("whisper");
