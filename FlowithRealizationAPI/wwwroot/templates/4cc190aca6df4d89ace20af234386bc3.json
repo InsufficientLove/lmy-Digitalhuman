@@ -1,0 +1,24 @@
+{
+  "TemplateId": "4cc190aca6df4d89ace20af234386bc3",
+  "TemplateName": "lhy",
+  "Description": "111",
+  "TemplateType": "headshot",
+  "Gender": "female",
+  "AgeRange": "adult",
+  "Style": "professional",
+  "EnableEmotion": true,
+  "ImagePath": "/templates/4cc190aca6df4d89ace20af234386bc3.jpg",
+  "PreviewVideoPath": "",
+  "DefaultVoiceSettings": {
+    "Speed": 1,
+    "Pitch": 0,
+    "Volume": 1,
+    "Style": "friendly"
+  },
+  "CustomParameters": {},
+  "CreatedAt": "2025-07-22T09:37:42.621163+08:00",
+  "UpdatedAt": "2025-07-22T09:37:42.8067152+08:00",
+  "IsActive": true,
+  "UsageCount": 0,
+  "Status": "ready"
+}

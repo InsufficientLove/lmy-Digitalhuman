@@ -259,7 +259,7 @@ namespace FlowithRealizationAPI.Services
                 // 构建Whisper命令参数
                 var model = _configuration["RealtimeDigitalHuman:Whisper:Model"] ?? "base";
                 var language = _configuration["RealtimeDigitalHuman:Whisper:Language"] ?? "zh";
-                var initial_prompt = _configuration["RealtimeDigitalHuman:Whisper:InitialPrompt"] ?? "以下是普通话的句子";  // 默认普通话
+                var initial_prompt = _configuration["RealtimeDigitalHuman:Whisper:InitialPrompt"] ?? "这是一个数字人对话场景。";  // 默认普通话 + 内容总结
                 var outputFormat = "json";
 
                 var arguments = BuildWhisperArguments(filePath, model, language, initial_prompt,outputFormat, whisperCommand);
