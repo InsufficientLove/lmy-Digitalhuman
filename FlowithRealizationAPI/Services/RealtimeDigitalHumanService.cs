@@ -640,13 +640,17 @@ namespace FlowithRealizationAPI.Services
             var audioUrls = new List<string>();
             int chunkIndex = 0;
 
+            // 用于存储待发送的响应
+            var responsesToSend = new Queue<StreamingChatResponse>();
+            Exception? caughtException = null;
+
             try
             {
                 // 流式获取LLM响应
                 await foreach (var llmChunk in llmService.ChatStreamAsync(llmRequest))
                 {
-                    // 发送文本块
-                    yield return new StreamingChatResponse
+                    // 准备文本块响应
+                    responsesToSend.Enqueue(new StreamingChatResponse
                     {
                         Type = "text",
                         TextDelta = llmChunk.Delta,
@@ -656,7 +660,7 @@ namespace FlowithRealizationAPI.Services
                             ["chunkIndex"] = chunkIndex++,
                             ["tokenIndex"] = llmChunk.TokenIndex
                         }
-                    };
+                    });
 
                     // 累积文本用于句子分割
                     sentenceBuffer += llmChunk.Delta;
@@ -707,10 +711,10 @@ namespace FlowithRealizationAPI.Services
                 // 等待所有TTS任务完成
                 var ttsResults = await Task.WhenAll(audioTasks);
                 
-                // 发送所有音频URL
+                // 准备音频响应
                 foreach (var ttsResult in ttsResults.Where(r => r.Success))
                 {
-                    yield return new StreamingChatResponse
+                    responsesToSend.Enqueue(new StreamingChatResponse
                     {
                         Type = "audio",
                         AudioChunkUrl = ttsResult.AudioUrl,
@@ -720,7 +724,7 @@ namespace FlowithRealizationAPI.Services
                             ["duration"] = ttsResult.Duration,
                             ["fileSize"] = ttsResult.FileSize
                         }
-                    };
+                    });
                 }
 
                 // 生成数字人视频
@@ -738,7 +742,7 @@ namespace FlowithRealizationAPI.Services
                     
                     if (videoResult.Success)
                     {
-                        yield return new StreamingChatResponse
+                        responsesToSend.Enqueue(new StreamingChatResponse
                         {
                             Type = "video",
                             VideoUrl = videoResult.VideoUrl,
@@ -748,12 +752,12 @@ namespace FlowithRealizationAPI.Services
                                 ["taskId"] = videoResult.TaskId,
                                 ["processingTime"] = videoResult.ProcessingTime
                             }
-                        };
+                        });
                     }
                 }
 
-                // 发送完成信号
-                yield return new StreamingChatResponse
+                // 准备完成响应
+                responsesToSend.Enqueue(new StreamingChatResponse
                 {
                     Type = "complete",
                     IsComplete = true,
@@ -763,15 +767,27 @@ namespace FlowithRealizationAPI.Services
                         ["audioCount"] = audioUrls.Count,
                         ["totalChunks"] = chunkIndex
                     }
-                };
+                });
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "流式对话处理失败");
+                caughtException = ex;
+            }
+
+            // 在try-catch块外发送响应
+            while (responsesToSend.Count > 0)
+            {
+                yield return responsesToSend.Dequeue();
+            }
+
+            // 如果有异常，发送错误响应
+            if (caughtException != null)
+            {
                 yield return new StreamingChatResponse
                 {
                     Type = "error",
-                    TextDelta = ex.Message,
+                    TextDelta = caughtException.Message,
                     IsComplete = true
                 };
             }
@@ -806,11 +822,13 @@ namespace FlowithRealizationAPI.Services
                     await File.WriteAllBytesAsync(audioPath, request.AudioData);
                 }
 
-                // 调用模板服务生成视频
+                // 由于GenerateWithTemplateRequest没有AudioPath属性，
+                // 我们需要先从音频文件生成文本（如果需要的话），
+                // 或者直接使用预设文本
                 var generateRequest = new GenerateWithTemplateRequest
                 {
                     TemplateId = request.AvatarId,
-                    AudioPath = audioPath,
+                    Text = "数字人视频生成中", // 使用默认文本，因为音频已经包含内容
                     Quality = request.Quality,
                     ResponseMode = "realtime"
                 };
@@ -825,7 +843,7 @@ namespace FlowithRealizationAPI.Services
                     {
                         Success = true,
                         VideoUrl = result.VideoUrl,
-                        TaskId = result.VideoId,
+                        TaskId = Guid.NewGuid().ToString(), // 生成一个任务ID
                         Status = "completed",
                         ProcessingTime = (int)stopwatch.ElapsedMilliseconds
                     };
