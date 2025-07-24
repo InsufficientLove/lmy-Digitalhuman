@@ -599,6 +599,31 @@
                                 <option value="false">禁用</option>
                             </select>
                         </div>
+                        <div class="setting-group">
+                            <span class="setting-label">对话模式:</span>
+                            <select class="setting-select" id="chatMode">
+                                <option value="normal" selected>普通模式</option>
+                                <option value="streaming">流式模式（实时语音）</option>
+                            </select>
+                        </div>
+                        <div class="setting-group">
+                            <span class="setting-label">TTS语音:</span>
+                            <select class="setting-select" id="ttsVoice">
+                                <option value="zh-CN-XiaoxiaoNeural" selected>晓晓（女声-友好）</option>
+                                <option value="zh-CN-XiaoyiNeural">晓伊（女声-专业）</option>
+                                <option value="zh-CN-XiaochenNeural">晓辰（女声-活泼）</option>
+                                <option value="zh-CN-XiaohanNeural">晓涵（女声-温柔）</option>
+                                <option value="zh-CN-YunxiNeural">云希（男声-专业）</option>
+                                <option value="zh-CN-YunyangNeural">云扬（男声-阳光）</option>
+                            </select>
+                        </div>
+                        <div class="setting-group">
+                            <span class="setting-label">启用AI对话:</span>
+                            <select class="setting-select" id="enableAI">
+                                <option value="true" selected>启用（智能回答）</option>
+                                <option value="false">禁用（原样播报）</option>
+                            </select>
+                        </div>
                     </div>
 
                     <div class="action-buttons">
@@ -1010,6 +1035,20 @@
                     this.showError('请输入文本内容');
                     return;
                 }
+
+                const chatMode = document.getElementById('chatMode').value;
+                const enableAI = document.getElementById('enableAI').value === 'true';
+
+                if (chatMode === 'streaming' && enableAI) {
+                    // 流式模式
+                    await this.sendStreamingMessage(text);
+                } else {
+                    // 普通模式
+                    await this.sendNormalMessage(text);
+                }
+            }
+
+            async sendNormalMessage(text) {
                 this.showLoading('正在生成数字人视频...');
                 this.showPendingAvatar();
                 try {
@@ -1046,6 +1085,114 @@
                 } catch (error) {
                     console.error('发送消息失败:', error);
                     this.showError('网络错误，请检查连接和服务状态');
+                } finally {
+                    this.hideLoading();
+                }
+            }
+
+            async sendStreamingMessage(text) {
+                this.showLoading('正在连接AI...');
+                this.showPendingAvatar();
+                
+                const responseTextArea = document.createElement('div');
+                responseTextArea.style.cssText = 'margin-top: 15px; padding: 15px; background: #f8f9fa; border-radius: 10px; max-height: 200px; overflow-y: auto;';
+                responseTextArea.innerHTML = '<strong>AI回复：</strong><br>';
+                this.textInput.parentElement.insertBefore(responseTextArea, this.textInput.nextSibling);
+
+                const audioQueue = [];
+                let fullResponse = '';
+                let videoGenerated = false;
+
+                try {
+                    const response = await fetch('/api/RealtimeDigitalHuman/streaming-chat', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            text: text,
+                            avatarId: this.currentAvatar,
+                            voice: document.getElementById('ttsVoice').value,
+                            model: 'qwen2.5:14b-instruct-q4_0',
+                            enableEmotion: document.getElementById('emotionMode').value === 'true',
+                            quality: document.getElementById('videoQuality').value,
+                            systemPrompt: '你是一个专业的AI助手，请用中文回答问题。回答要准确、简洁、有帮助。'
+                        })
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP错误: ${response.status}`);
+                    }
+
+                    // 使用 EventSource 读取 SSE 流
+                    const decoder = new TextDecoder();
+                    const reader = response.body.getReader();
+                    let buffer = '';
+
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+
+                        buffer += decoder.decode(value, { stream: true });
+                        const lines = buffer.split('\n');
+                        buffer = lines.pop() || '';
+
+                        for (const line of lines) {
+                            if (line.startsWith('data: ')) {
+                                const dataStr = line.slice(6);
+                                if (dataStr === '[DONE]') {
+                                    break;
+                                }
+                                
+                                try {
+                                    const data = JSON.parse(dataStr);
+                                
+                                switch (data.type) {
+                                    case 'text':
+                                        // 显示文本
+                                        fullResponse += data.textDelta;
+                                        responseTextArea.innerHTML = '<strong>AI回复：</strong><br>' + fullResponse;
+                                        responseTextArea.scrollTop = responseTextArea.scrollHeight;
+                                        break;
+                                        
+                                    case 'audio':
+                                        // 添加音频到队列
+                                        audioQueue.push(data.audioChunkUrl);
+                                        // 可以在这里播放音频
+                                        this.playAudioInBackground(data.audioChunkUrl);
+                                        break;
+                                        
+                                    case 'video':
+                                        // 播放生成的视频
+                                        if (!videoGenerated) {
+                                            this.playVideo(data.videoUrl);
+                                            videoGenerated = true;
+                                        }
+                                        break;
+                                        
+                                    case 'complete':
+                                        this.showSuccess('对话完成！');
+                                        this.textInput.value = '';
+                                        // 3秒后移除回复文本
+                                        setTimeout(() => {
+                                            responseTextArea.remove();
+                                        }, 3000);
+                                        break;
+                                        
+                                    case 'error':
+                                        this.showError('流式对话出错: ' + data.textDelta);
+                                        break;
+                                }
+                            } catch (e) {
+                                console.error('解析流式数据失败:', e);
+                            }
+                        }
+                    }
+                }
+                } catch (error) {
+                    console.error('流式对话失败:', error);
+                    this.showError('流式对话失败，请检查网络连接');
+                    responseTextArea.remove();
                 } finally {
                     this.hideLoading();
                 }
@@ -1410,6 +1557,15 @@
 
             hideUploadModal() {
                 this.uploadModal.style.display = 'none';
+            }
+
+            playAudioInBackground(audioUrl) {
+                // 创建一个隐藏的audio元素播放音频
+                const audio = new Audio(audioUrl);
+                audio.volume = 0.8;
+                audio.play().catch(e => {
+                    console.error('音频播放失败:', e);
+                });
             }
         }
 

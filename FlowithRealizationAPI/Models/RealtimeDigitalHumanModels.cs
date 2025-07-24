@@ -37,32 +37,89 @@ namespace FlowithRealizationAPI.Models
     }
 
     /// <summary>
-    /// 语音对话请求
+    /// 语音聊天请求
     /// </summary>
     public class VoiceChatRequest
     {
-        [Required]
-        public IFormFile AudioFile { get; set; } = default!;
-
-        /// <summary>
-        /// 数字人头像ID
-        /// </summary>
-        public string AvatarId { get; set; } = "default";
-
-        /// <summary>
-        /// 响应模式：instant(立即), fast(快速), quality(高质量)
-        /// </summary>
+        public IFormFile AudioFile { get; set; }
+        public string AvatarId { get; set; }
         public string ResponseMode { get; set; } = "instant";
-
-        /// <summary>
-        /// 视频质量：low, medium, high, ultra
-        /// </summary>
         public string Quality { get; set; } = "medium";
+    }
 
-        /// <summary>
-        /// 是否启用情感表达
-        /// </summary>
+    /// <summary>
+    /// 流式对话请求
+    /// </summary>
+    public class StreamingChatRequest
+    {
+        public string Text { get; set; }
+        public string AvatarId { get; set; }
+        public string Voice { get; set; } = "zh-CN-XiaoxiaoNeural";
+        public string Model { get; set; } = "qwen2.5:14b-instruct-q4_0";
         public bool EnableEmotion { get; set; } = true;
+        public string Quality { get; set; } = "medium";
+        public string SystemPrompt { get; set; }
+    }
+
+    /// <summary>
+    /// 流式对话响应
+    /// </summary>
+    public class StreamingChatResponse
+    {
+        public string Type { get; set; } // "text", "audio", "video", "complete"
+        public string TextDelta { get; set; }
+        public string AudioChunkUrl { get; set; }
+        public byte[] AudioData { get; set; }
+        public string VideoUrl { get; set; }
+        public bool IsComplete { get; set; }
+        public Dictionary<string, object> Metadata { get; set; } = new();
+    }
+
+    /// <summary>
+    /// TTS流式请求
+    /// </summary>
+    public class TTSStreamRequest
+    {
+        public string Text { get; set; }
+        public string Voice { get; set; } = "zh-CN-XiaoxiaoNeural";
+        public string Rate { get; set; } = "1.0";
+        public string Pitch { get; set; } = "0Hz";
+        public string OutputFormat { get; set; } = "audio-16khz-128kbitrate-mono-mp3";
+    }
+
+    /// <summary>
+    /// 音频块响应
+    /// </summary>
+    public class AudioChunkResponse
+    {
+        public byte[] AudioData { get; set; }
+        public int ChunkIndex { get; set; }
+        public bool IsComplete { get; set; }
+        public int TotalDuration { get; set; } // 毫秒
+    }
+
+    /// <summary>
+    /// 生成视频请求
+    /// </summary>
+    public class GenerateVideoRequest
+    {
+        public string AvatarId { get; set; }
+        public string AudioUrl { get; set; }
+        public byte[] AudioData { get; set; }
+        public string Quality { get; set; } = "medium";
+        public bool Async { get; set; } = false;
+    }
+
+    /// <summary>
+    /// 生成视频响应
+    /// </summary>
+    public class GenerateVideoResponse
+    {
+        public bool Success { get; set; }
+        public string VideoUrl { get; set; }
+        public string TaskId { get; set; }
+        public string Status { get; set; } // "processing", "completed", "failed"
+        public int ProcessingTime { get; set; }
     }
 
     /// <summary>

@@ -557,10 +557,16 @@ namespace FlowithRealizationAPI.Services
                 "--verbose False"
             });
 
-            // 如果有GPU支持，启用GPU加速
-            if (_configuration.GetValue<bool>("RealtimeDigitalHuman:Whisper:UseGPU"))
+            // 明确指定设备，避免Whisper自动检测
+            var useGPU = _configuration.GetValue<bool>("RealtimeDigitalHuman:Whisper:UseGPU");
+            if (useGPU)
             {
                 args.Add("--device cuda");
+            }
+            else
+            {
+                // 明确使用CPU，避免Whisper尝试使用CUDA
+                args.Add("--device cpu");
             }
 
             return string.Join(" ", args);

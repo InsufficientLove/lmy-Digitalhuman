@@ -341,5 +341,67 @@ namespace FlowithRealizationAPI.Controllers
                 return StatusCode(500, new { error = "系统健康检查失败", details = ex.Message });
             }
         }
+
+        /// <summary>
+        /// 流式对话 - 实时生成文本、语音和视频
+        /// </summary>
+        [HttpPost("streaming-chat")]
+        public async Task StreamingChat([FromBody] StreamingChatRequest request)
+        {
+            _logger.LogInformation("开始流式对话: {Text}", request.Text);
+
+            Response.ContentType = "text/event-stream";
+            Response.Headers.Add("Cache-Control", "no-cache");
+            Response.Headers.Add("X-Accel-Buffering", "no");
+
+            await foreach (var response in _realtimeService.ProcessStreamingChatAsync(request))
+            {
+                var json = JsonConvert.SerializeObject(response);
+                await Response.WriteAsync($"data: {json}\n\n");
+                await Response.Body.FlushAsync();
+            }
+
+            await Response.WriteAsync("data: [DONE]\n\n");
+            await Response.Body.FlushAsync();
+        }
+
+        /// <summary>
+        /// 流式文本转语音
+        /// </summary>
+        [HttpPost("text-to-speech-stream")]
+        public async IAsyncEnumerable<AudioChunkResponse> TextToSpeechStream([FromBody] TTSStreamRequest request)
+        {
+            _logger.LogInformation("开始流式TTS: {Text}", request.Text);
+
+            await foreach (var chunk in _realtimeService.TextToSpeechStreamAsync(request))
+            {
+                yield return chunk;
+            }
+        }
+
+        /// <summary>
+        /// 获取可用的TTS语音列表
+        /// </summary>
+        [HttpGet("voices")]
+        public async Task<IActionResult> GetAvailableVoices()
+        {
+            try
+            {
+                var ttsService = HttpContext.RequestServices.GetRequiredService<IEdgeTTSService>();
+                var voices = await ttsService.GetAvailableVoicesAsync();
+                
+                return Ok(new
+                {
+                    success = true,
+                    voices = voices,
+                    total = voices.Count
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "获取语音列表失败");
+                return StatusCode(500, new { error = "获取语音列表失败", details = ex.Message });
+            }
+        }
     }
 }

@@ -610,5 +610,298 @@ namespace FlowithRealizationAPI.Services
                 ["total_size"] = _prerenderedCache.Sum(v => v.Value.FileSize)
             };
         }
+
+        /// <summary>
+        /// 流式对话处理
+        /// </summary>
+        public async IAsyncEnumerable<StreamingChatResponse> ProcessStreamingChatAsync(StreamingChatRequest request)
+        {
+            _logger.LogInformation("开始流式对话处理: {Text}", request.Text);
+
+            // 获取LLM和TTS服务
+            var llmService = _serviceProvider.GetRequiredService<ILocalLLMService>();
+            var ttsService = _serviceProvider.GetRequiredService<IEdgeTTSService>();
+
+            // 准备LLM请求
+            var llmRequest = new LocalLLMRequest
+            {
+                ModelName = request.Model,
+                Message = request.Text,
+                SystemPrompt = request.SystemPrompt ?? "你是一个专业的AI助手，请用中文回答问题。回答要准确、简洁、有帮助。",
+                Stream = true,
+                Temperature = 0.7f,
+                MaxTokens = 1000
+            };
+
+            var textBuffer = new List<string>();
+            var sentenceBuffer = "";
+            var audioTasks = new List<Task<TTSResponse>>();
+            var audioUrls = new List<string>();
+            int chunkIndex = 0;
+
+            try
+            {
+                // 流式获取LLM响应
+                await foreach (var llmChunk in llmService.ChatStreamAsync(llmRequest))
+                {
+                    // 发送文本块
+                    yield return new StreamingChatResponse
+                    {
+                        Type = "text",
+                        TextDelta = llmChunk.Delta,
+                        IsComplete = false,
+                        Metadata = new Dictionary<string, object>
+                        {
+                            ["chunkIndex"] = chunkIndex++,
+                            ["tokenIndex"] = llmChunk.TokenIndex
+                        }
+                    };
+
+                    // 累积文本用于句子分割
+                    sentenceBuffer += llmChunk.Delta;
+                    textBuffer.Add(llmChunk.Delta);
+
+                    // 检测完整的句子
+                    var sentences = SplitIntoSentences(sentenceBuffer);
+                    if (sentences.Count > 1)
+                    {
+                        // 处理完整的句子（除了最后一个）
+                        for (int i = 0; i < sentences.Count - 1; i++)
+                        {
+                            var sentence = sentences[i].Trim();
+                            if (!string.IsNullOrEmpty(sentence))
+                            {
+                                // 异步生成TTS
+                                var ttsTask = GenerateTTSAsync(sentence, request.Voice, ttsService);
+                                audioTasks.Add(ttsTask);
+
+                                // 当有音频生成完成时，立即发送
+                                _ = Task.Run(async () =>
+                                {
+                                    var ttsResult = await ttsTask;
+                                    if (ttsResult.Success)
+                                    {
+                                        audioUrls.Add(ttsResult.AudioUrl);
+                                    }
+                                });
+                            }
+                        }
+
+                        // 保留最后一个未完成的句子
+                        sentenceBuffer = sentences[sentences.Count - 1];
+                    }
+
+                    // 如果LLM响应完成
+                    if (llmChunk.IsComplete)
+                    {
+                        // 处理最后的句子
+                        if (!string.IsNullOrEmpty(sentenceBuffer.Trim()))
+                        {
+                            var ttsTask = GenerateTTSAsync(sentenceBuffer.Trim(), request.Voice, ttsService);
+                            audioTasks.Add(ttsTask);
+                        }
+                    }
+                }
+
+                // 等待所有TTS任务完成
+                var ttsResults = await Task.WhenAll(audioTasks);
+                
+                // 发送所有音频URL
+                foreach (var ttsResult in ttsResults.Where(r => r.Success))
+                {
+                    yield return new StreamingChatResponse
+                    {
+                        Type = "audio",
+                        AudioChunkUrl = ttsResult.AudioUrl,
+                        IsComplete = false,
+                        Metadata = new Dictionary<string, object>
+                        {
+                            ["duration"] = ttsResult.Duration,
+                            ["fileSize"] = ttsResult.FileSize
+                        }
+                    };
+                }
+
+                // 生成数字人视频
+                if (audioUrls.Any())
+                {
+                    var videoRequest = new GenerateVideoRequest
+                    {
+                        AvatarId = request.AvatarId,
+                        AudioUrl = audioUrls.First(), // 使用第一个音频生成视频
+                        Quality = request.Quality,
+                        Async = true
+                    };
+
+                    var videoResult = await GenerateRealtimeVideoAsync(videoRequest);
+                    
+                    if (videoResult.Success)
+                    {
+                        yield return new StreamingChatResponse
+                        {
+                            Type = "video",
+                            VideoUrl = videoResult.VideoUrl,
+                            IsComplete = false,
+                            Metadata = new Dictionary<string, object>
+                            {
+                                ["taskId"] = videoResult.TaskId,
+                                ["processingTime"] = videoResult.ProcessingTime
+                            }
+                        };
+                    }
+                }
+
+                // 发送完成信号
+                yield return new StreamingChatResponse
+                {
+                    Type = "complete",
+                    IsComplete = true,
+                    Metadata = new Dictionary<string, object>
+                    {
+                        ["totalText"] = string.Join("", textBuffer),
+                        ["audioCount"] = audioUrls.Count,
+                        ["totalChunks"] = chunkIndex
+                    }
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "流式对话处理失败");
+                yield return new StreamingChatResponse
+                {
+                    Type = "error",
+                    TextDelta = ex.Message,
+                    IsComplete = true
+                };
+            }
+        }
+
+        /// <summary>
+        /// 生成实时数字人视频
+        /// </summary>
+        public async Task<GenerateVideoResponse> GenerateRealtimeVideoAsync(GenerateVideoRequest request)
+        {
+            var stopwatch = Stopwatch.StartNew();
+
+            try
+            {
+                _logger.LogInformation("开始生成实时数字人视频: Avatar={Avatar}", request.AvatarId);
+
+                // 获取模板服务
+                var templateService = _serviceProvider.GetRequiredService<IDigitalHumanTemplateService>();
+
+                // 准备音频文件
+                string audioPath = "";
+                if (!string.IsNullOrEmpty(request.AudioUrl))
+                {
+                    // 从URL获取音频文件路径
+                    audioPath = Path.Combine("wwwroot", request.AudioUrl.TrimStart('/'));
+                }
+                else if (request.AudioData != null && request.AudioData.Length > 0)
+                {
+                    // 保存音频数据到临时文件
+                    var audioFileName = $"realtime_audio_{Guid.NewGuid()}.mp3";
+                    audioPath = Path.Combine(_tempPath, audioFileName);
+                    await File.WriteAllBytesAsync(audioPath, request.AudioData);
+                }
+
+                // 调用模板服务生成视频
+                var generateRequest = new GenerateWithTemplateRequest
+                {
+                    TemplateId = request.AvatarId,
+                    AudioPath = audioPath,
+                    Quality = request.Quality,
+                    ResponseMode = "realtime"
+                };
+
+                var result = await templateService.GenerateWithTemplateAsync(generateRequest);
+
+                stopwatch.Stop();
+
+                if (result.Success)
+                {
+                    return new GenerateVideoResponse
+                    {
+                        Success = true,
+                        VideoUrl = result.VideoUrl,
+                        TaskId = result.VideoId,
+                        Status = "completed",
+                        ProcessingTime = (int)stopwatch.ElapsedMilliseconds
+                    };
+                }
+                else
+                {
+                    return new GenerateVideoResponse
+                    {
+                        Success = false,
+                        Status = "failed",
+                        ProcessingTime = (int)stopwatch.ElapsedMilliseconds
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "生成实时数字人视频失败");
+                return new GenerateVideoResponse
+                {
+                    Success = false,
+                    Status = "failed",
+                    ProcessingTime = (int)stopwatch.ElapsedMilliseconds
+                };
+            }
+        }
+
+        /// <summary>
+        /// 流式文本转语音
+        /// </summary>
+        public async IAsyncEnumerable<AudioChunkResponse> TextToSpeechStreamAsync(TTSStreamRequest request)
+        {
+            var ttsService = _serviceProvider.GetRequiredService<IEdgeTTSService>();
+            
+            await foreach (var chunk in ttsService.TextToSpeechStreamAsync(request))
+            {
+                yield return chunk;
+            }
+        }
+
+        /// <summary>
+        /// 生成TTS音频
+        /// </summary>
+        private async Task<TTSResponse> GenerateTTSAsync(string text, string voice, IEdgeTTSService ttsService)
+        {
+            var ttsRequest = new TTSRequest
+            {
+                Text = text,
+                Voice = voice,
+                Rate = "1.0",
+                Pitch = "0Hz"
+            };
+
+            return await ttsService.TextToSpeechAsync(ttsRequest);
+        }
+
+        /// <summary>
+        /// 将文本分割成句子
+        /// </summary>
+        private List<string> SplitIntoSentences(string text)
+        {
+            // 中文句子分割
+            var pattern = @"[。！？；!?;]+";
+            var sentences = Regex.Split(text, pattern)
+                .Where(s => !string.IsNullOrWhiteSpace(s))
+                .ToList();
+
+            // 如果没有找到句子分隔符，检查是否有足够长的文本
+            if (sentences.Count == 0 && text.Length > 50)
+            {
+                // 按逗号分割较长的文本
+                pattern = @"[，,]+";
+                sentences = Regex.Split(text, pattern)
+                    .Where(s => !string.IsNullOrWhiteSpace(s) && s.Length > 10)
+                    .ToList();
+            }
+
+            return sentences.Count > 0 ? sentences : new List<string> { text };
+        }
     }
 } 

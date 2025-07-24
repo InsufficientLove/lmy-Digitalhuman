@@ -42,6 +42,9 @@ builder.Services.AddSingleton<ILocalLLMService, OllamaService>();
 // Register digital human template services
 builder.Services.AddSingleton<IDigitalHumanTemplateService, DigitalHumanTemplateService>();
 
+// Register Edge TTS service
+builder.Services.AddSingleton<IEdgeTTSService, EdgeTTSService>();
+
 // Add HttpClient for services
 builder.Services.AddHttpClient();
 
@@ -110,6 +113,14 @@ app.UseStaticFiles(new StaticFileOptions
     FileProvider = new PhysicalFileProvider(
         Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "templates")),
     RequestPath = "/templates"
+});
+
+// 提供audio目录的静态文件访问（Edge TTS生成的音频）
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(
+        Path.Combine(Directory.GetCurrentDirectory(), "temp")),
+    RequestPath = "/audio"
 });
 
 app.UseAuthorization();

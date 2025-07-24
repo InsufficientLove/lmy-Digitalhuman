@@ -46,5 +46,20 @@ namespace FlowithRealizationAPI.Services
         /// 获取视频缓存统计
         /// </summary>
         Task<Dictionary<string, object>> GetCacheStatisticsAsync();
+
+        /// <summary>
+        /// 流式对话处理
+        /// </summary>
+        IAsyncEnumerable<StreamingChatResponse> ProcessStreamingChatAsync(StreamingChatRequest request);
+
+        /// <summary>
+        /// 生成实时数字人视频（基于音频流）
+        /// </summary>
+        Task<GenerateVideoResponse> GenerateRealtimeVideoAsync(GenerateVideoRequest request);
+
+        /// <summary>
+        /// 流式文本转语音
+        /// </summary>
+        IAsyncEnumerable<AudioChunkResponse> TextToSpeechStreamAsync(TTSStreamRequest request);
     }
 } 
