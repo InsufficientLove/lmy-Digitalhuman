@@ -88,38 +88,47 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseCors("AllowLocalhost");
 
+// 确保必要的目录存在
+var videosPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "videos");
+var tempPath = Path.Combine(Directory.GetCurrentDirectory(), "temp");
+var templatesPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "templates");
+var imagesPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "images");
+var avatarsPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "images", "avatars");
+
+Directory.CreateDirectory(videosPath);
+Directory.CreateDirectory(tempPath);
+Directory.CreateDirectory(templatesPath);
+Directory.CreateDirectory(imagesPath);
+Directory.CreateDirectory(avatarsPath);
+
 // 静态文件服务
 app.UseStaticFiles();
 
 // 提供videos目录的静态文件访问
 app.UseStaticFiles(new StaticFileOptions
 {
-    FileProvider = new PhysicalFileProvider(
-        Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "videos")),
+    FileProvider = new PhysicalFileProvider(videosPath),
     RequestPath = "/videos"
 });
 
 // 提供temp目录的静态文件访问
 app.UseStaticFiles(new StaticFileOptions
 {
-    FileProvider = new PhysicalFileProvider(
-        Path.Combine(Directory.GetCurrentDirectory(), "temp")),
+    FileProvider = new PhysicalFileProvider(tempPath),
     RequestPath = "/temp"
 });
 
 // 提供templates目录的静态文件访问
 app.UseStaticFiles(new StaticFileOptions
 {
-    FileProvider = new PhysicalFileProvider(
-        Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "templates")),
+    FileProvider = new PhysicalFileProvider(templatesPath),
     RequestPath = "/templates"
 });
 
 // 提供audio目录的静态文件访问（Edge TTS生成的音频）
 app.UseStaticFiles(new StaticFileOptions
 {
-    FileProvider = new PhysicalFileProvider(
-        Path.Combine(Directory.GetCurrentDirectory(), "temp")),
+    FileProvider = new PhysicalFileProvider(tempPath),
     RequestPath = "/audio"
 });
 

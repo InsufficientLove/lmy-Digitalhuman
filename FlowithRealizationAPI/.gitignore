@@ -1,14 +1,3 @@
-# Visual Studio files
-.vs/
-*.user
-*.userosscache
-*.suo
-*.userprefs
-*.dbmdl
-*.jfm
-*.pfx
-*.publishsettings
-
 # Build results
 [Dd]ebug/
 [Dd]ebugPublic/
@@ -16,129 +5,74 @@
 [Rr]eleases/
 x64/
 x86/
-build/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
 bld/
 [Bb]in/
 [Oo]bj/
-[Oo]ut/
-msbuild.log
-msbuild.err
-msbuild.wrn
+[Ll]og/
+[Ll]ogs/
 
-# Visual Studio Code
-.vscode/
-*.code-workspace
-
-# Rider
-.idea/
-
-# User-specific files
-*.rsuser
+# Visual Studio
+.vs/
 *.suo
 *.user
 *.userosscache
 *.sln.docstates
 
-# NuGet Packages
+# .NET Core
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# NuGet
 *.nupkg
 *.snupkg
 **/packages/*
 !**/packages/build/
-*.nuget.props
-*.nuget.targets
 
-# Logs
-logs/
-*.log
+# 临时文件
+temp/*
+!temp/.gitkeep
 
-# Local development settings
-appsettings.Development.json
-appsettings.Local.json
+# 生成的视频文件
+wwwroot/videos/*
+!wwwroot/videos/.gitkeep
 
-# Temporary files
-*.tmp
-*.temp
-*.swp
-*.*~
-project.lock.json
-.DS_Store
-*.pyc
-nupkg/
+# 音频文件
+wwwroot/audio/*
+!wwwroot/audio/.gitkeep
 
-# Visual Studio cache files
-# files ending in .cache can be ignored
-*.[Cc]ache
-# but keep track of directories ending in .cache
-!?*.[Cc]ache/
+# 模板文件（保留示例）
+wwwroot/templates/*
+!wwwroot/templates/*.json
+!wwwroot/templates/*.jpg
 
-# Others
-ClientBin/
-~$*
-*~
-*.dbmdl
-*.dbproj.schemaview
-*.jfm
-*.pfx
-*.publishsettings
-orleans.codegen.cs
+# 测试文件
+*.wav
+*.mp3
+*.mp4
+test_*
 
-# Windows image file caches
-Thumbs.db
-ehthumbs.db
-
-# Folder config file
-Desktop.ini
-
-# Recycle Bin used on file shares
-$RECYCLE.BIN/
-
-# VS Code directories
-.vscode/
-
-# Windows Installer files
-*.cab
-*.msi
-*.msix
-*.msm
-*.msp
-
-# Windows shortcuts
-*.lnk
-
-# JetBrains Rider
-.idea/
-*.sln.iml
-
-# User-specific files
-*.rsuser
-*.suo
-*.user
-*.userosscache
-*.sln.docstates
-
-# Mono Auto Generated Files
-mono_crash.*
+# 其他
+packages-microsoft-prod.deb
+*.db
+*.db-shm
+*.db-wal
 
 # macOS
 .DS_Store
 .AppleDouble
 .LSOverride
 
-# Thumbnails
-._*
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
 
-# Files that might appear in the root of a volume
-.DocumentRevisions-V100
-.fseventsd
-.Spotlight-V100
-.TemporaryItems
-.Trashes
-.VolumeIcon.icns
-.com.apple.timemachine.donotpresent
+# JetBrains
+.idea/
+*.iml
 
-# Directories potentially created on remote AFP share
-.AppleDB
-.AppleDesktop
-Network Trash Folder
-Temporary Items
-.apdisk 
+# VS Code
+.vscode/ 
