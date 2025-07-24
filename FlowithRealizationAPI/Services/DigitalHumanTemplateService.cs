@@ -525,16 +525,19 @@ namespace FlowithRealizationAPI.Services
 
         public async Task<bool> ValidateTemplateAsync(string templateId)
         {
-            return _templates.ContainsKey(templateId);
+            return await Task.FromResult(_templates.ContainsKey(templateId));
         }
 
         public async Task<string?> GetTemplatePreviewAsync(string templateId)
         {
-            if (_templates.TryGetValue(templateId, out var template))
+            return await Task.Run(() =>
             {
-                return template.PreviewVideoPath;
-            }
-            return null;
+                if (_templates.TryGetValue(templateId, out var template))
+                {
+                    return template.PreviewVideoPath;
+                }
+                return null;
+            });
         }
 
         public async Task<CreateDigitalHumanTemplateResponse> CloneTemplateAsync(string templateId, string newName)
