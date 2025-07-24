@@ -4,6 +4,9 @@ using Serilog.Events;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 
+// 设置控制台编码为UTF-8
+Console.OutputEncoding = System.Text.Encoding.UTF8;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // 配置Serilog
@@ -13,7 +16,8 @@ Log.Logger = new LoggerConfiguration()
     .Enrich.FromLogContext()
     .WriteTo.File("logs/realtime-digital-human-.log", 
         rollingInterval: RollingInterval.Day,
-        outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {Message:lj}{NewLine}{Exception}")
+        outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {Message:lj}{NewLine}{Exception}",
+        encoding: System.Text.Encoding.UTF8)
     .CreateLogger();
 
 builder.Host.UseSerilog();

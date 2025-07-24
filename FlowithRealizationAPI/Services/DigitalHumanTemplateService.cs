@@ -1,4 +1,5 @@
 using FlowithRealizationAPI.Models;
+using FlowithRealizationAPI.Services.Extensions;
 using System.Diagnostics;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -697,36 +698,13 @@ namespace FlowithRealizationAPI.Services
 
                 // 构造 edge-tts 命令
                 string ratePercent = rate == 1.0f ? "+0%" : (rate > 1.0f ? $"+{(int)((rate - 1.0f) * 100)}%" : $"-{(int)((1.0f - rate) * 100)}%");
-                var command = $"edge-tts --voice {voice} --rate {ratePercent} --pitch {pitch:+0}Hz --text \"{text}\" --write-media \"{outputPath}\"";
-
-                _logger.LogInformation("TTS命令: {Command}", command);
-
-                var processInfo = new ProcessStartInfo
+                // 尝试执行 edge-tts
+                var success = await TryExecuteEdgeTTSAsync(text, voice, ratePercent, pitch, outputPath);
+                
+                if (!success)
                 {
-                    FileName = "cmd.exe",
-                    Arguments = $"/c {command}",
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    WorkingDirectory = Directory.GetCurrentDirectory()
-                };
-
-                using var process = Process.Start(processInfo);
-                if (process == null)
-                {
-                    _logger.LogError("无法启动TTS进程");
-                    throw new Exception("无法启动TTS进程");
-                }
-
-                var output = await process.StandardOutput.ReadToEndAsync();
-                var error = await process.StandardError.ReadToEndAsync();
-                await process.WaitForExitAsync();
-
-                _logger.LogInformation("TTS标准输出: {Output}", output);
-                if (!string.IsNullOrWhiteSpace(error))
-                {
-                    _logger.LogError("TTS标准错误: {Error}", error);
+                    _logger.LogError("所有TTS执行方式都失败了");
+                    throw new Exception("语音合成失败: edge-tts 命令不可用。请确保已安装 edge-tts (pip install edge-tts)");
                 }
 
                 // 检查文件是否生成
@@ -873,6 +851,132 @@ namespace FlowithRealizationAPI.Services
                 return "surprised";
             
             return "neutral";
+        }
+
+        /// <summary>
+        /// 尝试多种方式执行edge-tts命令
+        /// </summary>
+        private async Task<bool> TryExecuteEdgeTTSAsync(string text, string voice, string ratePercent, float pitch, string outputPath)
+        {
+            // 方式1: 直接执行edge-tts命令
+            try
+            {
+                var command = $"edge-tts --voice {voice} --rate {ratePercent} --pitch {pitch:+0}Hz --text \"{text}\" --write-media \"{outputPath}\"";
+                _logger.LogInformation("尝试方式1: 直接执行edge-tts命令");
+                
+                if (await ExecuteCommandAsync("edge-tts", $"--voice {voice} --rate {ratePercent} --pitch {pitch:+0}Hz --text \"{text}\" --write-media \"{outputPath}\""))
+                {
+                    return File.Exists(outputPath) && new FileInfo(outputPath).Length > 0;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning("方式1失败: {Message}", ex.Message);
+            }
+
+            // 方式2: 使用python -m edge_tts
+            try
+            {
+                _logger.LogInformation("尝试方式2: 使用python -m edge_tts");
+                
+                if (await ExecuteCommandAsync("python", $"-m edge_tts --voice {voice} --rate {ratePercent} --pitch {pitch:+0}Hz --text \"{text}\" --write-media \"{outputPath}\""))
+                {
+                    return File.Exists(outputPath) && new FileInfo(outputPath).Length > 0;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning("方式2失败: {Message}", ex.Message);
+            }
+
+            // 方式3: 使用python3 -m edge_tts
+            try
+            {
+                _logger.LogInformation("尝试方式3: 使用python3 -m edge_tts");
+                
+                if (await ExecuteCommandAsync("python3", $"-m edge_tts --voice {voice} --rate {ratePercent} --pitch {pitch:+0}Hz --text \"{text}\" --write-media \"{outputPath}\""))
+                {
+                    return File.Exists(outputPath) && new FileInfo(outputPath).Length > 0;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning("方式3失败: {Message}", ex.Message);
+            }
+
+            // 方式4: 使用配置的Python路径
+            var pythonPath = _configuration["RealtimeDigitalHuman:Whisper:PythonPath"];
+            if (!string.IsNullOrEmpty(pythonPath))
+            {
+                try
+                {
+                    _logger.LogInformation("尝试方式4: 使用配置的Python路径 {PythonPath}", pythonPath);
+                    
+                    if (await ExecuteCommandAsync(pythonPath, $"-m edge_tts --voice {voice} --rate {ratePercent} --pitch {pitch:+0}Hz --text \"{text}\" --write-media \"{outputPath}\""))
+                    {
+                        return File.Exists(outputPath) && new FileInfo(outputPath).Length > 0;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning("方式4失败: {Message}", ex.Message);
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// 执行命令的辅助方法
+        /// </summary>
+        private async Task<bool> ExecuteCommandAsync(string fileName, string arguments)
+        {
+            try
+            {
+                var processInfo = new ProcessStartInfo
+                {
+                    FileName = fileName,
+                    Arguments = arguments,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    WorkingDirectory = Directory.GetCurrentDirectory(),
+                    StandardOutputEncoding = System.Text.Encoding.UTF8,
+                    StandardErrorEncoding = System.Text.Encoding.UTF8
+                };
+
+                // 设置环境变量
+                processInfo.Environment["PYTHONIOENCODING"] = "utf-8";
+                processInfo.Environment["PYTHONUNBUFFERED"] = "1";
+                processInfo.Environment["PYTHONUTF8"] = "1";
+
+                using var process = Process.Start(processInfo);
+                if (process == null)
+                {
+                    return false;
+                }
+
+                var output = await process.StandardOutput.ReadToEndAsync();
+                var error = await process.StandardError.ReadToEndAsync();
+                await process.WaitForExitAsync();
+
+                if (!string.IsNullOrWhiteSpace(output))
+                {
+                    _logger.LogDebug("命令输出: {Output}", output);
+                }
+                if (!string.IsNullOrWhiteSpace(error))
+                {
+                    _logger.LogDebug("命令错误: {Error}", error);
+                }
+
+                return process.ExitCode == 0;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug("执行命令失败 {FileName}: {Message}", fileName, ex.Message);
+                return false;
+            }
         }
     }
 }
