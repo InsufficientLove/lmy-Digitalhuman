@@ -745,7 +745,8 @@ namespace LmyDigitalHuman.Services
 
                 // 构建完整路径
                 var fullImagePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", imagePath.TrimStart('/'));
-                var fullAudioPath = audioPath; // audioPath已经是完整路径
+                // 如果音频路径是相对路径，转换为绝对路径
+                var fullAudioPath = Path.IsPathRooted(audioPath) ? audioPath : Path.GetFullPath(audioPath);
 
                 // 检查文件是否存在
                 if (!File.Exists(fullImagePath))
@@ -802,6 +803,9 @@ namespace LmyDigitalHuman.Services
                 process.StartInfo.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";
                 process.StartInfo.EnvironmentVariables["PYTHONUNBUFFERED"] = "1";
                 process.StartInfo.EnvironmentVariables["PYTHONUTF8"] = "1";
+                // 禁用代理以避免edge-tts的警告
+                process.StartInfo.EnvironmentVariables["NO_PROXY"] = "*";
+                process.StartInfo.EnvironmentVariables["no_proxy"] = "*";
 
                 _logger.LogInformation("执行SadTalker命令: {Python} {Arguments}", pythonPath, process.StartInfo.Arguments);
 
@@ -811,10 +815,21 @@ namespace LmyDigitalHuman.Services
                 var error = await process.StandardError.ReadToEndAsync();
                 await process.WaitForExitAsync();
 
-                _logger.LogInformation("SadTalker标准输出: {Output}", output);
+                // 清理进度条输出，只保留有意义的信息
+                var cleanOutput = CleanProgressBarOutput(output);
+                if (!string.IsNullOrWhiteSpace(cleanOutput))
+                {
+                    _logger.LogInformation("SadTalker输出: {Output}", cleanOutput);
+                }
+                
                 if (!string.IsNullOrWhiteSpace(error))
                 {
-                    _logger.LogError("SadTalker标准错误: {Error}", error);
+                    // 只记录真正的错误，忽略进度条
+                    var cleanError = CleanProgressBarOutput(error);
+                    if (!string.IsNullOrWhiteSpace(cleanError) && !cleanError.Contains("it/s]"))
+                    {
+                        _logger.LogError("SadTalker错误: {Error}", cleanError);
+                    }
                 }
 
                 if (process.ExitCode == 0)
@@ -940,6 +955,9 @@ namespace LmyDigitalHuman.Services
                 processInfo.Environment["PYTHONIOENCODING"] = "utf-8";
                 processInfo.Environment["PYTHONUNBUFFERED"] = "1";
                 processInfo.Environment["PYTHONUTF8"] = "1";
+                // 禁用代理以避免edge-tts的警告
+                processInfo.Environment["NO_PROXY"] = "*";
+                processInfo.Environment["no_proxy"] = "*";
 
                 using var process = Process.Start(processInfo);
                 if (process == null)
@@ -967,6 +985,42 @@ namespace LmyDigitalHuman.Services
                 _logger.LogDebug("执行命令失败 {FileName}: {Message}", fileName, ex.Message);
                 return false;
             }
+        }
+
+        private string CleanProgressBarOutput(string output)
+        {
+            if (string.IsNullOrWhiteSpace(output))
+                return output;
+
+            // 移除进度条和重复的行
+            var lines = output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            var cleanedLines = new List<string>();
+            var lastProgressLine = "";
+
+            foreach (var line in lines)
+            {
+                // 跳过重复的进度条行
+                if (line.Contains("%|") && line.Contains("it/s]"))
+                {
+                    // 只保留最后一个进度条行
+                    lastProgressLine = line;
+                    continue;
+                }
+                
+                // 保留非进度条行
+                if (!string.IsNullOrWhiteSpace(line))
+                {
+                    cleanedLines.Add(line);
+                }
+            }
+
+            // 如果有进度条，添加最后一个
+            if (!string.IsNullOrWhiteSpace(lastProgressLine))
+            {
+                cleanedLines.Add(lastProgressLine);
+            }
+
+            return string.Join("\n", cleanedLines);
         }
     }
 }

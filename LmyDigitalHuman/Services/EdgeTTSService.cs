@@ -264,6 +264,9 @@ namespace LmyDigitalHuman.Services
                 processInfo.Environment["PYTHONIOENCODING"] = "utf-8";
                 processInfo.Environment["PYTHONUNBUFFERED"] = "1";
                 processInfo.Environment["PYTHONUTF8"] = "1";
+                // 禁用代理以避免edge-tts的警告
+                processInfo.Environment["NO_PROXY"] = "*";
+                processInfo.Environment["no_proxy"] = "*";
 
                 using var process = Process.Start(processInfo);
                 if (process == null)
