@@ -45,37 +45,49 @@ if not exist "%SADTALKER_VENV%\Scripts\python.exe" (
 )
 
 echo.
-echo [步骤3] 在 SadTalker 环境中安装 Edge-TTS...
+echo [步骤3] 在 SadTalker 环境中安装依赖...
 if exist "%SADTALKER_VENV%\Scripts\python.exe" (
     echo 使用 SadTalker 环境: %SADTALKER_VENV%
-    "%SADTALKER_VENV%\Scripts\python.exe" -m pip install edge-tts
+    
+    REM 安装 PyTorch 1.12.1 + CUDA 11.3
+    echo 安装 PyTorch 1.12.1 + CUDA 11.3...
+    "%SADTALKER_VENV%\Scripts\python.exe" -m pip install torch==1.12.1+cu113 torchvision==0.13.1+cu113 torchaudio==0.12.1 --extra-index-url https://download.pytorch.org/whl/cu113
+    
+    REM 安装 SadTalker 核心依赖
+    echo 安装 SadTalker 依赖...
+    "%SADTALKER_VENV%\Scripts\python.exe" -m pip install numpy==1.23.4 face_alignment==1.3.5 imageio==2.19.3 imageio-ffmpeg==0.4.7
+    "%SADTALKER_VENV%\Scripts\python.exe" -m pip install librosa==0.9.2 numba resampy==0.3.1 pydub==0.25.1 scipy==1.10.1
+    "%SADTALKER_VENV%\Scripts\python.exe" -m pip install kornia==0.6.8 tqdm yacs==0.1.8 pyyaml joblib==1.1.0
+    "%SADTALKER_VENV%\Scripts\python.exe" -m pip install scikit-image==0.19.3 basicsr==1.4.2 facexlib==0.3.0
+    "%SADTALKER_VENV%\Scripts\python.exe" -m pip install gradio gfpgan av safetensors
+    
+    REM 安装 Edge-TTS 和 Whisper
+    echo 安装 Edge-TTS 和 Whisper...
+    "%SADTALKER_VENV%\Scripts\python.exe" -m pip install edge-tts openai-whisper
     
     REM 验证安装
+    "%SADTALKER_VENV%\Scripts\python.exe" -c "import torch; print('[成功] PyTorch 版本:', torch.__version__, '- CUDA 可用:', torch.cuda.is_available())"
     "%SADTALKER_VENV%\Scripts\python.exe" -c "import edge_tts; print('[成功] Edge-TTS 版本:', edge_tts.__version__)"
 ) else (
     echo [跳过] SadTalker 环境安装
 )
 
 echo.
-echo [步骤4] 在系统 Python 中安装 Edge-TTS（备用）...
-python -m pip install edge-tts
-
-echo.
-echo [步骤5] 检查 Whisper 环境...
-echo 正在检查 Whisper 是否已安装...
-python -c "import whisper" 2>nul
-if %errorlevel% neq 0 (
-    echo [提示] Whisper 未安装。如果需要语音识别功能，请运行：
-    echo pip install openai-whisper
-    echo.
-    echo 注意：Whisper 安装包较大，建议使用国内镜像：
-    echo pip install -i https://pypi.tuna.tsinghua.edu.cn/simple openai-whisper
+echo [步骤4] 下载 SadTalker 模型（可选）...
+if exist "%SADTALKER_PATH%\checkpoints" (
+    echo [提示] checkpoints 目录已存在，跳过模型下载
 ) else (
-    echo [成功] Whisper 已安装
+    echo [提示] 需要手动下载 SadTalker 模型
+    echo 请参考文档下载模型文件到：
+    echo %SADTALKER_PATH%\checkpoints
+    echo.
+    echo 模型下载地址：
+    echo - 百度网盘：https://pan.baidu.com/s/1tb0pBh2vZO5YD5vRNe_ZXg （提取码：sadt）
+    echo - Google Drive：https://drive.google.com/drive/folders/1Wd88VDoLhVzYsQ30_qDVluQHjqQHrmYKr
 )
 
 echo.
-echo [步骤6] 创建配置文件...
+echo [步骤5] 创建配置文件...
 if exist "appsettings.json" (
     echo 正在更新配置文件中的 Python 路径...
     REM 这里可以使用 PowerShell 来更新 JSON
@@ -87,7 +99,7 @@ if exist "appsettings.json" (
 )
 
 echo.
-echo [步骤7] 测试环境...
+echo [步骤6] 测试环境...
 echo.
 echo 测试 Edge-TTS...
 if exist "%SADTALKER_VENV%\Scripts\python.exe" (

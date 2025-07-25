@@ -40,9 +40,16 @@ dotnet run
 
 ## 系统要求
 - .NET 8.0 SDK
-- Python 3.8+
-- SadTalker 环境
-- CUDA（可选，用于 GPU 加速）
+- Python 3.8（与 SadTalker 兼容）
+- CUDA 11.3（推荐，与 SadTalker 最佳兼容）
+- SadTalker 环境（包含所有依赖）
+
+## SadTalker 环境说明
+本项目集成了完整的 SadTalker 环境，包括：
+- PyTorch 1.12.1 + CUDA 11.3
+- 所有 SadTalker 依赖（numpy==1.23.4, kornia==0.6.8 等）
+- Edge-TTS 和 Whisper（在同一虚拟环境中）
+- 预训练模型支持
 
 ## API 端点
 - POST `/api/RealtimeDigitalHuman/streaming-chat` - 流式对话
