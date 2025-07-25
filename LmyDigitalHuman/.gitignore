@@ -77,4 +77,31 @@ Desktop.ini
 # VS Code
 .vscode/*
 !.vscode/launch.json
-!.vscode/tasks.json 
+!.vscode/tasks.json
+
+# Python 相关
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+.venv/
+sadtalker_venv/
+sadtalker_env/
+
+# SadTalker 模型文件
+checkpoints/*
+gfpgan/*
+*.pth
+*.ckpt
+*.safetensors
+*.tar
+
+# 文档和脚本（只保留必要的）
+*.md
+!README.md
+*.bat
+!setup-python-env.bat
+!check-environment.bat
+*.sh
+!download-sadtalker-models.sh 

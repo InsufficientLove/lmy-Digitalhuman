@@ -99,20 +99,20 @@ if exist "appsettings.json" (
 )
 
 echo.
-echo [步骤6] 测试环境...
+echo [步骤6] 快速测试...
 echo.
-echo 测试 Edge-TTS...
 if exist "%SADTALKER_VENV%\Scripts\python.exe" (
-    "%SADTALKER_VENV%\Scripts\python.exe" -m edge_tts --voice zh-CN-XiaoxiaoNeural --text "环境配置成功" --write-media test_env.mp3
-) else (
-    python -m edge_tts --voice zh-CN-XiaoxiaoNeural --text "环境配置成功" --write-media test_env.mp3
-)
-
-if exist test_env.mp3 (
-    echo [成功] Edge-TTS 测试通过！
-    del test_env.mp3
-) else (
-    echo [警告] Edge-TTS 测试失败，请检查安装
+    echo 测试 Edge-TTS...
+    "%SADTALKER_VENV%\Scripts\python.exe" -c "import edge_tts; print('[成功] Edge-TTS 已安装')" 2>nul
+    if %errorlevel% neq 0 (
+        echo [警告] Edge-TTS 测试失败
+    )
+    
+    echo 测试 PyTorch...
+    "%SADTALKER_VENV%\Scripts\python.exe" -c "import torch; print('[成功] PyTorch 已安装, CUDA:', torch.cuda.is_available())" 2>nul
+    if %errorlevel% neq 0 (
+        echo [警告] PyTorch 测试失败
+    )
 )
 
 echo.
@@ -120,13 +120,12 @@ echo ============================================
 echo    环境配置完成！
 echo ============================================
 echo.
-echo 配置摘要：
-echo - Python 路径: %SADTALKER_VENV%\Scripts\python.exe
-echo - Edge-TTS: 已安装（支持语音合成）
-echo - Whisper: 需要时请手动安装（支持语音识别）
+echo Python 路径已更新到配置文件
 echo.
-echo 【下一步操作】
-echo 1. 启动 LmyDigitalHuman 项目
-echo 2. 如果遇到问题，请查看 logs 目录下的日志文件
+echo 【下一步】
+echo 1. 运行环境检查: check-environment.bat
+echo 2. 下载 SadTalker 模型（如果还没有）
+echo 3. 启动系统: dotnet run
+echo 4. 访问: http://localhost:5000
 echo.
 pause
