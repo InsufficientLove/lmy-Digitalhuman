@@ -777,21 +777,33 @@ namespace LmyDigitalHuman.Services
                     throw new Exception($"SadTalker inference.py不存在: {inferencePath}");
                 }
 
+                // 使用配置的Python路径（SadTalker虚拟环境）
+                var pythonPath = _configuration["RealtimeDigitalHuman:SadTalker:PythonPath"] ?? 
+                    _configuration["RealtimeDigitalHuman:Whisper:PythonPath"] ?? 
+                    "python";
+
                 var process = new Process
                 {
                     StartInfo = new ProcessStartInfo
                     {
-                        FileName = "python",
+                        FileName = pythonPath,
                         Arguments = $"inference.py --driven_audio \"{fullAudioPath}\" --source_image \"{fullImagePath}\" --result_dir \"{_outputPath}\" --still --preprocess full --enhancer gfpgan",
                         WorkingDirectory = _sadTalkerPath,
                         UseShellExecute = false,
                         RedirectStandardOutput = true,
                         RedirectStandardError = true,
-                        CreateNoWindow = true
+                        CreateNoWindow = true,
+                        StandardOutputEncoding = System.Text.Encoding.UTF8,
+                        StandardErrorEncoding = System.Text.Encoding.UTF8
                     }
                 };
 
-                _logger.LogInformation("执行SadTalker命令: python {Arguments}", process.StartInfo.Arguments);
+                // 设置Python环境变量
+                process.StartInfo.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";
+                process.StartInfo.EnvironmentVariables["PYTHONUNBUFFERED"] = "1";
+                process.StartInfo.EnvironmentVariables["PYTHONUTF8"] = "1";
+
+                _logger.LogInformation("执行SadTalker命令: {Python} {Arguments}", pythonPath, process.StartInfo.Arguments);
 
                 process.Start();
                 
@@ -858,71 +870,49 @@ namespace LmyDigitalHuman.Services
         /// </summary>
         private async Task<bool> TryExecuteEdgeTTSAsync(string text, string voice, string ratePercent, float pitch, string outputPath)
         {
-            // 方式1: 直接执行edge-tts命令
+            // 优先使用配置的Python路径（SadTalker虚拟环境）
+            var pythonPath = _configuration["RealtimeDigitalHuman:SadTalker:PythonPath"] ?? 
+                _configuration["RealtimeDigitalHuman:Whisper:PythonPath"] ?? 
+                "python";
+            
             try
             {
-                var command = $"edge-tts --voice {voice} --rate {ratePercent} --pitch {pitch:+0}Hz --text \"{text}\" --write-media \"{outputPath}\"";
-                _logger.LogInformation("尝试方式1: 直接执行edge-tts命令");
+                _logger.LogInformation("使用Python路径执行edge-tts: {PythonPath}", pythonPath);
+                
+                if (await ExecuteCommandAsync(pythonPath, $"-m edge_tts --voice {voice} --rate {ratePercent} --pitch {pitch:+0}Hz --text \"{text}\" --write-media \"{outputPath}\""))
+                {
+                    if (File.Exists(outputPath) && new FileInfo(outputPath).Length > 0)
+                    {
+                        _logger.LogInformation("TTS成功生成音频文件: {Path}, 大小: {Size} bytes", outputPath, new FileInfo(outputPath).Length);
+                        return true;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "执行edge-tts失败: {PythonPath}", pythonPath);
+            }
+
+            // 备用方式: 直接执行edge-tts命令（如果已添加到PATH）
+            try
+            {
+                _logger.LogInformation("尝试直接执行edge-tts命令");
                 
                 if (await ExecuteCommandAsync("edge-tts", $"--voice {voice} --rate {ratePercent} --pitch {pitch:+0}Hz --text \"{text}\" --write-media \"{outputPath}\""))
                 {
-                    return File.Exists(outputPath) && new FileInfo(outputPath).Length > 0;
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning("方式1失败: {Message}", ex.Message);
-            }
-
-            // 方式2: 使用python -m edge_tts
-            try
-            {
-                _logger.LogInformation("尝试方式2: 使用python -m edge_tts");
-                
-                if (await ExecuteCommandAsync("python", $"-m edge_tts --voice {voice} --rate {ratePercent} --pitch {pitch:+0}Hz --text \"{text}\" --write-media \"{outputPath}\""))
-                {
-                    return File.Exists(outputPath) && new FileInfo(outputPath).Length > 0;
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning("方式2失败: {Message}", ex.Message);
-            }
-
-            // 方式3: 使用python3 -m edge_tts
-            try
-            {
-                _logger.LogInformation("尝试方式3: 使用python3 -m edge_tts");
-                
-                if (await ExecuteCommandAsync("python3", $"-m edge_tts --voice {voice} --rate {ratePercent} --pitch {pitch:+0}Hz --text \"{text}\" --write-media \"{outputPath}\""))
-                {
-                    return File.Exists(outputPath) && new FileInfo(outputPath).Length > 0;
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning("方式3失败: {Message}", ex.Message);
-            }
-
-            // 方式4: 使用配置的Python路径
-            var pythonPath = _configuration["RealtimeDigitalHuman:Whisper:PythonPath"];
-            if (!string.IsNullOrEmpty(pythonPath))
-            {
-                try
-                {
-                    _logger.LogInformation("尝试方式4: 使用配置的Python路径 {PythonPath}", pythonPath);
-                    
-                    if (await ExecuteCommandAsync(pythonPath, $"-m edge_tts --voice {voice} --rate {ratePercent} --pitch {pitch:+0}Hz --text \"{text}\" --write-media \"{outputPath}\""))
+                    if (File.Exists(outputPath) && new FileInfo(outputPath).Length > 0)
                     {
-                        return File.Exists(outputPath) && new FileInfo(outputPath).Length > 0;
+                        _logger.LogInformation("TTS成功生成音频文件（直接命令）: {Path}", outputPath);
+                        return true;
                     }
                 }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning("方式4失败: {Message}", ex.Message);
-                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning("直接执行edge-tts失败: {Message}", ex.Message);
             }
 
+            _logger.LogError("所有edge-tts执行方式都失败了");
             return false;
         }
 

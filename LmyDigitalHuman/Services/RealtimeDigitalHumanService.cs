@@ -283,7 +283,12 @@ namespace LmyDigitalHuman.Services
                 ratePercent = $"-{(int)((1.0 - rate) * 100)}%";
             }
             
-            return $"edge-tts --voice {voice} --rate {ratePercent} --pitch {pitch:+0}Hz --text \"{text}\" --write-media \"{outputPath}\"";
+            // 使用配置的Python路径执行edge-tts
+            var pythonPath = _configuration["RealtimeDigitalHuman:SadTalker:PythonPath"] ?? 
+                _configuration["RealtimeDigitalHuman:Whisper:PythonPath"] ?? 
+                "python";
+            
+            return $"\"{pythonPath}\" -m edge_tts --voice {voice} --rate {ratePercent} --pitch {pitch:+0}Hz --text \"{text}\" --write-media \"{outputPath}\"";
         }
 
         private async Task<(bool Success, string Error)> RunCommandAsync(string command)

@@ -242,19 +242,28 @@ namespace LmyDigitalHuman.Services
         {
             try
             {
+                // 使用配置的Python路径（SadTalker虚拟环境）
+                var pythonPath = _configuration["RealtimeDigitalHuman:SadTalker:PythonPath"] ?? 
+                    _configuration["RealtimeDigitalHuman:Whisper:PythonPath"] ?? 
+                    "python";
+
                 var processInfo = new ProcessStartInfo
                 {
-                    FileName = "edge-tts",
-                    Arguments = arguments,
+                    FileName = pythonPath,
+                    Arguments = $"-m edge_tts {arguments}",
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                     UseShellExecute = false,
                     CreateNoWindow = true,
-                    WorkingDirectory = _outputPath
+                    WorkingDirectory = _outputPath,
+                    StandardOutputEncoding = System.Text.Encoding.UTF8,
+                    StandardErrorEncoding = System.Text.Encoding.UTF8
                 };
 
                 // 设置环境变量
                 processInfo.Environment["PYTHONIOENCODING"] = "utf-8";
+                processInfo.Environment["PYTHONUNBUFFERED"] = "1";
+                processInfo.Environment["PYTHONUTF8"] = "1";
 
                 using var process = Process.Start(processInfo);
                 if (process == null)
