@@ -1010,9 +1010,16 @@
                     console.log('[CreateAvatar] 返回结果:', result);
                     
                     if (result.success) {
-                        this.showSuccess('自定义数字人创建成功！');
+                        this.showSuccess('自定义数字人创建成功！预览视频正在后台生成中...');
                         this.hideUploadModal();
                         await this.loadAvailableAvatars(); // 重新加载头像列表
+                        
+                        // 提示用户视频正在生成
+                        if (!result.avatar?.previewVideoPath) {
+                            setTimeout(() => {
+                                this.showWarning('提示：预览视频仍在生成中，稍后刷新即可查看');
+                            }, 1000);
+                        }
                     } else {
                         this.showError(result.message || result.error || '创建失败');
                     }

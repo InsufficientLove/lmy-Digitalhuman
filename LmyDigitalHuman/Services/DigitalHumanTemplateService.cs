@@ -811,6 +811,7 @@ namespace LmyDigitalHuman.Services
                 process.StartInfo.EnvironmentVariables["no_proxy"] = "*";
 
                 _logger.LogInformation("执行SadTalker命令: {Python} {Arguments}", pythonPath, process.StartInfo.Arguments);
+                _logger.LogInformation("工作目录: {WorkingDirectory}", _sadTalkerPath);
 
                 process.Start();
                 
@@ -846,17 +847,30 @@ namespace LmyDigitalHuman.Services
 
                     if (process.ExitCode == 0)
                     {
-                        // 检查生成的视频文件
-                        var generatedVideoPath = Path.Combine(_outputPath, videoFileName);
-                        if (File.Exists(generatedVideoPath))
+                        // SadTalker可能生成在子目录中，需要查找实际生成的文件
+                        var foundVideoPath = FindGeneratedVideo(_outputPath, imagePath, audioPath);
+                        
+                        if (!string.IsNullOrEmpty(foundVideoPath))
                         {
-                            var fileInfo = new FileInfo(generatedVideoPath);
-                            _logger.LogInformation("视频生成成功: {Path}, 大小: {Size} bytes", generatedVideoPath, fileInfo.Length);
+                            var fileInfo = new FileInfo(foundVideoPath);
+                            _logger.LogInformation("视频生成成功: {Path}, 大小: {Size} bytes", foundVideoPath, fileInfo.Length);
+                            
+                            // 如果生成在子目录，移动到主目录
+                            var targetPath = Path.Combine(_outputPath, videoFileName);
+                            if (foundVideoPath != targetPath)
+                            {
+                                Directory.CreateDirectory(Path.GetDirectoryName(targetPath));
+                                File.Move(foundVideoPath, targetPath, true);
+                                
+                                // 清理空的子目录
+                                TryCleanupEmptyDirectories(Path.GetDirectoryName(foundVideoPath));
+                            }
+                            
                             return $"/videos/{videoFileName}";
                         }
                         else
                         {
-                            _logger.LogError("视频文件未生成: {Path}", generatedVideoPath);
+                            _logger.LogError("视频文件未找到，尝试路径: {Path}", Path.Combine(_outputPath, videoFileName));
                             throw new Exception("视频文件未生成");
                         }
                     }
@@ -1039,8 +1053,77 @@ namespace LmyDigitalHuman.Services
             // 其他可配置参数
             var batchSize = _configuration.GetValue<int>("RealtimeDigitalHuman:SadTalker:BatchSize", 2);
             args.Add($"--batch_size {batchSize}");
+            
+            // 添加size参数，确保输出文件名可预测
+            args.Add("--size 256");
 
             return string.Join(" ", args);
+        }
+
+        private string FindGeneratedVideo(string outputPath, string imagePath, string audioPath)
+        {
+            try
+            {
+                // 获取图片和音频的文件名（不含扩展名）
+                var imageNameWithoutExt = Path.GetFileNameWithoutExtension(imagePath);
+                var audioNameWithoutExt = Path.GetFileNameWithoutExtension(audioPath);
+                
+                // 查找所有mp4文件
+                var mp4Files = Directory.GetFiles(outputPath, "*.mp4", SearchOption.AllDirectories);
+                
+                foreach (var mp4File in mp4Files)
+                {
+                    var fileName = Path.GetFileName(mp4File);
+                    
+                    // SadTalker生成的文件名可能包含图片名和音频名
+                    if (fileName.Contains(imageNameWithoutExt) || 
+                        fileName.Contains(audioNameWithoutExt) ||
+                        fileName.Contains("##"))
+                    {
+                        _logger.LogInformation("找到生成的视频文件: {Path}", mp4File);
+                        return mp4File;
+                    }
+                }
+                
+                // 如果没找到，尝试获取最新的mp4文件
+                var latestFile = mp4Files
+                    .Select(f => new FileInfo(f))
+                    .OrderByDescending(f => f.CreationTime)
+                    .FirstOrDefault();
+                    
+                if (latestFile != null && (DateTime.Now - latestFile.CreationTime).TotalSeconds < 60)
+                {
+                    _logger.LogInformation("找到最新生成的视频文件: {Path}", latestFile.FullName);
+                    return latestFile.FullName;
+                }
+                
+                return null;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "查找生成的视频文件时出错");
+                return null;
+            }
+        }
+
+        private void TryCleanupEmptyDirectories(string directory)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(directory) || !Directory.Exists(directory))
+                    return;
+                    
+                // 如果目录为空，删除它
+                if (!Directory.GetFiles(directory).Any() && !Directory.GetDirectories(directory).Any())
+                {
+                    Directory.Delete(directory);
+                    _logger.LogInformation("清理空目录: {Path}", directory);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "清理目录失败: {Path}", directory);
+            }
         }
 
         private string CleanProgressBarOutput(string output)
