@@ -95,20 +95,23 @@ namespace LmyDigitalHuman.Services
                 _templates[templateId] = template;
                 await SaveTemplateToFileAsync(template);
 
-                // 生成预览视频（使用默认欢迎语）
-                try
+                // 异步生成预览视频，不阻塞模板创建
+                _ = Task.Run(async () =>
                 {
-                    var previewText = "你好，我是明懿，欢迎咨询";
-                    var audioUrl = await GenerateAudioAsync(previewText, template.DefaultVoiceSettings);
-                    var videoUrl = await GenerateVideoWithSadTalkerAsync(template.ImagePath, audioUrl, "medium", "neutral");
-                    template.PreviewVideoPath = videoUrl;
-                    _logger.LogInformation("预览视频生成成功: {VideoUrl}", videoUrl);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "生成预览视频失败，但模板创建继续");
-                    // 预览视频生成失败不影响模板创建
-                }
+                    try
+                    {
+                        var previewText = "你好，我是明懿，欢迎咨询";
+                        var audioUrl = await GenerateAudioAsync(previewText, template.DefaultVoiceSettings);
+                        var videoUrl = await GenerateVideoWithSadTalkerAsync(template.ImagePath, audioUrl, "medium", "neutral");
+                        template.PreviewVideoPath = videoUrl;
+                        await SaveTemplateToFileAsync(template); // 更新模板信息
+                        _logger.LogInformation("预览视频生成成功: {VideoUrl}", videoUrl);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "生成预览视频失败");
+                    }
+                });
 
                 template.Status = "ready";
                 template.UpdatedAt = DateTime.Now;
@@ -788,7 +791,7 @@ namespace LmyDigitalHuman.Services
                     StartInfo = new ProcessStartInfo
                     {
                         FileName = pythonPath,
-                        Arguments = $"inference.py --driven_audio \"{fullAudioPath}\" --source_image \"{fullImagePath}\" --result_dir \"{_outputPath}\" --still --preprocess full --enhancer gfpgan",
+                        Arguments = BuildSadTalkerArguments(fullAudioPath, fullImagePath, _outputPath, quality),
                         WorkingDirectory = _sadTalkerPath,
                         UseShellExecute = false,
                         RedirectStandardOutput = true,
@@ -811,9 +814,18 @@ namespace LmyDigitalHuman.Services
 
                 process.Start();
                 
-                var output = await process.StandardOutput.ReadToEndAsync();
-                var error = await process.StandardError.ReadToEndAsync();
-                await process.WaitForExitAsync();
+                // 添加超时机制
+                var timeoutSeconds = _configuration.GetValue<int>("RealtimeDigitalHuman:SadTalker:TimeoutSeconds", 120);
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds));
+                
+                var outputTask = process.StandardOutput.ReadToEndAsync();
+                var errorTask = process.StandardError.ReadToEndAsync();
+                
+                try
+                {
+                    await process.WaitForExitAsync(cts.Token);
+                    var output = await outputTask;
+                    var error = await errorTask;
 
                 // 清理进度条输出，只保留有意义的信息
                 var cleanOutput = CleanProgressBarOutput(output);
@@ -832,30 +844,44 @@ namespace LmyDigitalHuman.Services
                     }
                 }
 
-                if (process.ExitCode == 0)
-                {
-                    // 检查生成的视频文件
-                    var generatedVideoPath = Path.Combine(_outputPath, videoFileName);
-                    if (File.Exists(generatedVideoPath))
+                    if (process.ExitCode == 0)
                     {
-                        var fileInfo = new FileInfo(generatedVideoPath);
-                        _logger.LogInformation("视频生成成功: {Path}, 大小: {Size} bytes", generatedVideoPath, fileInfo.Length);
-                        return $"/videos/{videoFileName}";
+                        // 检查生成的视频文件
+                        var generatedVideoPath = Path.Combine(_outputPath, videoFileName);
+                        if (File.Exists(generatedVideoPath))
+                        {
+                            var fileInfo = new FileInfo(generatedVideoPath);
+                            _logger.LogInformation("视频生成成功: {Path}, 大小: {Size} bytes", generatedVideoPath, fileInfo.Length);
+                            return $"/videos/{videoFileName}";
+                        }
+                        else
+                        {
+                            _logger.LogError("视频文件未生成: {Path}", generatedVideoPath);
+                            throw new Exception("视频文件未生成");
+                        }
                     }
                     else
                     {
-                        _logger.LogError("视频文件未生成: {Path}", generatedVideoPath);
-                        throw new Exception("视频文件未生成");
+                        var errorMessage = $"SadTalker视频生成失败，退出码: {process.ExitCode}";
+                        if (!string.IsNullOrWhiteSpace(error))
+                        {
+                            errorMessage += $", 错误: {error}";
+                        }
+                        throw new Exception(errorMessage);
                     }
                 }
-                else
+                catch (OperationCanceledException)
                 {
-                    var errorMessage = $"SadTalker视频生成失败，退出码: {process.ExitCode}";
-                    if (!string.IsNullOrWhiteSpace(error))
+                    _logger.LogError("SadTalker执行超时 ({Timeout}秒)", timeoutSeconds);
+                    
+                    // 尝试终止进程
+                    try
                     {
-                        errorMessage += $", 错误: {error}";
+                        process.Kill(true);
                     }
-                    throw new Exception(errorMessage);
+                    catch { }
+                    
+                    throw new Exception($"视频生成超时（超过{timeoutSeconds}秒）");
                 }
             }
             catch (Exception ex)
@@ -985,6 +1011,36 @@ namespace LmyDigitalHuman.Services
                 _logger.LogDebug("执行命令失败 {FileName}: {Message}", fileName, ex.Message);
                 return false;
             }
+        }
+
+        private string BuildSadTalkerArguments(string audioPath, string imagePath, string outputPath, string quality)
+        {
+            var args = new List<string>
+            {
+                "inference.py",
+                $"--driven_audio \"{audioPath}\"",
+                $"--source_image \"{imagePath}\"",
+                $"--result_dir \"{outputPath}\"",
+                "--still"
+            };
+
+            // 根据质量设置决定是否使用增强器
+            var enableEnhancer = _configuration.GetValue<bool>("RealtimeDigitalHuman:SadTalker:EnableEnhancer", false);
+            if (enableEnhancer && quality != "fast")
+            {
+                args.Add("--preprocess full");
+                args.Add("--enhancer gfpgan");
+            }
+            else
+            {
+                args.Add("--preprocess crop");
+            }
+
+            // 其他可配置参数
+            var batchSize = _configuration.GetValue<int>("RealtimeDigitalHuman:SadTalker:BatchSize", 2);
+            args.Add($"--batch_size {batchSize}");
+
+            return string.Join(" ", args);
         }
 
         private string CleanProgressBarOutput(string output)

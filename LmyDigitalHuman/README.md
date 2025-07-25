@@ -95,7 +95,9 @@ pip install -r requirements.txt
     "SadTalker": {
       "Path": "F:/AI/SadTalker",
       "PythonPath": "F:/AI/SadTalker/venv/Scripts/python.exe",
-      "EnableGPU": true
+      "EnableGPU": true,
+      "EnableEnhancer": false,  // 关闭增强器以提高速度
+      "TimeoutSeconds": 120     // 超时时间（秒）
     }
   }
 }
@@ -132,6 +134,12 @@ pip install -r requirements.txt
 4. **中文乱码**
    - 系统已配置 UTF-8 编码
    - 确保终端支持 UTF-8
+
+5. **视频生成太慢**
+   - 在配置中设置 `"EnableEnhancer": false` 禁用增强器
+   - 首次运行需要加载模型，后续会更快
+   - 检查 GPU 是否正常工作
+   - 考虑调整 `TimeoutSeconds` 超时时间
 
 ### 环境检查
 运行 `check-environment.bat` 可以检查：
