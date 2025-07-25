@@ -38,10 +38,10 @@ namespace LmyDigitalHuman.Services
             _whisperService = whisperService;
             _httpClient = httpClient;
             
-            _templatesPath = _configuration["DigitalHumanTemplate:TemplatesPath"] ?? "wwwroot/templates";
-            _outputPath = _configuration["DigitalHumanTemplate:OutputPath"] ?? "wwwroot/videos";
-            _tempPath = _configuration["DigitalHumanTemplate:TempPath"] ?? "temp";
-            _sadTalkerPath = _configuration["RealtimeDigitalHuman:SadTalker:Path"] ?? "C:\\AI\\SadTalker";
+            _templatesPath = (_configuration["DigitalHumanTemplate:TemplatesPath"] ?? Path.Combine("wwwroot", "templates")).Replace('/', Path.DirectorySeparatorChar);
+            _outputPath = (_configuration["DigitalHumanTemplate:OutputPath"] ?? Path.Combine("wwwroot", "videos")).Replace('/', Path.DirectorySeparatorChar);
+            _tempPath = (_configuration["DigitalHumanTemplate:TempPath"] ?? "temp").Replace('/', Path.DirectorySeparatorChar);
+            _sadTalkerPath = (_configuration["RealtimeDigitalHuman:SadTalker:Path"] ?? Path.Combine("C:", "AI", "SadTalker")).Replace('/', Path.DirectorySeparatorChar);
             
             Directory.CreateDirectory(_templatesPath);
             Directory.CreateDirectory(_outputPath);
@@ -786,12 +786,15 @@ namespace LmyDigitalHuman.Services
                     _configuration["RealtimeDigitalHuman:Whisper:PythonPath"] ?? 
                     "python";
 
+                // 将输出路径转换为绝对路径
+                var fullOutputPath = Path.IsPathRooted(_outputPath) ? _outputPath : Path.GetFullPath(_outputPath);
+
                 var process = new Process
                 {
                     StartInfo = new ProcessStartInfo
                     {
                         FileName = pythonPath,
-                        Arguments = BuildSadTalkerArguments(fullAudioPath, fullImagePath, _outputPath, quality),
+                        Arguments = BuildSadTalkerArguments(fullAudioPath, fullImagePath, fullOutputPath, quality),
                         WorkingDirectory = _sadTalkerPath,
                         UseShellExecute = false,
                         RedirectStandardOutput = true,
@@ -812,6 +815,7 @@ namespace LmyDigitalHuman.Services
 
                 _logger.LogInformation("执行SadTalker命令: {Python} {Arguments}", pythonPath, process.StartInfo.Arguments);
                 _logger.LogInformation("工作目录: {WorkingDirectory}", _sadTalkerPath);
+                _logger.LogInformation("输出目录: {OutputPath}", fullOutputPath);
 
                 process.Start();
                 
@@ -835,6 +839,9 @@ namespace LmyDigitalHuman.Services
                     _logger.LogInformation("SadTalker输出: {Output}", cleanOutput);
                 }
                 
+                // 尝试从输出中解析生成的视频路径
+                var generatedVideoPath = ParseGeneratedVideoPath(output);
+                
                 if (!string.IsNullOrWhiteSpace(error))
                 {
                     // 只记录真正的错误，忽略进度条
@@ -847,8 +854,28 @@ namespace LmyDigitalHuman.Services
 
                     if (process.ExitCode == 0)
                     {
-                        // SadTalker可能生成在子目录中，需要查找实际生成的文件
-                        var foundVideoPath = FindGeneratedVideo(_outputPath, imagePath, audioPath);
+                        // 优先使用从输出中解析的路径
+                        string foundVideoPath = null;
+                        
+                        if (!string.IsNullOrEmpty(generatedVideoPath))
+                        {
+                            // 处理相对路径
+                            var candidatePath = Path.IsPathRooted(generatedVideoPath) 
+                                ? generatedVideoPath 
+                                : Path.Combine(_sadTalkerPath, generatedVideoPath);
+                            
+                            if (File.Exists(candidatePath))
+                            {
+                                foundVideoPath = candidatePath;
+                                _logger.LogInformation("使用从输出解析的视频路径: {Path}", foundVideoPath);
+                            }
+                        }
+                        
+                        // 如果解析失败，使用查找方法
+                        if (string.IsNullOrEmpty(foundVideoPath))
+                        {
+                            foundVideoPath = FindGeneratedVideo(fullOutputPath, imagePath, audioPath);
+                        }
                         
                         if (!string.IsNullOrEmpty(foundVideoPath))
                         {
@@ -1029,12 +1056,17 @@ namespace LmyDigitalHuman.Services
 
         private string BuildSadTalkerArguments(string audioPath, string imagePath, string outputPath, string quality)
         {
+            // 规范化路径分隔符（在Windows上SadTalker可能期望反斜杠）
+            var normalizedAudioPath = audioPath.Replace('/', Path.DirectorySeparatorChar);
+            var normalizedImagePath = imagePath.Replace('/', Path.DirectorySeparatorChar);
+            var normalizedOutputPath = outputPath.Replace('/', Path.DirectorySeparatorChar);
+            
             var args = new List<string>
             {
                 "inference.py",
-                $"--driven_audio \"{audioPath}\"",
-                $"--source_image \"{imagePath}\"",
-                $"--result_dir \"{outputPath}\"",
+                $"--driven_audio \"{normalizedAudioPath}\"",
+                $"--source_image \"{normalizedImagePath}\"",
+                $"--result_dir \"{normalizedOutputPath}\"",
                 "--still"
             };
 
@@ -1068,8 +1100,27 @@ namespace LmyDigitalHuman.Services
                 var imageNameWithoutExt = Path.GetFileNameWithoutExtension(imagePath);
                 var audioNameWithoutExt = Path.GetFileNameWithoutExtension(audioPath);
                 
+                // 确保输出路径存在
+                if (!Directory.Exists(outputPath))
+                {
+                    _logger.LogWarning("输出目录不存在: {Path}", outputPath);
+                    
+                    // 尝试在SadTalker工作目录下查找相对路径
+                    var sadTalkerOutputPath = Path.Combine(_sadTalkerPath, _outputPath);
+                    if (Directory.Exists(sadTalkerOutputPath))
+                    {
+                        _logger.LogInformation("在SadTalker目录下查找: {Path}", sadTalkerOutputPath);
+                        outputPath = sadTalkerOutputPath;
+                    }
+                    else
+                    {
+                        return null;
+                    }
+                }
+                
                 // 查找所有mp4文件
                 var mp4Files = Directory.GetFiles(outputPath, "*.mp4", SearchOption.AllDirectories);
+                _logger.LogInformation("在目录 {Path} 中找到 {Count} 个MP4文件", outputPath, mp4Files.Length);
                 
                 foreach (var mp4File in mp4Files)
                 {
@@ -1091,12 +1142,13 @@ namespace LmyDigitalHuman.Services
                     .OrderByDescending(f => f.CreationTime)
                     .FirstOrDefault();
                     
-                if (latestFile != null && (DateTime.Now - latestFile.CreationTime).TotalSeconds < 60)
+                if (latestFile != null && (DateTime.Now - latestFile.CreationTime).TotalSeconds < 120)
                 {
                     _logger.LogInformation("找到最新生成的视频文件: {Path}", latestFile.FullName);
                     return latestFile.FullName;
                 }
                 
+                _logger.LogWarning("未找到符合条件的视频文件");
                 return null;
             }
             catch (Exception ex)
@@ -1124,6 +1176,44 @@ namespace LmyDigitalHuman.Services
             {
                 _logger.LogWarning(ex, "清理目录失败: {Path}", directory);
             }
+        }
+
+        private string ParseGeneratedVideoPath(string output)
+        {
+            if (string.IsNullOrWhiteSpace(output))
+                return null;
+                
+            try
+            {
+                // 查找 "The generated video is named" 的行
+                var lines = output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                foreach (var line in lines)
+                {
+                    if (line.Contains("The generated video is named") && line.Contains(".mp4"))
+                    {
+                        // 提取路径部分
+                        var startIndex = line.IndexOf("named") + 5;
+                        var path = line.Substring(startIndex).Trim();
+                        
+                        // 移除可能的冒号
+                        if (path.EndsWith(":"))
+                            path = path.TrimEnd(':');
+                            
+                        // 规范化路径分隔符
+                        path = path.Replace('/', Path.DirectorySeparatorChar)
+                                  .Replace('\\', Path.DirectorySeparatorChar);
+                        
+                        _logger.LogInformation("从输出中解析到视频路径: {Path}", path);
+                        return path;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "解析视频路径时出错");
+            }
+            
+            return null;
         }
 
         private string CleanProgressBarOutput(string output)
