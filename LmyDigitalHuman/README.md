@@ -2,26 +2,34 @@
 
 ## 快速开始
 
-### 1. 环境准备
+### 方式一：Docker 部署（推荐）
+
 ```bash
-# 运行环境安装脚本
-setup-python-env.bat
+# 克隆项目
+git clone https://github.com/InsufficientLove/lmy-Digitalhuman.git
+cd lmy-Digitalhuman/LmyDigitalHuman
+
+# 启动开发环境（支持热重载和远程调试）
+docker-compose up lmy-digital-human-dev
+
+# 或启动生产环境
+docker-compose up -d lmy-digital-human
 ```
 
-### 2. 配置文件
-修改 `appsettings.json` 中的路径配置：
-- `SadTalker:Path` - SadTalker 安装路径
-- `Whisper:PythonPath` - Python 解释器路径
-- `Whisper:UseGPU` - 是否使用 GPU（已设置为 true）
+### 方式二：本地运行
 
-### 3. 启动系统
 ```bash
+# 运行环境安装脚本（Windows）
+setup-python-env.bat
+
+# 修改配置文件 appsettings.json
+# 启动系统
 dotnet run
 ```
 
-### 4. 访问界面
-- 实时数字人：https://localhost:7135/realtime-digital-human.html
-- 模板管理：https://localhost:7135/templates.html
+### 访问界面
+- 实时数字人：http://localhost:5000/realtime-digital-human.html
+- 模板管理：http://localhost:5000/templates.html
 
 ## 主要功能
 - 语音识别（ASR）：基于 Whisper
@@ -40,3 +48,25 @@ dotnet run
 - POST `/api/RealtimeDigitalHuman/streaming-chat` - 流式对话
 - POST `/api/RealtimeDigitalHuman/create-avatar` - 创建数字人头像
 - GET `/api/RealtimeDigitalHuman/voices` - 获取可用语音列表
+
+## 远程调试
+
+### VS Code
+1. 安装 Remote-SSH 扩展
+2. 连接到服务器：`ssh user@server`
+3. 打开项目文件夹
+4. F5 启动调试（使用 Docker 配置）
+
+### Visual Studio
+1. 调试 -> 附加到进程
+2. 连接类型：Docker (Linux Container)
+3. 选择容器和进程
+
+详细说明请查看 [Remote-Debug-Guide.md](Remote-Debug-Guide.md)
+
+## Docker 部署优势
+- 无需手动安装 CUDA、Python 等依赖
+- 环境一致性保证
+- 支持 GPU 加速（自动检测）
+- 便于横向扩展
+- 隔离性好，不影响宿主机

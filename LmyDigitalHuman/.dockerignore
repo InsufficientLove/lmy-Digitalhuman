@@ -1,0 +1,45 @@
+# .NET
+bin/
+obj/
+out/
+*.user
+*.suo
+*.userprefs
+.vs/
+
+# 临时文件
+temp/*
+!temp/.gitkeep
+logs/*
+*.log
+
+# 测试文件
+*.test
+test_*
+
+# 版本控制
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+
+# 文档
+*.md
+!README.md
+
+# 批处理脚本
+*.bat
+*.sh
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# 媒体文件（生产环境会挂载）
+wwwroot/videos/*
+!wwwroot/videos/.gitkeep
+wwwroot/templates/*.mp4
+wwwroot/templates/*.avi
