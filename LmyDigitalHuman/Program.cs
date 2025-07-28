@@ -37,17 +37,29 @@ builder.Services.AddSwaggerGen(c =>
 // Register realtime digital human services
 builder.Services.AddSingleton<IRealtimeDigitalHumanService, RealtimeDigitalHumanService>();
 
-// Register Whisper service (Python implementation only)
-builder.Services.AddSingleton<IWhisperService, WhisperService>();
+// Register modern Whisper.NET service (C# native)
+builder.Services.AddSingleton<IWhisperNetService, WhisperNetService>();
+
+// Register streaming TTS service
+builder.Services.AddSingleton<IStreamingTTSService, StreamingTTSService>();
+
+// Register MuseTalk service for digital human generation
+builder.Services.AddHttpClient<IMuseTalkService, MuseTalkService>();
 
 // Register local LLM services
 builder.Services.AddSingleton<ILocalLLMService, OllamaService>();
 
-// Register digital human template services
+// Register digital human template services (keeping for compatibility)
 builder.Services.AddSingleton<IDigitalHumanTemplateService, DigitalHumanTemplateService>();
 
 // Register Edge TTS service
 builder.Services.AddSingleton<IEdgeTTSService, EdgeTTSService>();
+
+// Add memory caching
+builder.Services.AddMemoryCache();
+
+// Add SignalR for real-time communication
+builder.Services.AddSignalR();
 
 // Add HttpClient for services
 builder.Services.AddHttpClient();
