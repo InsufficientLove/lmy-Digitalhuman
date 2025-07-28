@@ -819,8 +819,22 @@ namespace LmyDigitalHuman.Services
                 // 确保输出目录存在
                 Directory.CreateDirectory(_outputPath);
 
-                // 构建完整路径
-                var fullImagePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", imagePath.TrimStart('/'));
+                // 构建完整路径 - 处理中文路径问题
+                string fullImagePath;
+                if (Path.IsPathRooted(imagePath))
+                {
+                    fullImagePath = imagePath;
+                }
+                else
+                {
+                    // 移除开头的斜杠并构建完整路径
+                    var relativePath = imagePath.TrimStart('/', '\\');
+                    fullImagePath = Path.Combine(Directory.GetCurrentDirectory(), relativePath);
+                }
+                
+                // 规范化路径以处理中文字符
+                fullImagePath = Path.GetFullPath(fullImagePath);
+                
                 // 如果音频路径是相对路径，转换为绝对路径
                 var fullAudioPath = Path.IsPathRooted(audioPath) ? audioPath : Path.GetFullPath(audioPath);
 
@@ -828,6 +842,19 @@ namespace LmyDigitalHuman.Services
                 if (!File.Exists(fullImagePath))
                 {
                     _logger.LogError("图片文件不存在: {Path}", fullImagePath);
+                    
+                    // 尝试查找相似的文件
+                    var directory = Path.GetDirectoryName(fullImagePath);
+                    var fileName = Path.GetFileName(fullImagePath);
+                    if (Directory.Exists(directory))
+                    {
+                        var files = Directory.GetFiles(directory, "*.jpg")
+                            .Concat(Directory.GetFiles(directory, "*.png"))
+                            .Concat(Directory.GetFiles(directory, "*.jpeg"))
+                            .ToList();
+                        _logger.LogInformation("目录 {Directory} 中的图片文件: {Files}", directory, string.Join(", ", files.Select(Path.GetFileName)));
+                    }
+                    
                     throw new Exception($"图片文件不存在: {fullImagePath}");
                 }
 
@@ -885,6 +912,11 @@ namespace LmyDigitalHuman.Services
                 // 禁用代理以避免edge-tts的警告
                 process.StartInfo.EnvironmentVariables["NO_PROXY"] = "*";
                 process.StartInfo.EnvironmentVariables["no_proxy"] = "*";
+                // 设置CUDA相关环境变量（如果需要）
+                if (_configuration.GetValue<bool>("RealtimeDigitalHuman:SadTalker:EnableCUDA", false))
+                {
+                    process.StartInfo.EnvironmentVariables["CUDA_VISIBLE_DEVICES"] = "0";
+                }
 
                 _logger.LogInformation("执行SadTalker命令: {Python} {Arguments}", pythonPath, process.StartInfo.Arguments);
                 _logger.LogInformation("工作目录: {WorkingDirectory}", _sadTalkerPath);
@@ -1134,6 +1166,12 @@ namespace LmyDigitalHuman.Services
             var normalizedImagePath = imagePath.Replace('/', Path.DirectorySeparatorChar);
             var normalizedOutputPath = outputPath.Replace('/', Path.DirectorySeparatorChar);
             
+            // 记录路径信息用于调试
+            _logger.LogInformation("SadTalker参数路径:");
+            _logger.LogInformation("  音频: {AudioPath}", normalizedAudioPath);
+            _logger.LogInformation("  图片: {ImagePath}", normalizedImagePath);
+            _logger.LogInformation("  输出: {OutputPath}", normalizedOutputPath);
+            
             var args = new List<string>
             {
                 "inference.py",
@@ -1327,19 +1365,32 @@ namespace LmyDigitalHuman.Services
 
         private string SanitizeFileName(string name)
         {
-            // 移除所有非字母、数字、下划线、空格的字符
-            var sanitized = Regex.Replace(name, @"[^a-zA-Z0-9_\u4e00-\u9fa5 ]", "");
+            // 为了避免SadTalker的中文路径问题，将中文转换为拼音或移除
+            var sanitized = name;
+            
+            // 移除或替换中文字符，避免SadTalker路径问题
+            sanitized = Regex.Replace(sanitized, @"[\u4e00-\u9fa5]", "");
+            
+            // 移除所有非字母、数字、下划线的字符
+            sanitized = Regex.Replace(sanitized, @"[^a-zA-Z0-9_]", "");
+            
             // 确保文件名不以点或空格开头
             sanitized = sanitized.TrimStart('.', ' ');
             // 确保文件名不以点或空格结尾
             sanitized = sanitized.TrimEnd('.', ' ');
-            // 将多个空格替换为一个空格
-            sanitized = Regex.Replace(sanitized, @"\s+", " ");
-            // 如果清理后为空，使用默认名称
-            if (string.IsNullOrWhiteSpace(sanitized))
+            
+            // 如果清理后为空或太短，使用默认名称加时间戳
+            if (string.IsNullOrWhiteSpace(sanitized) || sanitized.Length < 2)
             {
-                sanitized = "Template";
+                sanitized = $"Template_{DateTime.Now:yyyyMMdd_HHmmss}";
             }
+            
+            // 限制长度，避免路径过长
+            if (sanitized.Length > 20)
+            {
+                sanitized = sanitized.Substring(0, 20);
+            }
+            
             return sanitized;
         }
     }
