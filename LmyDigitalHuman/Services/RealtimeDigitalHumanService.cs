@@ -624,6 +624,17 @@ namespace LmyDigitalHuman.Services
         {
             _logger.LogInformation("开始流式对话处理: {Text}", request.Text);
 
+            await foreach (var response in ProcessStreamingChatInternalAsync(request))
+            {
+                yield return response;
+            }
+        }
+
+        /// <summary>
+        /// 内部流式对话处理方法
+        /// </summary>
+        private async IAsyncEnumerable<StreamingChatResponse> ProcessStreamingChatInternalAsync(StreamingChatRequest request)
+        {
             // 获取LLM和TTS服务
             var llmService = _serviceProvider.GetRequiredService<ILocalLLMService>();
             var ttsService = _serviceProvider.GetRequiredService<IEdgeTTSService>();
@@ -646,7 +657,9 @@ namespace LmyDigitalHuman.Services
             var processedSegments = new List<string>();
             int chunkIndex = 0;
             var lastYieldTime = DateTime.Now;
+            Exception? processingException = null;
 
+            // 处理LLM流式响应
             try
             {
                 // 流式获取LLM响应
@@ -691,11 +704,7 @@ namespace LmyDigitalHuman.Services
                                         var ttsResult = await GenerateTTSAsync(sentence, request.Voice, ttsService);
                                         if (ttsResult.Success)
                                         {
-                                            // 立即返回音频响应
-                                            await foreach (var audioResponse in YieldAudioResponse(ttsResult, sentenceIndex))
-                                            {
-                                                // 这里无法直接yield，所以我们在主循环中处理
-                                            }
+                                            _logger.LogDebug("TTS生成成功: {Sentence}", sentence.Substring(0, Math.Min(10, sentence.Length)));
                                         }
                                     }
                                     catch (Exception ex)
@@ -750,9 +759,21 @@ namespace LmyDigitalHuman.Services
                     }
                 }
 
-                // 等待短暂时间让TTS任务有机会完成
-                await Task.Delay(500);
+                _logger.LogInformation("流式对话处理完成: 总计 {Chunks} 个chunk, {Sentences} 个句子", 
+                    chunkIndex, completedSentences.Count);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "流式对话处理失败");
+                processingException = ex;
+            }
 
+            // 等待短暂时间让TTS任务有机会完成
+            await Task.Delay(500);
+
+            // 发送完成或错误响应
+            if (processingException == null)
+            {
                 // 发送完成响应
                 yield return new StreamingChatResponse
                 {
@@ -766,18 +787,14 @@ namespace LmyDigitalHuman.Services
                         ["processingTime"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")
                     }
                 };
-
-                _logger.LogInformation("流式对话处理完成: 总计 {Chunks} 个chunk, {Sentences} 个句子", 
-                    chunkIndex, completedSentences.Count);
             }
-            catch (Exception ex)
+            else
             {
-                _logger.LogError(ex, "流式对话处理失败");
-                
+                // 发送错误响应
                 yield return new StreamingChatResponse
                 {
                     Type = "error",
-                    TextDelta = ex.Message,
+                    TextDelta = processingException.Message,
                     IsComplete = true,
                     Metadata = new Dictionary<string, object>
                     {
@@ -788,25 +805,7 @@ namespace LmyDigitalHuman.Services
             }
         }
 
-        /// <summary>
-        /// 辅助方法：生成音频响应
-        /// </summary>
-        private async IAsyncEnumerable<StreamingChatResponse> YieldAudioResponse(TTSResponse ttsResult, int index)
-        {
-            yield return new StreamingChatResponse
-            {
-                Type = "audio",
-                AudioChunkUrl = ttsResult.AudioUrl,
-                IsComplete = false,
-                Metadata = new Dictionary<string, object>
-                {
-                    ["duration"] = ttsResult.Duration,
-                    ["fileSize"] = ttsResult.FileSize,
-                    ["segmentIndex"] = index,
-                    ["generatedAt"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")
-                }
-            };
-        }
+
 
         /// <summary>
         /// 生成实时数字人视频
