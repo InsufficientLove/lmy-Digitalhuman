@@ -62,8 +62,9 @@ namespace LmyDigitalHuman.Services
                 // 生成模板ID
                 var templateId = Guid.NewGuid().ToString("N");
                 
-                // 保存头像图片
-                var imageFileName = $"{templateId}.jpg";
+                // 使用模板名称作为文件名，确保文件名安全
+                var safeName = SanitizeFileName(request.TemplateName);
+                var imageFileName = $"{safeName}_{templateId}.jpg";
                 var imagePath = Path.Combine(_templatesPath, imageFileName);
                 
                 using (var stream = new FileStream(imagePath, FileMode.Create))
@@ -100,16 +101,25 @@ namespace LmyDigitalHuman.Services
                 {
                     try
                     {
-                        var previewText = "你好，我是明懿，欢迎咨询";
+                        _logger.LogInformation("开始生成预览视频: {TemplateName}", template.TemplateName);
+                        var previewText = "你好，我是" + template.TemplateName + "，欢迎咨询";
                         var audioUrl = await GenerateAudioAsync(previewText, template.DefaultVoiceSettings);
                         var videoUrl = await GenerateVideoWithSadTalkerAsync(template.ImagePath, audioUrl, "medium", "neutral");
+                        
+                        // 更新模板状态
                         template.PreviewVideoPath = videoUrl;
+                        template.Status = "ready";
+                        template.UpdatedAt = DateTime.Now;
+                        
                         await SaveTemplateToFileAsync(template); // 更新模板信息
                         _logger.LogInformation("预览视频生成成功: {VideoUrl}", videoUrl);
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "生成预览视频失败");
+                        _logger.LogError(ex, "生成预览视频失败: {TemplateName}", template.TemplateName);
+                        template.Status = "error";
+                        template.UpdatedAt = DateTime.Now;
+                        await SaveTemplateToFileAsync(template);
                     }
                 });
 
@@ -660,14 +670,77 @@ namespace LmyDigitalHuman.Services
         private void InitializeDefaultTemplates()
         {
             // 移除默认模板，只支持自定义数字人
-            // 不再初始化任何默认模板
+            // 加载已存在的模板文件
+            LoadExistingTemplates();
+        }
+
+        private void LoadExistingTemplates()
+        {
+            try
+            {
+                if (!Directory.Exists(_templatesPath))
+                {
+                    Directory.CreateDirectory(_templatesPath);
+                    return;
+                }
+
+                var jsonFiles = Directory.GetFiles(_templatesPath, "*.json");
+                _logger.LogInformation("正在加载已存在的模板文件，共找到 {Count} 个文件", jsonFiles.Length);
+
+                foreach (var jsonFile in jsonFiles)
+                {
+                    try
+                    {
+                        var json = File.ReadAllText(jsonFile, System.Text.Encoding.UTF8);
+                        var template = JsonSerializer.Deserialize<DigitalHumanTemplate>(json);
+                        
+                        if (template != null && !string.IsNullOrEmpty(template.TemplateId))
+                        {
+                            // 验证图片文件是否存在
+                            var imageFileName = Path.GetFileName(template.ImagePath?.TrimStart('/'));
+                            var fullImagePath = Path.Combine(_templatesPath, imageFileName ?? "");
+                            
+                            if (!string.IsNullOrEmpty(imageFileName) && File.Exists(fullImagePath))
+                            {
+                                // 确保ImagePath格式正确
+                                template.ImagePath = $"/templates/{imageFileName}";
+                                _templates[template.TemplateId] = template;
+                                _logger.LogInformation("成功加载模板: {Name} ({Id})", template.TemplateName, template.TemplateId);
+                            }
+                            else
+                            {
+                                _logger.LogWarning("模板 {Name} 的图片文件不存在: {ImagePath}", template.TemplateName, fullImagePath);
+                            }
+                        }
+                        else
+                        {
+                            _logger.LogWarning("无效的模板文件: {File}", jsonFile);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "加载模板文件失败: {File}", jsonFile);
+                    }
+                }
+
+                _logger.LogInformation("模板加载完成，共加载 {Count} 个有效模板", _templates.Count);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "加载现有模板时发生错误");
+            }
         }
 
         private async Task SaveTemplateToFileAsync(DigitalHumanTemplate template)
         {
-            var filePath = Path.Combine(_templatesPath, $"{template.TemplateId}.json");
-            var json = JsonSerializer.Serialize(template, new JsonSerializerOptions { WriteIndented = true });
-            await File.WriteAllTextAsync(filePath, json);
+            // 使用安全的模板名称作为JSON文件名
+            var safeName = SanitizeFileName(template.TemplateName);
+            var filePath = Path.Combine(_templatesPath, $"{safeName}_{template.TemplateId}.json");
+            var json = JsonSerializer.Serialize(template, new JsonSerializerOptions { 
+                WriteIndented = true,
+                Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping 
+            });
+            await File.WriteAllTextAsync(filePath, json, System.Text.Encoding.UTF8);
         }
 
         private async Task GeneratePreviewVideoAsync(DigitalHumanTemplate template)
@@ -1250,6 +1323,24 @@ namespace LmyDigitalHuman.Services
             }
 
             return string.Join("\n", cleanedLines);
+        }
+
+        private string SanitizeFileName(string name)
+        {
+            // 移除所有非字母、数字、下划线、空格的字符
+            var sanitized = Regex.Replace(name, @"[^a-zA-Z0-9_\u4e00-\u9fa5 ]", "");
+            // 确保文件名不以点或空格开头
+            sanitized = sanitized.TrimStart('.', ' ');
+            // 确保文件名不以点或空格结尾
+            sanitized = sanitized.TrimEnd('.', ' ');
+            // 将多个空格替换为一个空格
+            sanitized = Regex.Replace(sanitized, @"\s+", " ");
+            // 如果清理后为空，使用默认名称
+            if (string.IsNullOrWhiteSpace(sanitized))
+            {
+                sanitized = "Template";
+            }
+            return sanitized;
         }
     }
 }

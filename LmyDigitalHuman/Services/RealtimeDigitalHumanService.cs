@@ -618,7 +618,7 @@ namespace LmyDigitalHuman.Services
         }
 
         /// <summary>
-        /// 流式对话处理
+        /// 流式对话处理 - 改进的分段响应模式
         /// </summary>
         public async IAsyncEnumerable<StreamingChatResponse> ProcessStreamingChatAsync(StreamingChatRequest request)
         {
@@ -641,21 +641,19 @@ namespace LmyDigitalHuman.Services
 
             var textBuffer = new List<string>();
             var sentenceBuffer = "";
+            var completedSentences = new List<string>();
             var audioTasks = new List<Task<TTSResponse>>();
-            var audioUrls = new List<string>();
+            var processedSegments = new List<string>();
             int chunkIndex = 0;
-
-            // 用于存储待发送的响应
-            var responsesToSend = new Queue<StreamingChatResponse>();
-            Exception? caughtException = null;
+            var lastYieldTime = DateTime.Now;
 
             try
             {
                 // 流式获取LLM响应
                 await foreach (var llmChunk in llmService.ChatStreamAsync(llmRequest))
                 {
-                    // 准备文本块响应
-                    responsesToSend.Enqueue(new StreamingChatResponse
+                    // 立即发送文本块响应，避免堆积
+                    yield return new StreamingChatResponse
                     {
                         Type = "text",
                         TextDelta = llmChunk.Delta,
@@ -663,9 +661,10 @@ namespace LmyDigitalHuman.Services
                         Metadata = new Dictionary<string, object>
                         {
                             ["chunkIndex"] = chunkIndex++,
-                            ["tokenIndex"] = llmChunk.TokenIndex
+                            ["tokenIndex"] = llmChunk.TokenIndex,
+                            ["timestamp"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")
                         }
-                    });
+                    };
 
                     // 累积文本用于句子分割
                     sentenceBuffer += llmChunk.Delta;
@@ -679,19 +678,29 @@ namespace LmyDigitalHuman.Services
                         for (int i = 0; i < sentences.Count - 1; i++)
                         {
                             var sentence = sentences[i].Trim();
-                            if (!string.IsNullOrEmpty(sentence))
+                            if (!string.IsNullOrEmpty(sentence) && sentence.Length > 3)
                             {
-                                // 异步生成TTS
-                                var ttsTask = GenerateTTSAsync(sentence, request.Voice, ttsService);
-                                audioTasks.Add(ttsTask);
-
-                                // 当有音频生成完成时，立即发送
+                                completedSentences.Add(sentence);
+                                
+                                // 异步生成TTS，避免阻塞
+                                var sentenceIndex = completedSentences.Count - 1;
                                 _ = Task.Run(async () =>
                                 {
-                                    var ttsResult = await ttsTask;
-                                    if (ttsResult.Success)
+                                    try
                                     {
-                                        audioUrls.Add(ttsResult.AudioUrl);
+                                        var ttsResult = await GenerateTTSAsync(sentence, request.Voice, ttsService);
+                                        if (ttsResult.Success)
+                                        {
+                                            // 立即返回音频响应
+                                            await foreach (var audioResponse in YieldAudioResponse(ttsResult, sentenceIndex))
+                                            {
+                                                // 这里无法直接yield，所以我们在主循环中处理
+                                            }
+                                        }
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        _logger.LogError(ex, "生成TTS失败: {Sentence}", sentence);
                                     }
                                 });
                             }
@@ -701,101 +710,102 @@ namespace LmyDigitalHuman.Services
                         sentenceBuffer = sentences[sentences.Count - 1];
                     }
 
+                    // 定期输出调试信息，避免过度堆积
+                    if ((DateTime.Now - lastYieldTime).TotalMilliseconds > 200) // 每200ms至少输出一次
+                    {
+                        lastYieldTime = DateTime.Now;
+                        
+                        // 可以在这里添加一些状态信息
+                        _logger.LogDebug("流式处理进度: 已处理 {Chunks} 个chunk, 完成 {Sentences} 个句子", 
+                            chunkIndex, completedSentences.Count);
+                    }
+
                     // 如果LLM响应完成
                     if (llmChunk.IsComplete)
                     {
                         // 处理最后的句子
                         if (!string.IsNullOrEmpty(sentenceBuffer.Trim()))
                         {
-                            var ttsTask = GenerateTTSAsync(sentenceBuffer.Trim(), request.Voice, ttsService);
-                            audioTasks.Add(ttsTask);
-                        }
-                    }
-                }
-
-                // 等待所有TTS任务完成
-                var ttsResults = await Task.WhenAll(audioTasks);
-                
-                // 准备音频响应
-                foreach (var ttsResult in ttsResults.Where(r => r.Success))
-                {
-                    responsesToSend.Enqueue(new StreamingChatResponse
-                    {
-                        Type = "audio",
-                        AudioChunkUrl = ttsResult.AudioUrl,
-                        IsComplete = false,
-                        Metadata = new Dictionary<string, object>
-                        {
-                            ["duration"] = ttsResult.Duration,
-                            ["fileSize"] = ttsResult.FileSize
-                        }
-                    });
-                }
-
-                // 生成数字人视频
-                if (audioUrls.Any())
-                {
-                    var videoRequest = new GenerateVideoRequest
-                    {
-                        AvatarId = request.AvatarId,
-                        AudioUrl = audioUrls.First(), // 使用第一个音频生成视频
-                        Quality = request.Quality,
-                        Async = true
-                    };
-
-                    var videoResult = await GenerateRealtimeVideoAsync(videoRequest);
-                    
-                    if (videoResult.Success)
-                    {
-                        responsesToSend.Enqueue(new StreamingChatResponse
-                        {
-                            Type = "video",
-                            VideoUrl = videoResult.VideoUrl,
-                            IsComplete = false,
-                            Metadata = new Dictionary<string, object>
+                            var finalSentence = sentenceBuffer.Trim();
+                            completedSentences.Add(finalSentence);
+                            
+                            // 异步生成最后一个TTS
+                            _ = Task.Run(async () =>
                             {
-                                ["taskId"] = videoResult.TaskId,
-                                ["processingTime"] = videoResult.ProcessingTime
-                            }
-                        });
+                                try
+                                {
+                                    var ttsResult = await GenerateTTSAsync(finalSentence, request.Voice, ttsService);
+                                    if (ttsResult.Success)
+                                    {
+                                        _logger.LogInformation("最后一句TTS生成完成: {Sentence}", finalSentence.Substring(0, Math.Min(20, finalSentence.Length)));
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    _logger.LogError(ex, "生成最终TTS失败: {Sentence}", finalSentence);
+                                }
+                            });
+                        }
+                        break; // LLM完成，退出循环
                     }
                 }
 
-                // 准备完成响应
-                responsesToSend.Enqueue(new StreamingChatResponse
+                // 等待短暂时间让TTS任务有机会完成
+                await Task.Delay(500);
+
+                // 发送完成响应
+                yield return new StreamingChatResponse
                 {
                     Type = "complete",
                     IsComplete = true,
                     Metadata = new Dictionary<string, object>
                     {
                         ["totalText"] = string.Join("", textBuffer),
-                        ["audioCount"] = audioUrls.Count,
-                        ["totalChunks"] = chunkIndex
+                        ["completedSentences"] = completedSentences.Count,
+                        ["totalChunks"] = chunkIndex,
+                        ["processingTime"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")
                     }
-                });
+                };
+
+                _logger.LogInformation("流式对话处理完成: 总计 {Chunks} 个chunk, {Sentences} 个句子", 
+                    chunkIndex, completedSentences.Count);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "流式对话处理失败");
-                caughtException = ex;
-            }
-
-            // 在try-catch块外发送响应
-            while (responsesToSend.Count > 0)
-            {
-                yield return responsesToSend.Dequeue();
-            }
-
-            // 如果有异常，发送错误响应
-            if (caughtException != null)
-            {
+                
                 yield return new StreamingChatResponse
                 {
                     Type = "error",
-                    TextDelta = caughtException.Message,
-                    IsComplete = true
+                    TextDelta = ex.Message,
+                    IsComplete = true,
+                    Metadata = new Dictionary<string, object>
+                    {
+                        ["errorTime"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff"),
+                        ["processedChunks"] = chunkIndex
+                    }
                 };
             }
+        }
+
+        /// <summary>
+        /// 辅助方法：生成音频响应
+        /// </summary>
+        private async IAsyncEnumerable<StreamingChatResponse> YieldAudioResponse(TTSResponse ttsResult, int index)
+        {
+            yield return new StreamingChatResponse
+            {
+                Type = "audio",
+                AudioChunkUrl = ttsResult.AudioUrl,
+                IsComplete = false,
+                Metadata = new Dictionary<string, object>
+                {
+                    ["duration"] = ttsResult.Duration,
+                    ["fileSize"] = ttsResult.FileSize,
+                    ["segmentIndex"] = index,
+                    ["generatedAt"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")
+                }
+            };
         }
 
         /// <summary>

@@ -719,6 +719,140 @@
     </div>
 
     <script>
+        // 流式响应分段管理器
+        class StreamingSegmentManager {
+            constructor() {
+                this.textSegments = [];
+                this.audioSegments = [];
+                this.currentTextBuffer = '';
+                this.sentenceBuffer = '';
+                this.isProcessing = false;
+                this.processingQueue = [];
+            }
+
+            addTextChunk(textDelta) {
+                this.currentTextBuffer += textDelta;
+                this.sentenceBuffer += textDelta;
+                
+                // 检测完整的句子
+                const sentences = this.splitIntoSentences(this.sentenceBuffer);
+                if (sentences.length > 1) {
+                    // 处理完整的句子（除了最后一个）
+                    for (let i = 0; i < sentences.length - 1; i++) {
+                        const sentence = sentences[i].trim();
+                        if (sentence && sentence.length > 3) {
+                            this.textSegments.push(sentence);
+                            this.processingQueue.push({
+                                type: 'text',
+                                content: sentence,
+                                timestamp: Date.now()
+                            });
+                        }
+                    }
+                    
+                    // 保留最后一个未完成的句子
+                    this.sentenceBuffer = sentences[sentences.length - 1];
+                }
+                
+                // 如果缓存的文本超过某个长度，强制分段
+                if (this.currentTextBuffer.length > 100) {
+                    this.forceSegment();
+                }
+            }
+
+            addAudioChunk(audioUrl) {
+                this.audioSegments.push(audioUrl);
+            }
+
+            forceSegment() {
+                if (this.sentenceBuffer.trim().length > 0) {
+                    this.textSegments.push(this.sentenceBuffer.trim());
+                    this.processingQueue.push({
+                        type: 'text',
+                        content: this.sentenceBuffer.trim(),
+                        timestamp: Date.now()
+                    });
+                    this.sentenceBuffer = '';
+                }
+            }
+
+            splitIntoSentences(text) {
+                // 中文和英文句子分割
+                const pattern = /[。！？；!?;]+/;
+                const sentences = text.split(pattern).filter(s => s.trim().length > 0);
+                
+                // 如果没有找到句子分隔符，检查是否有足够长的文本
+                if (sentences.length <= 1 && text.length > 50) {
+                    // 按逗号分割较长的文本
+                    const commaPattern = /[，,]+/;
+                    const commaSentences = text.split(commaPattern).filter(s => s.trim().length > 10);
+                    if (commaSentences.length > 1) {
+                        return commaSentences;
+                    }
+                }
+                
+                return sentences.length > 1 ? sentences : [text];
+            }
+
+            async processCompletedResponse(avatarId, settings, digitalHumanInstance) {
+                // 处理最后的文本段
+                this.forceSegment();
+                
+                console.log('[StreamingSegment] 开始处理完整响应, 文本段数:', this.textSegments.length);
+                
+                if (this.textSegments.length === 0) {
+                    console.log('[StreamingSegment] 没有文本段需要处理');
+                    return;
+                }
+
+                // 合并所有文本段
+                const fullText = this.textSegments.join('，');
+                
+                try {
+                    // 生成完整的数字人视频
+                    console.log('[StreamingSegment] 生成数字人视频:', fullText.substring(0, 50) + '...');
+                    
+                    const response = await fetch('/api/RealtimeDigitalHuman/instant-chat', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            text: fullText,
+                            avatarId: avatarId,
+                            responseMode: 'quality',
+                            quality: settings.quality,
+                            enableEmotion: settings.enableEmotion
+                        })
+                    });
+
+                    if (response.ok) {
+                        const result = await response.json();
+                        if (result.success && result.videoUrl) {
+                            console.log('[StreamingSegment] 数字人视频生成成功:', result.videoUrl);
+                            digitalHumanInstance.playVideo(result.videoUrl);
+                            digitalHumanInstance.updateStatus(result.metadata);
+                        } else {
+                            console.error('[StreamingSegment] 视频生成失败:', result);
+                        }
+                    } else {
+                        console.error('[StreamingSegment] 视频生成请求失败:', response.status);
+                    }
+                } catch (error) {
+                    console.error('[StreamingSegment] 处理完整响应失败:', error);
+                }
+            }
+
+            getStatistics() {
+                return {
+                    textSegments: this.textSegments.length,
+                    audioSegments: this.audioSegments.length,
+                    totalText: this.textSegments.join(''),
+                    queueLength: this.processingQueue.length
+                };
+            }
+        }
+
         class RealtimeDigitalHuman {
             constructor() {
                 this.currentAvatar = null;
@@ -899,22 +1033,31 @@
                     
                     // 获取可用头像列表
                     const response = await fetch('/api/RealtimeDigitalHuman/avatars');
-                    const result = await response.json();
-                    console.log('[Avatar] 返回:', result);
                     
-                    if (result.success) {
+                    if (!response.ok) {
+                        throw new Error(`HTTP错误: ${response.status}`);
+                    }
+                    
+                    const result = await response.json();
+                    console.log('[Avatar] API返回:', result);
+                    
+                    if (result.success && result.avatars && Array.isArray(result.avatars)) {
                         this.availableAvatars = result.avatars;
+                        console.log('[Avatar] 成功加载头像:', this.availableAvatars.length, '个');
                         this.renderAvatars();
                     } else {
-                        // 如果API失败，显示空状态
+                        console.warn('[Avatar] API返回格式异常:', result);
+                        // 如果API返回格式不正确，显示空状态
                         this.availableAvatars = [];
                         this.renderAvatars();
+                        this.showWarning('暂无可用的数字人头像，请先创建一个');
                     }
                 } catch (error) {
                     console.error('[Avatar] 加载头像失败:', error);
                     // 网络错误时显示空状态
                     this.availableAvatars = [];
                     this.renderAvatars();
+                    this.showError('加载头像失败：' + error.message);
                 } finally {
                     this.hideLoading();
                 }
@@ -922,6 +1065,7 @@
 
             renderAvatars() {
                 this.avatarSelector.innerHTML = '';
+                
                 if (this.availableAvatars.length === 0) {
                     // 没有自定义数字人，显示引导提示
                     this.avatarSelector.innerHTML = `
@@ -935,37 +1079,62 @@
                     document.getElementById('sendVoiceTextBtn').disabled = true;
                     return;
                 }
+
+                // 启用发送按钮
                 document.getElementById('sendTextBtn').disabled = false;
                 document.getElementById('sendVoiceTextBtn').disabled = false;
+                
                 this.availableAvatars.forEach((avatar, index) => {
                     const img = document.createElement('img');
-                    img.src = avatar.previewImageUrl;
+                    img.src = avatar.previewImageUrl || avatar.imageUrl;
                     img.className = 'avatar-option';
                     img.dataset.avatar = avatar.id;
                     img.alt = avatar.name;
-                    img.title = avatar.name;
+                    img.title = `${avatar.name}\n${avatar.description || ''}`;
+                    
+                    // 第一个头像默认选中
                     if (index === 0) {
                         img.classList.add('active');
                         this.currentAvatar = avatar.id;
                     }
+                    
                     img.addEventListener('click', (e) => {
                         document.querySelectorAll('.avatar-option').forEach(a => a.classList.remove('active'));
                         e.target.classList.add('active');
                         this.currentAvatar = e.target.dataset.avatar;
+                        console.log('[Avatar] 选中头像:', this.currentAvatar);
                     });
-                    img.addEventListener('error', () => {
+                    
+                    img.addEventListener('error', (e) => {
+                        console.warn('[Avatar] 图片加载失败:', img.src);
                         // 如果图片加载失败，显示默认占位符
-                        img.style.display = 'none';
                         const placeholder = document.createElement('div');
                         placeholder.className = 'avatar-option';
-                        placeholder.style.cssText = 'width:60px;height:60px;border-radius:50%;border:3px solid #ddd;display:flex;align-items:center;justify-content:center;background:#f8f9fa;color:#666;font-size:1.5em;';
+                        placeholder.style.cssText = 'width:60px;height:60px;border-radius:50%;border:3px solid #ddd;display:flex;align-items:center;justify-content:center;background:#f8f9fa;color:#666;font-size:1.5em;cursor:pointer;';
                         placeholder.textContent = '🎭';
                         placeholder.dataset.avatar = avatar.id;
-                        placeholder.title = avatar.name;
-                        img.parentNode.insertBefore(placeholder, img);
+                        placeholder.title = `${avatar.name}\n${avatar.description || ''}\n(图片加载失败)`;
+                        
+                        // 复制点击事件
+                        placeholder.addEventListener('click', (e) => {
+                            document.querySelectorAll('.avatar-option').forEach(a => a.classList.remove('active'));
+                            e.target.classList.add('active');
+                            this.currentAvatar = e.target.dataset.avatar;
+                            console.log('[Avatar] 选中头像:', this.currentAvatar);
+                        });
+                        
+                        // 如果是当前选中的，同步active状态
+                        if (img.classList.contains('active')) {
+                            placeholder.classList.add('active');
+                        }
+                        
+                        img.parentNode.replaceChild(placeholder, img);
                     });
+                    
                     this.avatarSelector.appendChild(img);
                 });
+                
+                console.log('[Avatar] 渲染完成，当前选中:', this.currentAvatar);
             }
 
             async createCustomAvatar() {
@@ -1106,7 +1275,8 @@
                 responseTextArea.innerHTML = '<strong>AI回复：</strong><br>';
                 this.textInput.parentElement.insertBefore(responseTextArea, this.textInput.nextSibling);
 
-                const audioQueue = [];
+                // 分段响应管理
+                const segmentManager = new StreamingSegmentManager();
                 let fullResponse = '';
                 let videoGenerated = false;
 
@@ -1156,15 +1326,18 @@
                                 
                                 switch (data.type) {
                                     case 'text':
-                                        // 显示文本
+                                        // 显示文本并添加到分段管理器
                                         fullResponse += data.textDelta;
                                         responseTextArea.innerHTML = '<strong>AI回复：</strong><br>' + fullResponse;
                                         responseTextArea.scrollTop = responseTextArea.scrollHeight;
+                                        
+                                        // 添加到分段管理器
+                                        segmentManager.addTextChunk(data.textDelta);
                                         break;
                                         
                                     case 'audio':
-                                        // 添加音频到队列
-                                        audioQueue.push(data.audioChunkUrl);
+                                        // 将音频添加到分段管理器
+                                        segmentManager.addAudioChunk(data.audioChunkUrl);
                                         // 可以在这里播放音频
                                         this.playAudioInBackground(data.audioChunkUrl);
                                         break;
@@ -1178,6 +1351,12 @@
                                         break;
                                         
                                     case 'complete':
+                                        // 处理完整响应
+                                        await segmentManager.processCompletedResponse(this.currentAvatar, {
+                                            quality: document.getElementById('videoQuality').value,
+                                            enableEmotion: document.getElementById('emotionMode').value === 'true'
+                                        }, this);
+                                        
                                         this.showSuccess('对话完成！');
                                         this.textInput.value = '';
                                         // 3秒后移除回复文本
@@ -1191,11 +1370,10 @@
                                         break;
                                 }
                             } catch (e) {
-                                console.error('解析流式数据失败:', e);
+                                console.error('解析流式数据失败:', e, 'line:', line);
                             }
                         }
                     }
-                }
                 } catch (error) {
                     console.error('流式对话失败:', error);
                     this.showError('流式对话失败，请检查网络连接');
