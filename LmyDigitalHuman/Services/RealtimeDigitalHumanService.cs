@@ -635,9 +635,39 @@ namespace LmyDigitalHuman.Services
         /// </summary>
         private async IAsyncEnumerable<StreamingChatResponse> ProcessStreamingChatInternalAsync(StreamingChatRequest request)
         {
+            var responses = new List<StreamingChatResponse>();
+            var textBuffer = new List<string>();
+            var sentenceBuffer = "";
+            var completedSentences = new List<string>();
+            int chunkIndex = 0;
+            var lastYieldTime = DateTime.Now;
+            Exception? processingException = null;
+
             // 获取LLM和TTS服务
-            var llmService = _serviceProvider.GetRequiredService<ILocalLLMService>();
-            var ttsService = _serviceProvider.GetRequiredService<IEdgeTTSService>();
+            ILocalLLMService? llmService = null;
+            IEdgeTTSService? ttsService = null;
+
+            try
+            {
+                llmService = _serviceProvider.GetRequiredService<ILocalLLMService>();
+                ttsService = _serviceProvider.GetRequiredService<IEdgeTTSService>();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "获取服务失败");
+                yield return new StreamingChatResponse
+                {
+                    Type = "error",
+                    TextDelta = "服务初始化失败: " + ex.Message,
+                    IsComplete = true,
+                    Metadata = new Dictionary<string, object>
+                    {
+                        ["errorTime"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff"),
+                        ["processedChunks"] = 0
+                    }
+                };
+                yield break;
+            }
 
             // 准备LLM请求
             var llmRequest = new LocalLLMRequest
@@ -650,18 +680,34 @@ namespace LmyDigitalHuman.Services
                 MaxTokens = 1000
             };
 
+            // 处理LLM流式响应 - 使用不包含catch的独立方法
+            await foreach (var response in ProcessLLMStreamAsync(llmService, llmRequest, request, ttsService))
+            {
+                yield return response;
+            }
+        }
+
+        /// <summary>
+        /// 处理LLM流式响应的独立方法 - 不包含catch子句
+        /// </summary>
+        private async IAsyncEnumerable<StreamingChatResponse> ProcessLLMStreamAsync(
+            ILocalLLMService llmService, 
+            LocalLLMRequest llmRequest, 
+            StreamingChatRequest request,
+            IEdgeTTSService ttsService)
+        {
             var textBuffer = new List<string>();
             var sentenceBuffer = "";
             var completedSentences = new List<string>();
-            var audioTasks = new List<Task<TTSResponse>>();
-            var processedSegments = new List<string>();
             int chunkIndex = 0;
             var lastYieldTime = DateTime.Now;
-            Exception? processingException = null;
+            bool hasError = false;
+            string errorMessage = "";
 
-            // 处理LLM流式响应
             try
             {
+                _logger.LogInformation("开始LLM流式处理: {Text}", request.Text);
+                
                 // 流式获取LLM响应
                 await foreach (var llmChunk in llmService.ChatStreamAsync(llmRequest))
                 {
@@ -764,15 +810,16 @@ namespace LmyDigitalHuman.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "流式对话处理失败");
-                processingException = ex;
+                _logger.LogError(ex, "LLM流式处理失败");
+                hasError = true;
+                errorMessage = ex.Message;
             }
 
             // 等待短暂时间让TTS任务有机会完成
             await Task.Delay(500);
 
             // 发送完成或错误响应
-            if (processingException == null)
+            if (!hasError)
             {
                 // 发送完成响应
                 yield return new StreamingChatResponse
@@ -794,7 +841,7 @@ namespace LmyDigitalHuman.Services
                 yield return new StreamingChatResponse
                 {
                     Type = "error",
-                    TextDelta = processingException.Message,
+                    TextDelta = errorMessage,
                     IsComplete = true,
                     Metadata = new Dictionary<string, object>
                     {
