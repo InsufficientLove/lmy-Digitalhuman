@@ -250,6 +250,11 @@ echo Quick Check Complete!
 echo ================================================
 echo.
 echo For detailed analysis: verify_installation_status.bat
-echo This window stays open for review.
 echo.
-pause
+echo ===========================================
+echo Window Will Stay Open
+echo ===========================================
+echo This window will NOT close automatically.
+echo You can review all results above.
+echo Press any key when ready to close...
+pause >nul

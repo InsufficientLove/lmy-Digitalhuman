@@ -407,6 +407,10 @@ echo.
 echo ===========================================
 echo Verification Complete!
 echo ===========================================
-echo This window will stay open so you can review all results.
-echo Press any key to close...
+echo.
+echo This window will NOT close automatically.
+echo You can scroll up to review all detailed results.
+echo All information remains visible for your analysis.
+echo.
+echo Press any key when you're ready to close...
 pause >nul
