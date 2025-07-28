@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Caching.Memory;
+using System.Threading.Channels;
 
 namespace LmyDigitalHuman.Services
 {
@@ -618,44 +619,53 @@ namespace LmyDigitalHuman.Services
         }
 
         /// <summary>
-        /// 流式对话处理 - 改进的分段响应模式
+        /// 流式对话处理 - 使用Channel模式避免yield限制
         /// </summary>
         public async IAsyncEnumerable<StreamingChatResponse> ProcessStreamingChatAsync(StreamingChatRequest request)
         {
             _logger.LogInformation("开始流式对话处理: {Text}", request.Text);
 
-            await foreach (var response in ProcessStreamingChatInternalAsync(request))
+            var channel = Channel.CreateUnbounded<StreamingChatResponse>();
+            var writer = channel.Writer;
+
+            // 启动后台任务处理流式响应
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await ProcessStreamingChatWithChannelAsync(request, writer);
+                }
+                finally
+                {
+                    writer.Complete();
+                }
+            });
+
+            // 从channel中读取并yield响应
+            await foreach (var response in channel.Reader.ReadAllAsync())
             {
                 yield return response;
             }
         }
 
         /// <summary>
-        /// 内部流式对话处理方法
+        /// 使用Channel处理流式对话 - 不使用yield，避免语法限制
         /// </summary>
-        private async IAsyncEnumerable<StreamingChatResponse> ProcessStreamingChatInternalAsync(StreamingChatRequest request)
+        private async Task ProcessStreamingChatWithChannelAsync(StreamingChatRequest request, ChannelWriter<StreamingChatResponse> writer)
         {
-            var responses = new List<StreamingChatResponse>();
-            var textBuffer = new List<string>();
-            var sentenceBuffer = "";
-            var completedSentences = new List<string>();
-            int chunkIndex = 0;
-            var lastYieldTime = DateTime.Now;
-            Exception? processingException = null;
-
-            // 获取LLM和TTS服务
             ILocalLLMService? llmService = null;
             IEdgeTTSService? ttsService = null;
 
             try
             {
+                // 获取服务
                 llmService = _serviceProvider.GetRequiredService<ILocalLLMService>();
                 ttsService = _serviceProvider.GetRequiredService<IEdgeTTSService>();
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "获取服务失败");
-                yield return new StreamingChatResponse
+                await writer.WriteAsync(new StreamingChatResponse
                 {
                     Type = "error",
                     TextDelta = "服务初始化失败: " + ex.Message,
@@ -665,8 +675,8 @@ namespace LmyDigitalHuman.Services
                         ["errorTime"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff"),
                         ["processedChunks"] = 0
                     }
-                };
-                yield break;
+                });
+                return;
             }
 
             // 准备LLM请求
@@ -680,39 +690,21 @@ namespace LmyDigitalHuman.Services
                 MaxTokens = 1000
             };
 
-            // 处理LLM流式响应 - 使用不包含catch的独立方法
-            await foreach (var response in ProcessLLMStreamAsync(llmService, llmRequest, request, ttsService))
-            {
-                yield return response;
-            }
-        }
-
-        /// <summary>
-        /// 处理LLM流式响应的独立方法 - 不包含catch子句
-        /// </summary>
-        private async IAsyncEnumerable<StreamingChatResponse> ProcessLLMStreamAsync(
-            ILocalLLMService llmService, 
-            LocalLLMRequest llmRequest, 
-            StreamingChatRequest request,
-            IEdgeTTSService ttsService)
-        {
             var textBuffer = new List<string>();
             var sentenceBuffer = "";
             var completedSentences = new List<string>();
             int chunkIndex = 0;
             var lastYieldTime = DateTime.Now;
-            bool hasError = false;
-            string errorMessage = "";
 
             try
             {
                 _logger.LogInformation("开始LLM流式处理: {Text}", request.Text);
-                
+
                 // 流式获取LLM响应
                 await foreach (var llmChunk in llmService.ChatStreamAsync(llmRequest))
                 {
                     // 立即发送文本块响应，避免堆积
-                    yield return new StreamingChatResponse
+                    await writer.WriteAsync(new StreamingChatResponse
                     {
                         Type = "text",
                         TextDelta = llmChunk.Delta,
@@ -723,7 +715,7 @@ namespace LmyDigitalHuman.Services
                             ["tokenIndex"] = llmChunk.TokenIndex,
                             ["timestamp"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")
                         }
-                    };
+                    });
 
                     // 累积文本用于句子分割
                     sentenceBuffer += llmChunk.Delta;
@@ -740,7 +732,7 @@ namespace LmyDigitalHuman.Services
                             if (!string.IsNullOrEmpty(sentence) && sentence.Length > 3)
                             {
                                 completedSentences.Add(sentence);
-                                
+
                                 // 异步生成TTS，避免阻塞
                                 var sentenceIndex = completedSentences.Count - 1;
                                 _ = Task.Run(async () =>
@@ -751,6 +743,21 @@ namespace LmyDigitalHuman.Services
                                         if (ttsResult.Success)
                                         {
                                             _logger.LogDebug("TTS生成成功: {Sentence}", sentence.Substring(0, Math.Min(10, sentence.Length)));
+                                            
+                                            // 通过Channel发送音频响应
+                                            await writer.WriteAsync(new StreamingChatResponse
+                                            {
+                                                Type = "audio",
+                                                AudioChunkUrl = ttsResult.AudioUrl,
+                                                IsComplete = false,
+                                                Metadata = new Dictionary<string, object>
+                                                {
+                                                    ["duration"] = ttsResult.Duration,
+                                                    ["fileSize"] = ttsResult.FileSize,
+                                                    ["segmentIndex"] = sentenceIndex,
+                                                    ["generatedAt"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")
+                                                }
+                                            });
                                         }
                                     }
                                     catch (Exception ex)
@@ -769,9 +776,9 @@ namespace LmyDigitalHuman.Services
                     if ((DateTime.Now - lastYieldTime).TotalMilliseconds > 200) // 每200ms至少输出一次
                     {
                         lastYieldTime = DateTime.Now;
-                        
+
                         // 可以在这里添加一些状态信息
-                        _logger.LogDebug("流式处理进度: 已处理 {Chunks} 个chunk, 完成 {Sentences} 个句子", 
+                        _logger.LogDebug("流式处理进度: 已处理 {Chunks} 个chunk, 完成 {Sentences} 个句子",
                             chunkIndex, completedSentences.Count);
                     }
 
@@ -783,7 +790,7 @@ namespace LmyDigitalHuman.Services
                         {
                             var finalSentence = sentenceBuffer.Trim();
                             completedSentences.Add(finalSentence);
-                            
+
                             // 异步生成最后一个TTS
                             _ = Task.Run(async () =>
                             {
@@ -793,6 +800,21 @@ namespace LmyDigitalHuman.Services
                                     if (ttsResult.Success)
                                     {
                                         _logger.LogInformation("最后一句TTS生成完成: {Sentence}", finalSentence.Substring(0, Math.Min(20, finalSentence.Length)));
+                                        
+                                        // 通过Channel发送最后的音频响应
+                                        await writer.WriteAsync(new StreamingChatResponse
+                                        {
+                                            Type = "audio",
+                                            AudioChunkUrl = ttsResult.AudioUrl,
+                                            IsComplete = false,
+                                            Metadata = new Dictionary<string, object>
+                                            {
+                                                ["duration"] = ttsResult.Duration,
+                                                ["fileSize"] = ttsResult.FileSize,
+                                                ["segmentIndex"] = completedSentences.Count - 1,
+                                                ["generatedAt"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")
+                                            }
+                                        });
                                     }
                                 }
                                 catch (Exception ex)
@@ -805,24 +827,11 @@ namespace LmyDigitalHuman.Services
                     }
                 }
 
-                _logger.LogInformation("流式对话处理完成: 总计 {Chunks} 个chunk, {Sentences} 个句子", 
-                    chunkIndex, completedSentences.Count);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "LLM流式处理失败");
-                hasError = true;
-                errorMessage = ex.Message;
-            }
+                // 等待短暂时间让TTS任务有机会完成
+                await Task.Delay(500);
 
-            // 等待短暂时间让TTS任务有机会完成
-            await Task.Delay(500);
-
-            // 发送完成或错误响应
-            if (!hasError)
-            {
                 // 发送完成响应
-                yield return new StreamingChatResponse
+                await writer.WriteAsync(new StreamingChatResponse
                 {
                     Type = "complete",
                     IsComplete = true,
@@ -833,22 +842,27 @@ namespace LmyDigitalHuman.Services
                         ["totalChunks"] = chunkIndex,
                         ["processingTime"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")
                     }
-                };
+                });
+
+                _logger.LogInformation("流式对话处理完成: 总计 {Chunks} 个chunk, {Sentences} 个句子",
+                    chunkIndex, completedSentences.Count);
             }
-            else
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "LLM流式处理失败");
+
                 // 发送错误响应
-                yield return new StreamingChatResponse
+                await writer.WriteAsync(new StreamingChatResponse
                 {
                     Type = "error",
-                    TextDelta = errorMessage,
+                    TextDelta = ex.Message,
                     IsComplete = true,
                     Metadata = new Dictionary<string, object>
                     {
                         ["errorTime"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff"),
                         ["processedChunks"] = chunkIndex
                     }
-                };
+                });
             }
         }
 
