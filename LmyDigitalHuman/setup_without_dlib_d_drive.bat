@@ -380,4 +380,13 @@ echo.
 echo No dlib compilation headaches!
 echo Environment is stable and ready to use.
 echo.
-pause
+echo ================================================
+echo Setup Complete! 
+echo ================================================
+echo.
+echo To verify what was installed, run:
+echo   verify_installation_status.bat
+echo.
+echo This window will stay open for review.
+echo Press any key to close...
+pause >nul

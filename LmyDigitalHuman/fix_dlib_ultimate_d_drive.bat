@@ -331,5 +331,13 @@ if exist "%BASE_DIR%\temp_build" (
 )
 
 echo.
-echo Script completed! Check results above.
-pause
+echo ================================================
+echo Script Completed! Check Results Above
+echo ================================================
+echo.
+echo To verify what was installed, run:
+echo   verify_installation_status.bat
+echo.
+echo This window will stay open for review.
+echo Press any key to close...
+pause >nul
