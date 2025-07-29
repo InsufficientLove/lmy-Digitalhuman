@@ -27,9 +27,26 @@ builder.WebHost.ConfigureKestrel(serverOptions =>
 {
     serverOptions.ConfigureHttpsDefaults(httpsOptions =>
     {
-        // 在开发环境中允许HTTP/1.1降级
+        // 在开发环境中允许HTTP/1.1降级，使用更宽松的SSL协议
         httpsOptions.SslProtocols = System.Security.Authentication.SslProtocols.Tls12 | System.Security.Authentication.SslProtocols.Tls13;
+        
+        // 开发环境下允许无效证书
+        if (builder.Environment.IsDevelopment())
+        {
+            httpsOptions.CheckCertificateRevocation = false;
+        }
     });
+    
+    // 开发环境下的端点配置
+    if (builder.Environment.IsDevelopment())
+    {
+        serverOptions.Listen(System.Net.IPAddress.Any, 5001); // HTTP
+        serverOptions.Listen(System.Net.IPAddress.Any, 7001, listenOptions =>
+        {
+            listenOptions.UseHttps(); // HTTPS with default dev cert
+            listenOptions.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http1; // 强制使用HTTP/1.1
+        });
+    }
 });
 
 // Add services to the container.
