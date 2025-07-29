@@ -156,6 +156,56 @@
             font-size: 1.1rem;
         }
 
+        /* WebRTC样式 */
+        .webrtc-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .webrtc-controls input[type="text"] {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .stats-panel {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+        }
+
+        .stats-panel h5 {
+            margin: 0 0 10px 0;
+            color: #495057;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 10px;
+        }
+
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            color: #6c757d;
+            margin-bottom: 5px;
+        }
+
+        .stat-item span:last-child {
+            font-weight: bold;
+            color: #28a745;
+        }
+
         .input-group {
             display: flex;
             flex-direction: column;
@@ -558,6 +608,26 @@
                     </div>
                     <div id="realtimeStatus" style="display: none; color: #28a745; font-weight: bold;">
                         ✅ 实时对话已连接，可以开始语音交互
+                    </div>
+                </div>
+
+                <!-- WebRTC实时通信 -->
+                <div class="section">
+                    <h3>🌐 WebRTC实时通信 <span style="color: #ff6b6b; font-size: 0.8em;">(新功能)</span></h3>
+                    <div class="webrtc-section">
+                        <div class="webrtc-video-container" style="margin-bottom: 15px;">
+                            <video id="remoteVideo" autoplay playsinline muted 
+                                   style="width: 100%; max-height: 200px; border-radius: 8px; background: #000; border: 2px solid #ddd;"></video>
+                            <div style="text-align: center; margin-top: 5px; font-size: 0.9em; color: #666;">
+                                数字人实时视频将在这里显示
+                            </div>
+                        </div>
+                        <div id="controls" class="webrtc-controls">
+                            <!-- WebRTC控制按钮将由JS动态生成 -->
+                        </div>
+                        <div id="stats" class="webrtc-stats" style="margin-top: 15px;">
+                            <!-- 统计信息将由JS动态生成 -->
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1291,5 +1361,8 @@
             }
         };
     </script>
+
+    <!-- WebRTC实时通信脚本 -->
+    <script src="js/webrtc-realtime.js"></script>
 </body>
 </html>
