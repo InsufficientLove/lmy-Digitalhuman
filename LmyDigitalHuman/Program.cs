@@ -40,6 +40,7 @@ builder.Services.AddSwaggerGen(c =>
 builder.Services.AddSingleton<IWhisperNetService, WhisperNetService>();
 builder.Services.AddSingleton<IStreamingTTSService, StreamingTTSService>();
 builder.Services.AddSingleton<IMuseTalkService, MuseTalkService>();
+builder.Services.AddSingleton<IMuseTalkCommercialService, MuseTalkCommercialService>();
 builder.Services.AddSingleton<ILocalLLMService, OllamaService>();
 builder.Services.AddSingleton<IDigitalHumanTemplateService, DigitalHumanTemplateService>();
 builder.Services.AddSingleton<IEdgeTTSService, EdgeTTSService>();
