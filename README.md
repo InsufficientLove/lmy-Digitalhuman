@@ -58,12 +58,12 @@
    cd lmy-Digitalhuman
    ```
 
-2. **配置 Python 环境**
+2. **一键环境配置（推荐）**
    ```bash
-   # Windows
-   setup-python-env.bat
+   # Windows - 运行一键环境部署脚本
+   setup-environment.bat
    
-   # Linux/macOS
+   # Linux/macOS - 手动安装依赖
    pip install torch torchvision torchaudio numpy opencv-python pillow scipy scikit-image librosa tqdm pydub requests
    ```
 
@@ -88,13 +88,9 @@
 | 脚本名称 | 功能说明 | 适用平台 |
 |---------|----------|----------|
 | `setup-environment.bat` | 一键环境部署和配置 | Windows |
-| `setup-python-env.bat` | Python环境专用配置 | Windows |
 | `startup.bat` | 生产环境启动 | Windows |
-| `dev-start.bat` | 开发环境启动（热重载） | Windows |
-| `docker-start.bat` | Docker容器启动 | Windows |
-| `fix-build-errors.bat` | 编译错误诊断和修复 | Windows |
-| `startup.sh` | 生产环境启动 | Linux/macOS |
-| `dev-start.sh` | 开发环境启动（热重载） | Linux/macOS |
+
+> **注意**: 已精简脚本文件，保留最核心的两个脚本。Linux/macOS用户请使用手动命令启动。
 
 ## 🌐 访问地址
 
