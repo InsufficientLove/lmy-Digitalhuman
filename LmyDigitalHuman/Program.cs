@@ -22,6 +22,16 @@ Log.Logger = new LoggerConfiguration()
 
 builder.Host.UseSerilog();
 
+// 配置Kestrel服务器以解决HTTPS/HTTP2问题
+builder.WebHost.ConfigureKestrel(serverOptions =>
+{
+    serverOptions.ConfigureHttpsDefaults(httpsOptions =>
+    {
+        // 在开发环境中允许HTTP/1.1降级
+        httpsOptions.SslProtocols = System.Security.Authentication.SslProtocols.Tls12 | System.Security.Authentication.SslProtocols.Tls13;
+    });
+});
+
 // Add services to the container.
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
