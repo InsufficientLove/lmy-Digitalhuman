@@ -47,6 +47,16 @@ verify-environment.bat
 
 ### 🔧 常见问题解决
 
+#### 清理全局Python环境
+如果您之前在全局Python环境中安装了依赖，建议清理以避免冲突：
+```bash
+# 自动清理全局Python依赖
+cleanup-global-python.bat
+
+# 或查看详细指南
+# 阅读文件: CLEANUP_GUIDE.md
+```
+
 #### Edge-TTS 语音合成问题
 如果启动后遇到 `edge-tts 命令不可用` 错误：
 ```bash
