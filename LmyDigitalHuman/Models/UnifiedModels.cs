@@ -10,7 +10,9 @@ namespace LmyDigitalHuman.Models
     public class DigitalHumanTemplate
     {
         public string TemplateId { get; set; } = string.Empty;
+        public string Id { get => TemplateId; set => TemplateId = value; }
         public string TemplateName { get; set; } = string.Empty;
+        public string Name { get => TemplateName; set => TemplateName = value; }
         public string Description { get; set; } = string.Empty;
         public string TemplateType { get; set; } = "headshot"; // headshot, half_body, full_body
         public string Gender { get; set; } = "neutral"; // male, female, neutral
@@ -108,6 +110,7 @@ namespace LmyDigitalHuman.Models
         public int? BatchSize { get; set; } = 4;
         public float? BboxShift { get; set; }
         public string Priority { get; set; } = "normal"; // low, normal, high
+        public bool EnableEmotion { get; set; } = true;
         public string? CacheKey { get; set; }
     }
 
@@ -215,6 +218,7 @@ namespace LmyDigitalHuman.Models
     {
         public bool Success { get; set; }
         public string ConversationId { get; set; } = string.Empty;
+        public string InputText { get; set; } = string.Empty;
         public string RecognizedText { get; set; } = string.Empty;
         public string ResponseText { get; set; } = string.Empty;
         public string VideoUrl { get; set; } = string.Empty;
@@ -223,6 +227,7 @@ namespace LmyDigitalHuman.Models
         public string ProcessingTime { get; set; } = string.Empty;
         public bool FromCache { get; set; }
         public string Message { get; set; } = string.Empty;
+        public ServiceMetrics? Metrics { get; set; }
     }
 
     /// <summary>
@@ -275,8 +280,11 @@ namespace LmyDigitalHuman.Models
     {
         public string Text { get; set; } = string.Empty;
         public string Voice { get; set; } = "zh-CN-XiaoxiaoNeural";
+        public string VoiceId { get; set; } = "zh-CN-XiaoxiaoNeural";
         public string Rate { get; set; } = "1.0";
+        public string Speed { get; set; } = "1.0";
         public string Pitch { get; set; } = "0Hz";
+        public string Emotion { get; set; } = "neutral";
         public string OutputFormat { get; set; } = "audio-16khz-128kbitrate-mono-mp3";
         public string OutputPath { get; set; } = string.Empty;
     }
@@ -348,6 +356,16 @@ namespace LmyDigitalHuman.Models
     // ==================== 大模型相关 ====================
 
     /// <summary>
+    /// 聊天消息
+    /// </summary>
+    public class ChatMessage
+    {
+        public string Role { get; set; } = string.Empty; // user, assistant, system
+        public string Content { get; set; } = string.Empty;
+        public DateTime Timestamp { get; set; } = DateTime.UtcNow;
+    }
+
+    /// <summary>
     /// 本地LLM请求
     /// </summary>
     public class LocalLLMRequest
@@ -355,12 +373,16 @@ namespace LmyDigitalHuman.Models
         [Required]
         public string Message { get; set; } = string.Empty;
         
+        public string Prompt { get; set; } = string.Empty;
         public string ModelName { get; set; } = "qwen2.5:14b-instruct-q4_0";
         public string? ConversationId { get; set; }
         public float Temperature { get; set; } = 0.7f;
+        public float TopP { get; set; } = 0.9f;
+        public int TopK { get; set; } = 40;
         public int MaxTokens { get; set; } = 500;
         public string? SystemPrompt { get; set; }
         public bool Stream { get; set; } = false;
+        public List<ChatMessage> History { get; set; } = new();
     }
 
     /// <summary>
@@ -370,10 +392,13 @@ namespace LmyDigitalHuman.Models
     {
         public bool Success { get; set; }
         public string Response { get; set; } = string.Empty;
+        public string Message { get; set; } = string.Empty;
+        public string ModelName { get; set; } = string.Empty;
         public string? ConversationId { get; set; }
         public long ProcessingTime { get; set; }
         public int TokensUsed { get; set; }
         public string Error { get; set; } = string.Empty;
+        public Dictionary<string, object>? Metadata { get; set; }
     }
 
     // ==================== 统计和监控相关 ====================
@@ -677,10 +702,13 @@ namespace LmyDigitalHuman.Models
     {
         public string Text { get; set; } = string.Empty;
         public string Voice { get; set; } = "zh-CN-XiaoxiaoNeural";
+        public string VoiceId { get; set; } = "zh-CN-XiaoxiaoNeural";
         public string Rate { get; set; } = "1.0";
+        public string Speed { get; set; } = "1.0";
         public string Pitch { get; set; } = "0Hz";
         public string OutputFormat { get; set; } = "audio-16khz-128kbitrate-mono-mp3";
         public string SessionId { get; set; } = string.Empty;
+        public int ChunkSize { get; set; } = 4096;
     }
 
     /// <summary>
@@ -693,6 +721,7 @@ namespace LmyDigitalHuman.Models
         
         public string? ConversationId { get; set; }
         public string Quality { get; set; } = "fast";
+        public string ResponseMode { get; set; } = "stream";
         public bool EnableEmotionDetection { get; set; } = true;
         public string Language { get; set; } = "zh";
         public VoiceSettings? VoiceSettings { get; set; }
@@ -705,6 +734,14 @@ namespace LmyDigitalHuman.Models
     {
         public bool Success { get; set; }
         public string ConversationId { get; set; } = string.Empty;
+        public string RecognizedText { get; set; } = string.Empty;
+        public string ResponseText { get; set; } = string.Empty;
+        public string VideoUrl { get; set; } = string.Empty;
+        public string AudioUrl { get; set; } = string.Empty;
+        public string DetectedEmotion { get; set; } = "neutral";
+        public string ProcessingTime { get; set; } = string.Empty;
+        public bool FromCache { get; set; }
+        public DigitalHumanTemplate? Template { get; set; }
         public string Message { get; set; } = string.Empty;
         public string SessionId { get; set; } = string.Empty;
         public Dictionary<string, object>? ConnectionInfo { get; set; }

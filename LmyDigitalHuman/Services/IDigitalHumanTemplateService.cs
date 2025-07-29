@@ -8,6 +8,8 @@ namespace LmyDigitalHuman.Services
         Task<CreateDigitalHumanTemplateResponse> CreateTemplateAsync(CreateDigitalHumanTemplateRequest request);
         Task<GetTemplatesResponse> GetTemplatesAsync(GetTemplatesRequest request);
         Task<DigitalHumanTemplate?> GetTemplateByIdAsync(string templateId);
+        Task<DigitalHumanTemplate> CloneTemplateAsync(string templateId, string newName);
+        Task<string> GetTemplatePreviewAsync(string templateId);
         Task<bool> DeleteTemplateAsync(string templateId);
         Task<bool> UpdateTemplateAsync(string templateId, CreateDigitalHumanTemplateRequest request);
 
@@ -22,6 +24,7 @@ namespace LmyDigitalHuman.Services
 
         // 统计与监控
         Task<TemplateStatistics> GetStatisticsAsync();
+        Task<TemplateStatistics> GetTemplateStatisticsAsync();
         Task<bool> IncrementUsageCountAsync(string templateId);
 
         // 性能优化
@@ -35,6 +38,8 @@ namespace LmyDigitalHuman.Services
         
         // 缓存管理
         Task<bool> RefreshTemplateCacheAsync(string? templateId = null);
+        Task<Dictionary<string, object>> GetTemplateCacheStatusAsync();
+        Task<bool> ClearTemplateCacheAsync(string? templateId = null);
         Task<long> GetCacheSizeAsync();
         Task<bool> ClearExpiredCacheAsync();
     }

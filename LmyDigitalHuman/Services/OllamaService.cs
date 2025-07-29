@@ -56,6 +56,11 @@ namespace LmyDigitalHuman.Services
             }
         }
 
+        public async Task<LocalLLMResponse> GenerateResponseAsync(LocalLLMRequest request)
+        {
+            return await ChatAsync(request);
+        }
+
         public async Task<LocalLLMResponse> ChatAsync(LocalLLMRequest request)
         {
             var startTime = DateTime.Now;

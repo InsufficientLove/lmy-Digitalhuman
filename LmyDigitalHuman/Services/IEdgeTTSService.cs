@@ -13,6 +13,16 @@ namespace LmyDigitalHuman.Services
         Task<TTSResponse> TextToSpeechAsync(TTSRequest request);
 
         /// <summary>
+        /// 生成音频（兼容性方法）
+        /// </summary>
+        Task<byte[]> GenerateAudioAsync(TTSRequest request);
+
+        /// <summary>
+        /// 转换文本为语音（兼容性方法）
+        /// </summary>
+        Task<TTSResponse> ConvertTextToSpeechAsync(string text, string voice = "zh-CN-XiaoxiaoNeural");
+
+        /// <summary>
         /// 流式文本转语音
         /// </summary>
         IAsyncEnumerable<AudioChunkResponse> TextToSpeechStreamAsync(TTSStreamRequest request);

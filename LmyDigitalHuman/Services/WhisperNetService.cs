@@ -20,7 +20,7 @@ namespace LmyDigitalHuman.Services
         private WhisperFactory? _whisperFactory;
         private WhisperProcessor? _whisperProcessor;
         private bool _isInitialized = false;
-        private readonly object _lockObject = new object();
+        private readonly SemaphoreSlim _initSemaphore = new(1, 1);
 
         public WhisperNetService(ILogger<WhisperNetService> logger, IConfiguration configuration)
         {
@@ -32,45 +32,42 @@ namespace LmyDigitalHuman.Services
         {
             if (_isInitialized) return true;
 
-            lock (_lockObject)
+            await _initSemaphore.WaitAsync();
+            try
             {
                 if (_isInitialized) return true;
 
-                try
+                _logger.LogInformation("正在初始化Whisper.NET...");
+
+                // 获取模型路径配置
+                var modelPath = _configuration["RealtimeDigitalHuman:WhisperNet:ModelPath"] ?? "Models/ggml-base.bin";
+                var modelSize = _configuration["RealtimeDigitalHuman:WhisperNet:ModelSize"] ?? "Base";
+
+                // 确保模型文件存在
+                if (!File.Exists(modelPath))
                 {
-                    _logger.LogInformation("正在初始化Whisper.NET...");
-
-                    // 获取模型路径配置
-                    var modelPath = _configuration["RealtimeDigitalHuman:WhisperNet:ModelPath"] ?? "Models/ggml-base.bin";
-                    var modelSize = _configuration["RealtimeDigitalHuman:WhisperNet:ModelSize"] ?? "Base";
-
-                    // 确保模型文件存在
-                    if (!File.Exists(modelPath))
-                    {
-                        _logger.LogWarning("Whisper模型文件不存在: {ModelPath}, 尝试下载...", modelPath);
-                        await DownloadModelAsync(modelPath, modelSize);
-                    }
-
-                    // 创建Whisper工厂和处理器
-                    _whisperFactory = WhisperFactory.FromPath(modelPath);
-                    _whisperProcessor = _whisperFactory.CreateBuilder()
-                        .WithLanguage("zh") // 默认中文
-                        .WithTranslate(false) // 不翻译，保持原语言
-                        .WithPrintProgress(false)
-                        .WithPrintResults(false)
-                        .WithNoContext(true)
-                        .WithSingleSegment(false)
-                        .Build();
-
-                    _isInitialized = true;
-                    _logger.LogInformation("Whisper.NET 初始化成功");
-                    return true;
+                    _logger.LogWarning("Whisper模型文件不存在: {ModelPath}, 尝试下载...", modelPath);
+                    await DownloadModelAsync(modelPath, modelSize);
                 }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Whisper.NET 初始化失败");
-                    return false;
-                }
+
+                // 创建Whisper工厂和处理器
+                _whisperFactory = WhisperFactory.FromPath(modelPath);
+                _whisperProcessor = _whisperFactory.CreateBuilder()
+                    .WithLanguage("zh") // 默认中文
+                    .Build();
+
+                _isInitialized = true;
+                _logger.LogInformation("Whisper.NET 初始化成功");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Whisper.NET 初始化失败");
+                return false;
+            }
+            finally
+            {
+                _initSemaphore.Release();
             }
         }
 
@@ -296,6 +293,7 @@ namespace LmyDigitalHuman.Services
         {
             _whisperProcessor?.Dispose();
             _whisperFactory?.Dispose();
+            _initSemaphore?.Dispose();
             _isInitialized = false;
         }
     }

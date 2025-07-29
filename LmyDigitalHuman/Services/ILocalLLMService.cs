@@ -16,6 +16,11 @@ namespace LmyDigitalHuman.Services
         Task<Models.LocalLLMResponse> ChatAsync(Models.LocalLLMRequest request);
 
         /// <summary>
+        /// 生成响应（兼容性方法）
+        /// </summary>
+        Task<Models.LocalLLMResponse> GenerateResponseAsync(Models.LocalLLMRequest request);
+
+        /// <summary>
         /// 流式对话
         /// </summary>
         IAsyncEnumerable<LocalLLMStreamResponse> ChatStreamAsync(Models.LocalLLMRequest request);
@@ -76,15 +81,7 @@ namespace LmyDigitalHuman.Services
         public int TokenIndex { get; set; } = 0;
     }
 
-    /// <summary>
-    /// 聊天消息
-    /// </summary>
-    public class ChatMessage
-    {
-        public string Role { get; set; } = "user"; // user, assistant, system
-        public string Content { get; set; } = string.Empty;
-        public DateTime Timestamp { get; set; } = DateTime.Now;
-    }
+    // ChatMessage 类已移至 LmyDigitalHuman.Models.UnifiedModels 中统一管理
 
     /// <summary>
     /// 模型状态

@@ -504,7 +504,7 @@ namespace LmyDigitalHuman.Services
                         .WithAudioCodec("pcm_s16le")
                         .WithAudioSamplingRate(16000)
                         .WithAudioBitrate(128)
-                        .WithAudioChannels(1)) // mono
+                        .WithCustomArgument("-ac 1")) // mono
                     .ProcessAsynchronously();
 
                 stopwatch.Stop();
@@ -549,7 +549,7 @@ namespace LmyDigitalHuman.Services
                     .FromFileInput(inputPath)
                     .OutputToFile(outputPath, true, options => options
                         .WithAudioFilters(filterOptions => filterOptions
-                            .Normalize())
+                            .Arguments("dynaudnorm"))
                         .WithAudioCodec("pcm_s16le"))
                     .ProcessAsynchronously();
 
@@ -595,9 +595,7 @@ namespace LmyDigitalHuman.Services
                     .FromFileInput(inputPath)
                     .OutputToFile(outputPath, true, options => options
                         .WithAudioFilters(filterOptions => filterOptions
-                            .HighPass(200) // 高通滤波器去除低频噪音
-                            .LowPass(8000) // 低通滤波器去除高频噪音
-                            .Normalize()) // 标准化音量
+                            .Arguments("highpass=f=200,lowpass=f=8000,dynaudnorm"))
                         .WithAudioCodec("pcm_s16le"))
                     .ProcessAsynchronously();
 
@@ -644,8 +642,7 @@ namespace LmyDigitalHuman.Services
                     .FromFileInput(inputPath)
                     .OutputToFile(outputPath, true, options => options
                         .WithAudioFilters(filterOptions => filterOptions
-                            .Afftdn() // FFT降噪
-                            .Normalize())
+                            .Arguments("afftdn,dynaudnorm"))
                         .WithAudioCodec("pcm_s16le"))
                     .ProcessAsynchronously();
 
@@ -689,7 +686,7 @@ namespace LmyDigitalHuman.Services
                     .FromFileInput(inputPath)
                     .OutputToFile(outputPath, true, options => options
                         .WithAudioFilters(filterOptions => filterOptions
-                            .Volume(volumeMultiplier))
+                            .Arguments($"volume={volumeMultiplier}"))
                         .WithAudioCodec("pcm_s16le"))
                     .ProcessAsynchronously();
 
@@ -1008,7 +1005,7 @@ namespace LmyDigitalHuman.Services
                     .OutputToFile(optimizedPath, true, options => options
                         .WithAudioCodec("pcm_s16le")
                         .WithAudioSamplingRate(16000)
-                        .WithAudioChannels(1))
+                        .WithCustomArgument("-ac 1"))
                     .ProcessAsynchronously();
 
                 return optimizedPath;

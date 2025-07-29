@@ -654,27 +654,23 @@ namespace LmyDigitalHuman.Services
             return await Task.FromResult(_templates.ContainsKey(templateId));
         }
 
-        public async Task<string?> GetTemplatePreviewAsync(string templateId)
+        public async Task<string> GetTemplatePreviewAsync(string templateId)
         {
             return await Task.Run(() =>
             {
                 if (_templates.TryGetValue(templateId, out var template))
                 {
-                    return template.PreviewVideoPath;
+                    return template.PreviewVideoPath ?? string.Empty;
                 }
-                return null;
+                return string.Empty;
             });
         }
 
-        public async Task<CreateDigitalHumanTemplateResponse> CloneTemplateAsync(string templateId, string newName)
+        public async Task<DigitalHumanTemplate> CloneTemplateAsync(string templateId, string newName)
         {
             if (!_templates.TryGetValue(templateId, out var originalTemplate))
             {
-                return new CreateDigitalHumanTemplateResponse
-                {
-                    Success = false,
-                    Message = "源模板不存在"
-                };
+                throw new ArgumentException("源模板不存在", nameof(templateId));
             }
 
             var newTemplateId = Guid.NewGuid().ToString("N");
@@ -700,13 +696,7 @@ namespace LmyDigitalHuman.Services
             _templates[newTemplateId] = clonedTemplate;
             await SaveTemplateToFileAsync(clonedTemplate);
 
-            return new CreateDigitalHumanTemplateResponse
-            {
-                Success = true,
-                TemplateId = newTemplateId,
-                Template = clonedTemplate,
-                Message = "模板复制成功"
-            };
+            return clonedTemplate;
         }
 
         public async Task<byte[]> ExportTemplateAsync(string templateId)
@@ -772,7 +762,18 @@ namespace LmyDigitalHuman.Services
             };
         }
 
-        public async Task<bool> ClearTemplateCacheAsync(string templateId)
+        public async Task<Dictionary<string, object>> GetTemplateCacheStatusAsync()
+        {
+            return new Dictionary<string, object>
+            {
+                ["total_cached_items"] = _templates.Count,
+                ["cache_size_mb"] = 0, // 模拟值
+                ["last_cleanup"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+                ["templates"] = _templates.Keys.ToList()
+            };
+        }
+
+        public async Task<bool> ClearTemplateCacheAsync(string? templateId = null)
         {
             // 清理与模板相关的缓存
             return true;

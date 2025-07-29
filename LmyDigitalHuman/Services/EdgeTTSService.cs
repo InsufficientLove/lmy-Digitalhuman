@@ -111,6 +111,35 @@ namespace LmyDigitalHuman.Services
         }
 
         /// <summary>
+        /// 生成音频（兼容性方法）
+        /// </summary>
+        public async Task<byte[]> GenerateAudioAsync(TTSRequest request)
+        {
+            var ttsResponse = await TextToSpeechAsync(request);
+            if (ttsResponse.Success && !string.IsNullOrEmpty(ttsResponse.AudioPath) && File.Exists(ttsResponse.AudioPath))
+            {
+                var audioData = await File.ReadAllBytesAsync(ttsResponse.AudioPath);
+                // 清理临时文件
+                try { File.Delete(ttsResponse.AudioPath); } catch { }
+                return audioData;
+            }
+            return Array.Empty<byte>();
+        }
+
+        /// <summary>
+        /// 转换文本为语音（兼容性方法）
+        /// </summary>
+        public async Task<TTSResponse> ConvertTextToSpeechAsync(string text, string voice = "zh-CN-XiaoxiaoNeural")
+        {
+            var request = new TTSRequest
+            {
+                Text = text,
+                Voice = voice
+            };
+            return await TextToSpeechAsync(request);
+        }
+
+        /// <summary>
         /// 流式文本转语音
         /// </summary>
         public async IAsyncEnumerable<AudioChunkResponse> TextToSpeechStreamAsync(TTSStreamRequest request)
