@@ -47,6 +47,10 @@ builder.Services.AddSingleton<IEdgeTTSService, EdgeTTSService>();
 builder.Services.AddSingleton<IConversationService, ConversationService>();
 builder.Services.AddSingleton<IAudioPipelineService, AudioPipelineService>();
 
+// 超低延迟实时服务
+builder.Services.AddSingleton<IGPUResourceManager, GPUResourceManager>();
+builder.Services.AddSingleton<IRealtimePipelineService, RealtimePipelineService>();
+
 // Add memory caching
 builder.Services.AddMemoryCache();
 
