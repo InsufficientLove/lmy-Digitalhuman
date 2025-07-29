@@ -106,17 +106,16 @@ if /i "%download_choice%"=="Y" (
     if not exist "LmyDigitalHuman\Models\%model_file%" (
         echo [⏳] 正在下载，请稍候...
         
-        powershell -Command "& {
-            $url = 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/%model_file%'
-            $output = 'LmyDigitalHuman\Models\%model_file%'
-            Write-Host '[📊] 开始下载...'
-            try {
-                $webClient = New-Object System.Net.WebClient
-                $webClient.DownloadFile($url, $output)
-                Write-Host '[✅] 下载完成!'
-            } catch {
-                Write-Host '[❌] 下载失败:' $_.Exception.Message
-            }
+        powershell -Command ^
+        "$url = 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/%model_file%'; ^
+        $output = 'LmyDigitalHuman\Models\%model_file%'; ^
+        Write-Host '[📊] 开始下载...'; ^
+        try { ^
+            $webClient = New-Object System.Net.WebClient; ^
+            $webClient.DownloadFile($url, $output); ^
+            Write-Host '[✅] 下载完成!' ^
+        } catch { ^
+            Write-Host '[❌] 下载失败:' $_.Exception.Message ^
         }"
         
         if exist "LmyDigitalHuman\Models\%model_file%" (
