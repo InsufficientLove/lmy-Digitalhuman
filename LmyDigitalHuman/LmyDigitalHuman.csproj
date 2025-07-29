@@ -59,11 +59,17 @@
     <!-- 并发和任务处理 -->
     <PackageReference Include="System.Threading.Channels" Version="8.0.0" />
     
+    <!-- 高性能消息队列 -->
+    <PackageReference Include="System.Threading.Tasks.Dataflow" Version="8.0.0" />
+    
     <!-- 性能监控 -->
     <PackageReference Include="System.Diagnostics.PerformanceCounter" Version="8.0.0" />
     
     <!-- WebSocket支持增强 -->
     <PackageReference Include="Microsoft.AspNetCore.WebSockets" Version="2.2.1" />
+    
+    <!-- .NET原生TTS支持 -->
+    <PackageReference Include="Microsoft.CognitiveServices.Speech" Version="1.32.1" />
   </ItemGroup>
 
   <ItemGroup>

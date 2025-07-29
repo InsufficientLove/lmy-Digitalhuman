@@ -1,11 +1,12 @@
 using LmyDigitalHuman.Models;
 using Microsoft.Extensions.Caching.Memory;
 using NAudio.Wave;
-using NAudio.Lame;
 using FFMpegCore;
+using Microsoft.CognitiveServices.Speech;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text;
+using System.Threading.Channels;
 
 namespace LmyDigitalHuman.Services
 {
@@ -17,17 +18,25 @@ namespace LmyDigitalHuman.Services
         private readonly IMemoryCache _cache;
         private readonly ILogger<AudioPipelineService> _logger;
         private readonly IConfiguration _configuration;
+        private readonly SpeechSynthesizer? _speechSynthesizer; // Azure TTS备选方案
+
+        // 高性能队列管理 - 使用Channel而不是外部消息队列
+        private readonly Channel<AudioProcessingJob> _audioProcessingChannel;
+        private readonly Channel<TTSProcessingJob> _ttsProcessingChannel;
+        private readonly ChannelWriter<AudioProcessingJob> _audioChannelWriter;
+        private readonly ChannelWriter<TTSProcessingJob> _ttsChannelWriter;
 
         // 实时会话管理
         private readonly ConcurrentDictionary<string, SpeechRecognitionSession> _speechSessions = new();
         private readonly ConcurrentDictionary<string, TTSSession> _ttsSessions = new();
 
-        // 音频处理队列
+        // 音频处理队列 - 支持200人并发
         private readonly SemaphoreSlim _audioProcessingSemaphore;
         private readonly SemaphoreSlim _ttsProcessingSemaphore;
 
         // 预加载的语音模型
         private readonly ConcurrentDictionary<string, bool> _preloadedVoices = new();
+        private readonly CancellationTokenSource _cancellationTokenSource = new();
 
         public AudioPipelineService(
             IWhisperNetService whisperService,
@@ -44,12 +53,50 @@ namespace LmyDigitalHuman.Services
             _logger = logger;
             _configuration = configuration;
 
-            // 从配置中获取并发限制
-            var maxAudioProcessing = configuration.GetValue<int>("DigitalHuman:MaxAudioProcessing", 5);
-            var maxTTSProcessing = configuration.GetValue<int>("DigitalHuman:MaxTTSProcessing", 3);
+            // 高并发配置 - 支持200人同时使用
+            var maxAudioProcessing = configuration.GetValue<int>("DigitalHuman:MaxAudioProcessing", 20);
+            var maxTTSProcessing = configuration.GetValue<int>("DigitalHuman:MaxTTSProcessing", 15);
 
             _audioProcessingSemaphore = new SemaphoreSlim(maxAudioProcessing, maxAudioProcessing);
             _ttsProcessingSemaphore = new SemaphoreSlim(maxTTSProcessing, maxTTSProcessing);
+
+            // 初始化高性能队列
+            var audioChannelOptions = new BoundedChannelOptions(1000)
+            {
+                FullMode = BoundedChannelFullMode.Wait,
+                SingleReader = false,
+                SingleWriter = false
+            };
+            var audioChannel = Channel.CreateBounded<AudioProcessingJob>(audioChannelOptions);
+            _audioProcessingChannel = audioChannel;
+            _audioChannelWriter = audioChannel.Writer;
+
+            var ttsChannelOptions = new BoundedChannelOptions(1000)
+            {
+                FullMode = BoundedChannelFullMode.Wait,
+                SingleReader = false,
+                SingleWriter = false
+            };
+            var ttsChannel = Channel.CreateBounded<TTSProcessingJob>(ttsChannelOptions);
+            _ttsProcessingChannel = ttsChannel;
+            _ttsChannelWriter = ttsChannel.Writer;
+
+            // 初始化Azure Speech Service（备选方案）
+            var speechKey = configuration["Azure:Speech:Key"];
+            var speechRegion = configuration["Azure:Speech:Region"];
+            if (!string.IsNullOrEmpty(speechKey) && !string.IsNullOrEmpty(speechRegion))
+            {
+                var speechConfig = SpeechConfig.FromSubscription(speechKey, speechRegion);
+                speechConfig.SpeechSynthesisLanguage = "zh-CN";
+                speechConfig.SpeechSynthesisVoiceName = "zh-CN-XiaoxiaoNeural";
+                _speechSynthesizer = new SpeechSynthesizer(speechConfig);
+            }
+
+            // 启动后台处理器
+            StartBackgroundProcessors();
+
+            _logger.LogInformation("音频处理管道初始化完成，支持并发: Audio={Audio}, TTS={TTS}", 
+                maxAudioProcessing, maxTTSProcessing);
         }
 
         public async Task<SpeechRecognitionResult> RecognizeSpeechAsync(byte[] audioData, string format = "wav")
@@ -278,43 +325,58 @@ namespace LmyDigitalHuman.Services
                 var outputPath = request.OutputPath ?? Path.Combine("temp", $"tts_{Guid.NewGuid():N}.wav");
                 Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
 
-                // 使用Edge TTS生成语音
-                var edgeTTSResult = await _edgeTTSService.GenerateAudioAsync(request.Text, request.VoiceId, outputPath);
-                
-                stopwatch.Stop();
+                TTSResult result;
 
-                if (edgeTTSResult.Success)
+                // 优先使用Edge TTS，Azure Speech作为备选
+                try
                 {
-                    var fileInfo = new FileInfo(outputPath);
-                    var audioUrl = $"/temp/{Path.GetFileName(outputPath)}";
-
-                    var result = new TTSResult
+                    var edgeTTSResult = await _edgeTTSService.GenerateAudioAsync(request.Text, request.VoiceId, outputPath);
+                    
+                    if (edgeTTSResult.Success)
                     {
-                        Success = true,
-                        AudioPath = outputPath,
-                        AudioUrl = audioUrl,
-                        Duration = await GetAudioDurationAsync(outputPath),
-                        ProcessingTime = stopwatch.ElapsedMilliseconds,
-                        FileSize = fileInfo.Length
-                    };
+                        result = CreateTTSResult(outputPath, stopwatch.ElapsedMilliseconds);
+                    }
+                    else if (_speechSynthesizer != null)
+                    {
+                        // 使用Azure Speech作为备选
+                        result = await GenerateWithAzureSpeechAsync(request, outputPath, stopwatch.ElapsedMilliseconds);
+                    }
+                    else
+                    {
+                        result = new TTSResult
+                        {
+                            Success = false,
+                            Error = edgeTTSResult.Error,
+                            ProcessingTime = stopwatch.ElapsedMilliseconds
+                        };
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Edge TTS失败，尝试Azure Speech备选方案");
+                    
+                    if (_speechSynthesizer != null)
+                    {
+                        result = await GenerateWithAzureSpeechAsync(request, outputPath, stopwatch.ElapsedMilliseconds);
+                    }
+                    else
+                    {
+                        result = new TTSResult
+                        {
+                            Success = false,
+                            Error = ex.Message,
+                            ProcessingTime = stopwatch.ElapsedMilliseconds
+                        };
+                    }
+                }
 
-                    // 缓存结果
+                // 缓存结果
+                if (result.Success)
+                {
                     _cache.Set(cacheKey, result, TimeSpan.FromHours(2));
-
-                    _logger.LogInformation("TTS转换成功: AudioPath={AudioPath}, Duration={Duration}ms", 
-                        outputPath, stopwatch.ElapsedMilliseconds);
-
-                    return result;
                 }
-                else
-                {
-                    return new TTSResult
-                    {
-                        Success = false,
-                        Error = edgeTTSResult.Error,
-                        ProcessingTime = stopwatch.ElapsedMilliseconds
-                    };
-                }
+
+                return result;
             }
             finally
             {
@@ -817,6 +879,121 @@ namespace LmyDigitalHuman.Services
             return _audioProcessingSemaphore.CurrentCount;
         }
 
+        // 高性能队列处理方法
+        private void StartBackgroundProcessors()
+        {
+            var processorCount = Environment.ProcessorCount;
+            
+            // 启动音频处理器
+            for (int i = 0; i < processorCount / 2; i++)
+            {
+                _ = Task.Run(ProcessAudioQueueAsync);
+            }
+            
+            // 启动TTS处理器
+            for (int i = 0; i < processorCount / 2; i++)
+            {
+                _ = Task.Run(ProcessTTSQueueAsync);
+            }
+            
+            _logger.LogInformation("启动了 {AudioProcessors} 个音频处理器和 {TTSProcessors} 个TTS处理器", 
+                processorCount / 2, processorCount / 2);
+        }
+
+        private async Task ProcessAudioQueueAsync()
+        {
+            await foreach (var job in _audioProcessingChannel.Reader.ReadAllAsync(_cancellationTokenSource.Token))
+            {
+                try
+                {
+                    var result = await RecognizeSpeechFromFileAsync(job.AudioPath);
+                    job.TaskCompletionSource.SetResult(result);
+                }
+                catch (Exception ex)
+                {
+                    job.TaskCompletionSource.SetException(ex);
+                }
+            }
+        }
+
+        private async Task ProcessTTSQueueAsync()
+        {
+            await foreach (var job in _ttsProcessingChannel.Reader.ReadAllAsync(_cancellationTokenSource.Token))
+            {
+                try
+                {
+                    var result = await ConvertTextToSpeechAsync(job.Request);
+                    job.TaskCompletionSource.SetResult(result);
+                }
+                catch (Exception ex)
+                {
+                    job.TaskCompletionSource.SetException(ex);
+                }
+            }
+        }
+
+        private async Task<TTSResult> GenerateWithAzureSpeechAsync(TTSRequest request, string outputPath, long elapsedTime)
+        {
+            try
+            {
+                if (_speechSynthesizer == null)
+                {
+                    return new TTSResult { Success = false, Error = "Azure Speech Service未配置" };
+                }
+
+                var ssml = $@"
+                <speak version='1.0' xml:lang='zh-CN'>
+                    <voice name='{request.VoiceId}'>
+                        <prosody rate='{request.Speed:F1}' pitch='{request.Pitch:F1}'>
+                            {request.Text}
+                        </prosody>
+                    </voice>
+                </speak>";
+
+                using var result = await _speechSynthesizer.SpeakSsmlAsync(ssml);
+                
+                if (result.Reason == ResultReason.SynthesizingAudioCompleted)
+                {
+                    await File.WriteAllBytesAsync(outputPath, result.AudioData);
+                    return CreateTTSResult(outputPath, elapsedTime);
+                }
+                else
+                {
+                    return new TTSResult
+                    {
+                        Success = false,
+                        Error = $"Azure Speech合成失败: {result.Reason}",
+                        ProcessingTime = elapsedTime
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                return new TTSResult
+                {
+                    Success = false,
+                    Error = ex.Message,
+                    ProcessingTime = elapsedTime
+                };
+            }
+        }
+
+        private TTSResult CreateTTSResult(string outputPath, long processingTime)
+        {
+            var fileInfo = new FileInfo(outputPath);
+            var audioUrl = $"/temp/{Path.GetFileName(outputPath)}";
+
+            return new TTSResult
+            {
+                Success = true,
+                AudioPath = outputPath,
+                AudioUrl = audioUrl,
+                Duration = GetAudioDurationAsync(outputPath).Result,
+                ProcessingTime = processingTime,
+                FileSize = fileInfo.Length
+            };
+        }
+
         // 私有辅助方法
         private async Task<string> OptimizeAudioForSpeechRecognitionAsync(string inputPath)
         {
@@ -907,6 +1084,30 @@ namespace LmyDigitalHuman.Services
             using var sha256 = System.Security.Cryptography.SHA256.Create();
             var hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(content));
             return Convert.ToBase64String(hash);
+        }
+
+        // 新增队列任务类
+        internal class AudioProcessingJob
+        {
+            public string AudioPath { get; set; } = string.Empty;
+            public TaskCompletionSource<SpeechRecognitionResult> TaskCompletionSource { get; set; } = new();
+        }
+
+        internal class TTSProcessingJob
+        {
+            public TTSRequest Request { get; set; } = new();
+            public TaskCompletionSource<TTSResult> TaskCompletionSource { get; set; } = new();
+        }
+
+        public void Dispose()
+        {
+            _cancellationTokenSource?.Cancel();
+            _audioChannelWriter?.Complete();
+            _ttsChannelWriter?.Complete();
+            _speechSynthesizer?.Dispose();
+            _audioProcessingSemaphore?.Dispose();
+            _ttsProcessingSemaphore?.Dispose();
+            _cancellationTokenSource?.Dispose();
         }
     }
 

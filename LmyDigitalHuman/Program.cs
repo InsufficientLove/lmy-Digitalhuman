@@ -34,8 +34,7 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-// Register realtime digital human services
-builder.Services.AddSingleton<IRealtimeDigitalHumanService, RealtimeDigitalHumanService>();
+// Realtime digital human services are now handled by ConversationService
 
 // Register modern Whisper.NET service (C# native)
 builder.Services.AddSingleton<IWhisperNetService, WhisperNetService>();
@@ -43,13 +42,13 @@ builder.Services.AddSingleton<IWhisperNetService, WhisperNetService>();
 // Register streaming TTS service
 builder.Services.AddSingleton<IStreamingTTSService, StreamingTTSService>();
 
-// Register MuseTalk service for digital human generation
-builder.Services.AddHttpClient<IMuseTalkService, MuseTalkService>();
+// Register MuseTalk service for digital human generation (updated)
+builder.Services.AddSingleton<IMuseTalkService, MuseTalkService>();
 
 // Register local LLM services
 builder.Services.AddSingleton<ILocalLLMService, OllamaService>();
 
-// Register digital human template services (keeping for compatibility)
+// Register digital human template services
 builder.Services.AddSingleton<IDigitalHumanTemplateService, DigitalHumanTemplateService>();
 
 // Register Edge TTS service
