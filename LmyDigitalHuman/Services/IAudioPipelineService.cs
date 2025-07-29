@@ -73,20 +73,7 @@ namespace LmyDigitalHuman.Services
         public float Confidence { get; set; }
     }
 
-    /// <summary>
-    /// TTS请求
-    /// </summary>
-    public class TTSRequest
-    {
-        public string Text { get; set; } = string.Empty;
-        public string VoiceId { get; set; } = "zh-CN-XiaoxiaoNeural";
-        public string OutputFormat { get; set; } = "wav";
-        public float Speed { get; set; } = 1.0f;
-        public float Pitch { get; set; } = 1.0f;
-        public float Volume { get; set; } = 1.0f;
-        public string Emotion { get; set; } = "neutral";
-        public string? OutputPath { get; set; }
-    }
+    // TTSRequest已移至IEdgeTTSService.cs中定义，避免重复
 
     /// <summary>
     /// TTS结果

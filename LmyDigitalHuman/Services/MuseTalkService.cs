@@ -4,6 +4,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text.Json;
 using System.Text;
+using System.Threading.Channels;
 
 namespace LmyDigitalHuman.Services
 {
@@ -240,6 +241,12 @@ namespace LmyDigitalHuman.Services
                         
                         if (template != null)
                         {
+                            // 确保兼容性属性正确设置
+                            if (string.IsNullOrEmpty(template.Id) && !string.IsNullOrEmpty(template.TemplateId))
+                                template.Id = template.TemplateId;
+                            if (string.IsNullOrEmpty(template.Name) && !string.IsNullOrEmpty(template.TemplateName))
+                                template.Name = template.TemplateName;
+                                
                             var imagePath = Path.Combine(_templatesPath, template.ImagePath);
                             if (File.Exists(imagePath))
                             {
@@ -282,8 +289,10 @@ namespace LmyDigitalHuman.Services
 
             var template = new DigitalHumanTemplate
             {
-                Id = templateId,
-                Name = request.Name,
+                TemplateId = templateId,
+                Id = templateId, // 兼容性别名
+                TemplateName = request.Name,
+                Name = request.Name, // 兼容性别名
                 Description = request.Description,
                 ImagePath = imageFileName,
                 ImageUrl = $"/templates/{imageFileName}",
@@ -318,7 +327,7 @@ namespace LmyDigitalHuman.Services
                     var jsonContent = await File.ReadAllTextAsync(jsonFile);
                     var template = JsonSerializer.Deserialize<DigitalHumanTemplate>(jsonContent);
                     
-                    if (template?.Id == templateId)
+                    if (template?.TemplateId == templateId || template?.Id == templateId)
                     {
                         File.Delete(jsonFile);
                         
@@ -344,7 +353,7 @@ namespace LmyDigitalHuman.Services
         public async Task<bool> ValidateTemplateAsync(string templateId)
         {
             var templates = await GetAvailableTemplatesAsync();
-            return templates.Any(t => t.Id == templateId);
+            return templates.Any(t => t.TemplateId == templateId || t.Id == templateId);
         }
 
         public async Task<PreprocessingResult> PreprocessTemplateAsync(string templateId)

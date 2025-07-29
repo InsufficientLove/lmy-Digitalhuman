@@ -72,7 +72,9 @@ namespace LmyDigitalHuman.Models
     public class DigitalHumanTemplate
     {
         public string TemplateId { get; set; } = string.Empty;
+        public string Id { get; set; } = string.Empty; // 兼容性别名
         public string TemplateName { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty; // 兼容性别名
         public string Description { get; set; } = string.Empty;
         public string TemplateType { get; set; } = string.Empty;
         public string Gender { get; set; } = string.Empty;
@@ -80,7 +82,9 @@ namespace LmyDigitalHuman.Models
         public string Style { get; set; } = string.Empty;
         public bool EnableEmotion { get; set; }
         public string ImagePath { get; set; } = string.Empty;
+        public string ImageUrl { get; set; } = string.Empty; // Web访问URL
         public string PreviewVideoPath { get; set; } = string.Empty;
+        public string PreviewImageUrl { get; set; } = string.Empty; // 预览图片URL
         public VoiceSettings? DefaultVoiceSettings { get; set; }
         public Dictionary<string, object>? CustomParameters { get; set; }
         public DateTime CreatedAt { get; set; }
