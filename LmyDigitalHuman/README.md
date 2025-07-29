@@ -1,178 +1,175 @@
-# LmyDigitalHuman - 实时数字人系统
+# 🤖 数字人系统 - 高并发AI数字人对话平台
 
-## 系统介绍
-LmyDigitalHuman 是一个集成了语音识别、语音合成、大语言模型对话和数字人视频生成的实时交互系统。基于 SadTalker、Whisper、Edge-TTS 等技术，提供流畅的数字人对话体验。
+## 📋 项目简介
 
-## 主要功能
-- **语音识别（ASR）**：基于 OpenAI Whisper，支持多语言识别
-- **语音合成（TTS）**：基于 Edge-TTS，支持多种中文语音
-- **数字人视频生成**：基于 SadTalker，支持实时唇形同步
-- **大语言模型对话**：支持 Ollama/Qwen2.5 等模型
-- **实时流式响应**：文本、音频、视频流式输出
-- **模板管理**：支持自定义数字人形象
+基于 .NET 8 + MuseTalk 的高性能数字人对话系统，支持 **200人并发**，提供文本对话、语音对话和实时语音交互功能。
 
-## 快速开始
+### ✨ 核心特性
 
-### 方式一：Docker 部署（推荐）
+- 🚀 **高并发**: 支持200人同时使用，50人实时对话
+- 🎭 **多模态交互**: 文本、语音、实时语音对话
+- 🎨 **数字人模板**: 可复用的数字人角色管理
+- ⚡ **智能缓存**: 多级缓存策略，提升响应速度
+- 🔧 **一键部署**: Windows/Linux 自动化启动脚本
+- 📱 **可视化界面**: 完整的H5测试平台
+- 🌐 **RESTful API**: 标准化接口，支持第三方集成
 
+### 🛠️ 技术栈
+
+- **后端**: .NET 8 Web API + SignalR
+- **AI引擎**: MuseTalk (数字人生成)
+- **语音识别**: Whisper.NET (C# 原生)
+- **语音合成**: Edge TTS + Azure Speech
+- **音频处理**: FFMpegCore + NAudio
+- **队列管理**: System.Threading.Channels
+- **缓存**: IMemoryCache + 文件缓存
+
+## 🚀 快速开始
+
+### 环境要求
+
+- .NET 8 SDK
+- Python 3.8+
+- FFmpeg (推荐)
+- Windows 10+ / Linux / macOS
+
+### 一键启动
+
+**Windows:**
 ```bash
-# 克隆项目
-git clone https://github.com/InsufficientLove/lmy-Digitalhuman.git
-cd lmy-Digitalhuman/LmyDigitalHuman
-
-# 启动开发环境（支持热重载和远程调试）
-docker-compose up lmy-digital-human-dev
-
-# 或启动生产环境
-docker-compose up -d lmy-digital-human
+startup.bat
 ```
 
-### 方式二：本地运行
-
+**Linux/Mac:**
 ```bash
-# 1. 运行环境安装脚本（Windows）
-setup-python-env.bat
-
-# 2. 运行环境检查工具
-check-environment.bat
-
-# 3. 修改配置文件 appsettings.json
-# 设置正确的 Python 路径和 SadTalker 路径
-
-# 4. 启动系统
-dotnet run
+chmod +x startup.sh
+./startup.sh
 ```
 
-### 访问界面
-- 实时数字人：http://localhost:5000/realtime-digital-human.html
-- 模板管理：http://localhost:5000/templates.html
+### 访问地址
 
-## 系统要求
+启动成功后，访问以下地址：
 
-### 软件环境
-- **操作系统**：Windows 10/11, Ubuntu 20.04+
-- **.NET SDK**：8.0 或更高版本
-- **Python**：3.8（与 SadTalker 兼容）
-- **CUDA**：11.3（推荐，最佳兼容性）
-- **显卡驱动**：NVIDIA 470.63+
+- 🌐 **测试平台**: https://localhost:7135/digital-human-test.html
+- 📚 **API文档**: https://localhost:7135/swagger
+- ❤️ **健康检查**: https://localhost:7135/health
 
-### 硬件要求
-- **GPU**：NVIDIA 显卡（至少 8GB 显存）
-- **内存**：16GB 或以上
-- **硬盘**：至少 20GB 可用空间
+## 📖 功能说明
 
-## 环境配置
+### 1. 文本对话
+```http
+POST /api/conversation/text
+Content-Type: application/json
 
-### 1. Python 环境
-所有组件使用同一个虚拟环境（SadTalker venv）：
-```bash
-# 创建虚拟环境
-python -m venv sadtalker_venv
-
-# 激活虚拟环境
-# Windows: sadtalker_venv\Scripts\activate
-# Linux: source sadtalker_venv/bin/activate
-
-# 安装依赖
-pip install torch==1.12.1+cu113 torchvision==0.13.1+cu113 torchaudio==0.12.1 --extra-index-url https://download.pytorch.org/whl/cu113
-pip install -r requirements.txt
+{
+  "templateId": "template_001",
+  "text": "你好，我是数字人助手",
+  "emotion": "friendly",
+  "quality": "medium"
+}
 ```
 
-### 2. SadTalker 模型
-下载预训练模型：
-- [百度网盘](https://pan.baidu.com/s/1tb0pBh2vZO5YD5vRNe_ZXg)（提取码：sadt）
-- [Google Drive](https://drive.google.com/drive/folders/1Wd88VDoLhVzYsQ30_qDVluQHjqQHrmYKr)
+### 2. 语音对话
+```http
+POST /api/conversation/audio
+Content-Type: multipart/form-data
 
-放置到对应目录：
-- SadTalker 模型 → `checkpoints/`
-- GFPGAN 模型 → `gfpgan/weights/`
+templateId: template_001
+audioFile: [音频文件]
+quality: medium
+```
 
-### 3. 配置文件
-修改 `appsettings.json`：
+### 3. 实时对话
+使用 SignalR WebSocket 连接 `/conversationHub` 进行实时语音交互。
+
+### 4. 模板管理
+```http
+GET /api/digitalhumantemplate/list     # 获取模板列表
+POST /api/digitalhumantemplate/create  # 创建新模板
+```
+
+## 🏗️ 项目结构
+
+```
+LmyDigitalHuman/
+├── Controllers/           # API控制器
+│   ├── ConversationController.cs
+│   ├── DigitalHumanTemplateController.cs
+│   └── LocalLLMController.cs
+├── Services/             # 业务服务层
+│   ├── ConversationService.cs
+│   ├── AudioPipelineService.cs
+│   ├── MuseTalkService.cs
+│   └── ...
+├── Models/              # 数据模型
+├── wwwroot/            # 静态资源
+│   └── digital-human-test.html
+├── musetalk_service_complete.py  # MuseTalk Python服务
+├── startup.bat         # Windows启动脚本
+├── startup.sh          # Linux/Mac启动脚本
+└── 架构设计方案.md      # 详细技术方案
+```
+
+## ⚡ 性能配置
+
+系统支持高度可配置的并发参数（`appsettings.json`）：
+
 ```json
 {
-  "RealtimeDigitalHuman": {
-    "SadTalker": {
-      "Path": "F:/AI/SadTalker",
-      "PythonPath": "F:/AI/SadTalker/venv/Scripts/python.exe",
-      "EnableGPU": true,
-      "EnableEnhancer": false,  // 关闭增强器以提高速度
-      "TimeoutSeconds": 120     // 超时时间（秒）
-    }
+  "DigitalHuman": {
+    "MaxConcurrentConversations": 200,
+    "MaxRealtimeConversations": 50,
+    "MaxAudioProcessing": 20,
+    "MaxTTSProcessing": 15,
+    "MaxVideoGeneration": 10
   }
 }
 ```
 
-## API 端点
+## 🔧 开发指南
 
-### 实时数字人
-- `POST /api/RealtimeDigitalHuman/streaming-chat` - 流式对话
-- `POST /api/RealtimeDigitalHuman/instant-chat` - 即时响应
-- `POST /api/RealtimeDigitalHuman/create-avatar` - 创建数字人
-- `GET /api/RealtimeDigitalHuman/avatars` - 获取头像列表
+### 本地开发
 
-### 语音服务
-- `GET /api/RealtimeDigitalHuman/voices` - 获取可用语音
-- `POST /api/RealtimeDigitalHuman/tts-stream` - 流式语音合成
+```bash
+# 恢复依赖
+dotnet restore
 
-## 故障排除
+# 运行项目
+dotnet run
 
-### 常见问题
-
-1. **Edge-TTS 找不到**
-   - 确保在 SadTalker 虚拟环境中安装：`pip install edge-tts`
-   
-2. **PyTorch 未找到**
-   - 检查配置的 Python 路径是否指向虚拟环境
-   - 运行 `check-environment.bat` 检查环境
-
-3. **CUDA 错误**
-   - 确认安装 CUDA 11.3
-   - 检查显卡驱动版本
-   - 验证 PyTorch CUDA 支持：`python -c "import torch; print(torch.cuda.is_available())"`
-
-4. **中文乱码**
-   - 系统已配置 UTF-8 编码
-   - 确保终端支持 UTF-8
-
-5. **视频生成太慢**
-   - 在配置中设置 `"EnableEnhancer": false` 禁用增强器
-   - 首次运行需要加载模型，后续会更快
-   - 检查 GPU 是否正常工作
-   - 考虑调整 `TimeoutSeconds` 超时时间
-
-### 环境检查
-运行 `check-environment.bat` 可以检查：
-- Python 环境和版本
-- 所有依赖安装状态
-- CUDA 和 GPU 支持
-- SadTalker 模型文件
-
-## 开发指南
-
-### 项目结构
-```
-LmyDigitalHuman/
-├── Controllers/        # API 控制器
-├── Services/          # 业务逻辑服务
-├── Models/            # 数据模型
-├── wwwroot/           # 静态文件和前端
-├── appsettings.json   # 配置文件
-├── setup-python-env.bat # 环境安装脚本
-└── check-environment.bat # 环境检查工具
+# 构建发布版本
+dotnet build --configuration Release
 ```
 
-### 远程调试
-支持 VS Code 和 Visual Studio 远程调试：
-1. 使用 Docker 开发容器
-2. 通过 SSH 连接调试
-3. 详见 `.vscode/launch.json` 配置
+### API集成
 
-## 许可证
-本项目基于 MIT 许可证开源。注意：
-- SadTalker 有其自己的许可条款
-- 商业使用请确认所有组件的许可证
+所有接口都提供标准的RESTful API，支持：
+- JSON响应格式
+- 统一错误处理
+- 请求验证
+- 异步处理
+- 缓存支持
 
-## 联系方式
-- GitHub: [InsufficientLove/lmy-Digitalhuman](https://github.com/InsufficientLove/lmy-Digitalhuman)
-- Issues: 欢迎提交问题和建议
+详细API文档请访问：https://localhost:7135/swagger
+
+## 📊 监控与日志
+
+- **实时监控**: 系统状态、并发数、处理时间
+- **详细日志**: Serilog结构化日志
+- **性能指标**: 缓存命中率、错误率统计
+- **健康检查**: 服务可用性监控
+
+## 🤝 技术支持
+
+如遇问题，请提供：
+1. 错误日志 (`logs/` 目录)
+2. 系统环境信息
+3. 复现步骤
+
+## 📄 许可证
+
+本项目仅供学习和研究使用。
+
+---
+
+**🌟 开始体验高性能数字人对话系统！**
