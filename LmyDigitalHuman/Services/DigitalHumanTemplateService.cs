@@ -871,8 +871,11 @@ namespace LmyDigitalHuman.Services
                         DefaultVoiceSettings = new VoiceSettings
                         {
                             Voice = "zh-CN-XiaoxiaoNeural",
+                            VoiceId = "zh-CN-XiaoxiaoNeural",
                             Rate = "medium",
-                            Pitch = "medium"
+                            Pitch = "medium",
+                            Speed = 1.0f,
+                            Volume = 1.0f
                         },
                         CustomParameters = new Dictionary<string, object>(),
                         CreatedAt = DateTime.Now,
@@ -895,8 +898,11 @@ namespace LmyDigitalHuman.Services
                         DefaultVoiceSettings = new VoiceSettings
                         {
                             Voice = "zh-CN-YunxiNeural",
+                            VoiceId = "zh-CN-YunxiNeural",
                             Rate = "medium",
-                            Pitch = "medium"
+                            Pitch = "medium",
+                            Speed = 1.0f,
+                            Volume = 1.0f
                         },
                         CustomParameters = new Dictionary<string, object>(),
                         CreatedAt = DateTime.Now,
@@ -919,8 +925,11 @@ namespace LmyDigitalHuman.Services
                         DefaultVoiceSettings = new VoiceSettings
                         {
                             Voice = "zh-CN-XiaohanNeural",
+                            VoiceId = "zh-CN-XiaohanNeural",
                             Rate = "medium",
-                            Pitch = "medium"
+                            Pitch = "medium",
+                            Speed = 1.0f,
+                            Volume = 1.0f
                         },
                         CustomParameters = new Dictionary<string, object>(),
                         CreatedAt = DateTime.Now,
@@ -977,10 +986,30 @@ namespace LmyDigitalHuman.Services
         {
             try
             {
-                // 构建 TTS 命令 - 使用配置中的默认语音
-                var voice = _configuration["RealtimeDigitalHuman:EdgeTTS:DefaultVoice"] ?? "zh-CN-XiaoxiaoNeural";
+                // 构建 TTS 命令 - 使用语音设置中的语音或配置中的默认语音
+                var voice = voiceSettings?.Voice ?? voiceSettings?.VoiceId ?? _configuration["RealtimeDigitalHuman:EdgeTTS:DefaultVoice"] ?? "zh-CN-XiaoxiaoNeural";
                 var rate = voiceSettings?.Speed ?? 1.0f;
-                var pitch = voiceSettings?.Pitch ?? 0.0f;
+                
+                // 处理 Pitch - 如果是字符串，转换为数值
+                float pitch = 0.0f;
+                if (voiceSettings?.Pitch != null)
+                {
+                    if (float.TryParse(voiceSettings.Pitch, out float parsedPitch))
+                    {
+                        pitch = parsedPitch;
+                    }
+                    else
+                    {
+                        // 处理预设值
+                        pitch = voiceSettings.Pitch.ToLower() switch
+                        {
+                            "low" => -0.2f,
+                            "medium" => 0.0f,
+                            "high" => 0.2f,
+                            _ => 0.0f
+                        };
+                    }
+                }
                 var fileName = $"tts_{Guid.NewGuid()}.wav";
                 var outputPath = Path.Combine(_tempPath, fileName);
 

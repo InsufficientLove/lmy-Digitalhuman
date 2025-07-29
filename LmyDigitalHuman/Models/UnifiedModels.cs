@@ -273,9 +273,11 @@ namespace LmyDigitalHuman.Models
     /// </summary>
     public class VoiceSettings
     {
+        public string Voice { get; set; } = "zh-CN-XiaoxiaoNeural";
         public string VoiceId { get; set; } = "zh-CN-XiaoxiaoNeural";
+        public string Rate { get; set; } = "medium";
+        public string Pitch { get; set; } = "medium";
         public float Speed { get; set; } = 1.0f;
-        public float Pitch { get; set; } = 0.0f;
         public float Volume { get; set; } = 1.0f;
         public string Emotion { get; set; } = "neutral";
     }
