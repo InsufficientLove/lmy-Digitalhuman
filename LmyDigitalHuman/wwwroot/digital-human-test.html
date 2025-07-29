@@ -772,9 +772,9 @@
                 templateCard.onclick = () => selectTemplate(template);
                 
                 templateCard.innerHTML = `
-                    <img src="${template.imageUrl || '/images/default-avatar.png'}" 
+                    <img src="${template.imageUrl || '/images/default-avatar.svg'}" 
                          alt="${template.templateName}" class="template-image"
-                         onerror="this.src='/images/default-avatar.png'">
+                         onerror="this.src='/images/default-avatar.svg'">
                     <div class="template-name">${template.templateName}</div>
                     <div class="template-info">${template.gender} · ${template.style}</div>
                 `;

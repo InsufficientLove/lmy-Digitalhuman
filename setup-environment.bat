@@ -65,12 +65,13 @@ if %errorlevel% neq 0 (
     echo [✓] 检测到 Python 版本:
     python --version
     
-    echo [信息] 正在安装 MuseTalk 依赖库...
-    pip install torch torchvision torchaudio numpy opencv-python pillow scipy scikit-image librosa tqdm pydub requests --quiet
+    echo [信息] 正在安装 MuseTalk 和 TTS 依赖库...
+    pip install torch torchvision torchaudio numpy opencv-python pillow scipy scikit-image librosa tqdm pydub requests edge-tts --quiet
     if %errorlevel% neq 0 (
-        echo [警告] MuseTalk 依赖库安装失败，部分功能可能不可用
+        echo [警告] 依赖库安装失败，部分功能可能不可用
+        echo [提示] 请手动执行: pip install edge-tts torch torchvision numpy opencv-python
     ) else (
-        echo [✓] MuseTalk 依赖库安装完成
+        echo [✓] MuseTalk 和 TTS 依赖库安装完成
     )
 )
 

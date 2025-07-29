@@ -23,7 +23,7 @@
 
 2. **运行一键环境配置**
    ```bash
-   # Windows
+   # Windows - 完整环境部署（包含 MuseTalk 和 Edge-TTS）
    setup-environment.bat
    
    # Linux/macOS  
@@ -35,11 +35,19 @@
    # 生产环境启动
    startup.bat          # Windows
    ./startup.sh         # Linux/macOS
-   
-   # 开发环境启动（支持热重载）
-   dev-start.bat        # Windows
-   ./dev-start.sh       # Linux/macOS
    ```
+
+### 🔧 常见问题解决
+
+#### Edge-TTS 语音合成问题
+如果启动后遇到 `edge-tts 命令不可用` 错误：
+```bash
+# 快速安装 Edge-TTS
+install-edge-tts.bat
+
+# 或手动安装
+pip install edge-tts
+```
 
 ### 方法二：手动配置
 

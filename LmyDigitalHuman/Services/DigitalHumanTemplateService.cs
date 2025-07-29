@@ -782,9 +782,14 @@ namespace LmyDigitalHuman.Services
         // 私有辅助方法
         private void InitializeDefaultTemplates()
         {
-            // 移除默认模板，只支持自定义数字人
             // 加载已存在的模板文件
             LoadExistingTemplates();
+            
+            // 如果没有任何模板，创建一些示例模板
+            if (_templates.Count == 0)
+            {
+                CreateSampleTemplates();
+            }
         }
 
         private void LoadExistingTemplates()
@@ -841,6 +846,103 @@ namespace LmyDigitalHuman.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "加载现有模板时发生错误");
+            }
+        }
+
+        private void CreateSampleTemplates()
+        {
+            try
+            {
+                _logger.LogInformation("创建示例模板...");
+
+                var sampleTemplates = new[]
+                {
+                    new DigitalHumanTemplate
+                    {
+                        TemplateId = "sample-female-1",
+                        TemplateName = "小雅",
+                        Description = "专业女性主播，适合商务场景",
+                        TemplateType = "standard",
+                        Gender = "female",
+                        AgeRange = "25-35",
+                        Style = "professional",
+                        EnableEmotion = true,
+                        ImagePath = "/images/default-avatar.svg",
+                        DefaultVoiceSettings = new VoiceSettings
+                        {
+                            Voice = "zh-CN-XiaoxiaoNeural",
+                            Rate = "medium",
+                            Pitch = "medium"
+                        },
+                        CustomParameters = new Dictionary<string, object>(),
+                        CreatedAt = DateTime.Now,
+                        UpdatedAt = DateTime.Now,
+                        IsActive = true,
+                        Status = "active",
+                        UsageCount = 0
+                    },
+                    new DigitalHumanTemplate
+                    {
+                        TemplateId = "sample-male-1",
+                        TemplateName = "小明",
+                        Description = "友好男性助手，适合客服场景",
+                        TemplateType = "standard",
+                        Gender = "male",
+                        AgeRange = "25-35",
+                        Style = "friendly",
+                        EnableEmotion = true,
+                        ImagePath = "/images/default-avatar.svg",
+                        DefaultVoiceSettings = new VoiceSettings
+                        {
+                            Voice = "zh-CN-YunxiNeural",
+                            Rate = "medium",
+                            Pitch = "medium"
+                        },
+                        CustomParameters = new Dictionary<string, object>(),
+                        CreatedAt = DateTime.Now,
+                        UpdatedAt = DateTime.Now,
+                        IsActive = true,
+                        Status = "active",
+                        UsageCount = 0
+                    },
+                    new DigitalHumanTemplate
+                    {
+                        TemplateId = "sample-female-2",
+                        TemplateName = "小慧",
+                        Description = "活泼女性主播，适合娱乐场景",
+                        TemplateType = "standard",
+                        Gender = "female",
+                        AgeRange = "20-30",
+                        Style = "casual",
+                        EnableEmotion = true,
+                        ImagePath = "/images/default-avatar.svg",
+                        DefaultVoiceSettings = new VoiceSettings
+                        {
+                            Voice = "zh-CN-XiaohanNeural",
+                            Rate = "medium",
+                            Pitch = "medium"
+                        },
+                        CustomParameters = new Dictionary<string, object>(),
+                        CreatedAt = DateTime.Now,
+                        UpdatedAt = DateTime.Now,
+                        IsActive = true,
+                        Status = "active",
+                        UsageCount = 0
+                    }
+                };
+
+                foreach (var template in sampleTemplates)
+                {
+                    _templates[template.TemplateId] = template;
+                    // 保存到文件
+                    _ = Task.Run(async () => await SaveTemplateToFileAsync(template));
+                }
+
+                _logger.LogInformation("成功创建 {Count} 个示例模板", sampleTemplates.Length);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "创建示例模板失败");
             }
         }
 
