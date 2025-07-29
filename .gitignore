@@ -9,6 +9,11 @@ artifacts/
 **/obj/
 **/xunit.runner.visualstudio.testadapter/
 
+# Python virtual environment
+venv/
+env/
+.venv/
+
 # Visual Studio
 .vs/
 *.suo

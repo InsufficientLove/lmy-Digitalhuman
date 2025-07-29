@@ -65,13 +65,50 @@ if %errorlevel% neq 0 (
     echo [✓] 检测到 Python 版本:
     python --version
     
-    echo [信息] 正在安装 MuseTalk 和 TTS 依赖库...
+    echo [信息] 正在创建 Python 虚拟环境...
+    if not exist "venv" (
+        python -m venv venv
+        if %errorlevel% neq 0 (
+            echo [错误] 虚拟环境创建失败
+            echo 请确保 Python 已正确安装并支持 venv 模块
+            pause
+            goto end
+        )
+        echo [✓] 虚拟环境创建成功
+    ) else (
+        echo [✓] 虚拟环境已存在
+    )
+    
+    echo [信息] 激活虚拟环境并安装依赖库...
+    call venv\Scripts\activate.bat
+    
+    echo [信息] 升级 pip...
+    python -m pip install --upgrade pip --quiet
+    
+    echo [信息] 安装 MuseTalk 和 TTS 依赖库...
     pip install torch torchvision torchaudio numpy opencv-python pillow scipy scikit-image librosa tqdm pydub requests edge-tts --quiet
     if %errorlevel% neq 0 (
         echo [警告] 依赖库安装失败，部分功能可能不可用
-        echo [提示] 请手动执行: pip install edge-tts torch torchvision numpy opencv-python
+        echo [提示] 请手动执行以下命令:
+        echo   call venv\Scripts\activate.bat
+        echo   pip install edge-tts torch torchvision numpy opencv-python
     ) else (
         echo [✓] MuseTalk 和 TTS 依赖库安装完成
+    )
+    
+    echo [信息] 验证关键依赖安装...
+    python -c "import torch; print(f'PyTorch: {torch.__version__}')" 2>nul
+    if %errorlevel% neq 0 (
+        echo [警告] PyTorch 验证失败
+    ) else (
+        echo [✓] PyTorch 验证成功
+    )
+    
+    python -c "import edge_tts; print('Edge-TTS: 已安装')" 2>nul
+    if %errorlevel% neq 0 (
+        echo [警告] Edge-TTS 验证失败
+    ) else (
+        echo [✓] Edge-TTS 验证成功
     )
 )
 
@@ -169,6 +206,10 @@ echo ===========================================================================
 echo.
 echo [✓] 环境部署成功完成！
 echo.
+echo 🐍 Python 虚拟环境已创建: venv\
+echo   - 所有 Python 依赖都安装在独立环境中
+echo   - 不会污染系统全局 Python 环境
+echo.
 echo 🚀 接下来您可以：
 echo.
 echo   1. 使用 Visual Studio 2022 开发:
@@ -177,12 +218,14 @@ echo.
 echo   2. 生产模式启动:
 echo      双击运行: startup.bat
 echo.
-echo   3. 查看启动指南:
+echo   3. 手动激活虚拟环境:
+echo      执行命令: call venv\Scripts\activate.bat
+echo.
+echo   4. 查看启动指南:
 echo      阅读文件: STARTUP_GUIDE.md
 echo.
 echo 🌐 系统启动后访问地址:
-echo   - HTTPS: https://localhost:7001
-echo   - HTTP:  http://localhost:5001
+echo   - HTTP:  http://localhost:5000
 echo.
 echo 📚 如遇问题，请查看 STARTUP_GUIDE.md 或 CHANGELOG.md
 echo.

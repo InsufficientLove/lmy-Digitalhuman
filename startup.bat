@@ -67,6 +67,15 @@ echo     - 按 Ctrl+C 可停止服务
 echo     - 如需开发模式，请使用 dev-start.bat
 echo.
 
+REM 激活Python虚拟环境（如果存在）
+if exist "venv\Scripts\activate.bat" (
+    echo [信息] 激活 Python 虚拟环境...
+    call venv\Scripts\activate.bat
+    echo [✓] 虚拟环境已激活
+) else (
+    echo [警告] 未找到 Python 虚拟环境，请先运行 setup-environment.bat
+)
+
 cd LmyDigitalHuman
 dotnet run --configuration Release
 

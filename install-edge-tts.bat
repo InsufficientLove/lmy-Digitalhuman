@@ -18,11 +18,27 @@ echo [✓] Python 环境正常
 python --version
 
 echo.
-echo [2/3] 安装 edge-tts...
+echo [2/4] 检查虚拟环境...
+if exist "venv\Scripts\activate.bat" (
+    echo [✓] 找到虚拟环境，正在激活...
+    call venv\Scripts\activate.bat
+) else (
+    echo [警告] 未找到虚拟环境，将安装到全局环境
+    echo [建议] 请先运行 setup-environment.bat 创建虚拟环境
+)
+
+echo.
+echo [3/4] 安装 edge-tts...
 pip install edge-tts --upgrade --quiet
 if %errorlevel% neq 0 (
     echo [错误] edge-tts 安装失败
-    echo 请尝试手动执行: pip install edge-tts
+    if exist "venv\Scripts\activate.bat" (
+        echo 请尝试手动执行:
+        echo   call venv\Scripts\activate.bat
+        echo   pip install edge-tts
+    ) else (
+        echo 请尝试手动执行: pip install edge-tts
+    )
     pause
     exit /b 1
 )
@@ -30,10 +46,10 @@ if %errorlevel% neq 0 (
 echo [✓] edge-tts 安装完成
 
 echo.
-echo [3/3] 验证安装...
-edge-tts --version >nul 2>&1
+echo [4/4] 验证安装...
+python -c "import edge_tts; print('Edge-TTS: 已安装')" 2>nul
 if %errorlevel% neq 0 (
-    echo [警告] edge-tts 命令验证失败，但安装可能成功
+    echo [警告] edge-tts Python模块验证失败
     echo 请重启命令行或重新启动应用程序
 ) else (
     echo [✓] edge-tts 验证成功

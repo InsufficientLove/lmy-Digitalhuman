@@ -29,17 +29,32 @@ if %errorlevel% neq 0 (
 )
 
 echo.
-echo [3/6] 检查 Edge-TTS...
-edge-tts --version >nul 2>&1
-if %errorlevel% neq 0 (
-    echo [❌] Edge-TTS 未安装 - 运行 install-edge-tts.bat 修复
-    set /a ERRORS+=1
+echo [3/7] 检查 Python 虚拟环境...
+if exist "venv\Scripts\activate.bat" (
+    echo [✅] Python 虚拟环境存在
+    call venv\Scripts\activate.bat >nul 2>&1
 ) else (
-    echo [✅] Edge-TTS 已安装
+    echo [❌] Python 虚拟环境不存在 - 运行 setup-environment.bat 创建
+    set /a ERRORS+=1
 )
 
 echo.
-echo [4/6] 检查项目编译...
+echo [4/7] 检查 Edge-TTS...
+if exist "venv\Scripts\activate.bat" (
+    call venv\Scripts\activate.bat >nul 2>&1
+    python -c "import edge_tts" >nul 2>&1
+    if %errorlevel% neq 0 (
+        echo [❌] Edge-TTS 未安装在虚拟环境 - 运行 install-edge-tts.bat 修复
+        set /a ERRORS+=1
+    ) else (
+        echo [✅] Edge-TTS 已安装在虚拟环境
+    )
+) else (
+    echo [⚠️] 跳过 Edge-TTS 检查（虚拟环境不存在）
+)
+
+echo.
+echo [5/7] 检查项目编译...
 cd LmyDigitalHuman
 dotnet build --no-restore --verbosity quiet >nul 2>&1
 if %errorlevel% neq 0 (
@@ -50,7 +65,7 @@ if %errorlevel% neq 0 (
 )
 
 echo.
-echo [5/6] 检查必要目录...
+echo [6/7] 检查必要目录...
 if not exist "wwwroot\templates" (
     echo [❌] 模板目录缺失
     set /a ERRORS+=1
@@ -66,7 +81,7 @@ if not exist "wwwroot\images" (
 )
 
 echo.
-echo [6/6] 测试应用启动...
+echo [7/7] 测试应用启动...
 echo [信息] 启动应用程序进行快速测试...
 start /B dotnet run --no-build >nul 2>&1
 timeout /t 10 /nobreak >nul
