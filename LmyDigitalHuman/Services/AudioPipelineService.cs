@@ -99,7 +99,7 @@ namespace LmyDigitalHuman.Services
                 maxAudioProcessing, maxTTSProcessing);
         }
 
-        public async Task<SpeechRecognitionResult> RecognizeSpeechAsync(byte[] audioData, string format = "wav")
+        public async Task<Models.SpeechRecognitionResult> RecognizeSpeechAsync(byte[] audioData, string format = "wav")
         {
             var stopwatch = Stopwatch.StartNew();
             
@@ -110,7 +110,7 @@ namespace LmyDigitalHuman.Services
 
                 // 检查缓存
                 var cacheKey = GenerateAudioCacheKey(audioData);
-                if (_cache.TryGetValue(cacheKey, out SpeechRecognitionResult? cachedResult))
+                if (_cache.TryGetValue(cacheKey, out Models.SpeechRecognitionResult? cachedResult))
                 {
                     _logger.LogInformation("从缓存返回语音识别结果");
                     return cachedResult!;
@@ -149,7 +149,7 @@ namespace LmyDigitalHuman.Services
             }
         }
 
-        public async Task<SpeechRecognitionResult> RecognizeSpeechFromFileAsync(string audioPath)
+        public async Task<Models.SpeechRecognitionResult> RecognizeSpeechFromFileAsync(string audioPath)
         {
             var stopwatch = Stopwatch.StartNew();
             
@@ -159,7 +159,7 @@ namespace LmyDigitalHuman.Services
 
                 if (!File.Exists(audioPath))
                 {
-                    return new SpeechRecognitionResult
+                    return new Models.SpeechRecognitionResult
                     {
                         Success = false,
                         Error = "音频文件不存在"
@@ -176,7 +176,7 @@ namespace LmyDigitalHuman.Services
 
                 if (whisperResult.Success)
                 {
-                    var result = new SpeechRecognitionResult
+                    var result = new Models.SpeechRecognitionResult
                     {
                         Success = true,
                         Text = whisperResult.Text,
@@ -194,7 +194,7 @@ namespace LmyDigitalHuman.Services
                 }
                 else
                 {
-                    return new SpeechRecognitionResult
+                    return new Models.SpeechRecognitionResult
                     {
                         Success = false,
                         Error = whisperResult.Error,
@@ -205,7 +205,7 @@ namespace LmyDigitalHuman.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "语音识别失败: AudioPath={AudioPath}", audioPath);
-                return new SpeechRecognitionResult
+                return new Models.SpeechRecognitionResult
                 {
                     Success = false,
                     Error = ex.Message,
@@ -214,7 +214,7 @@ namespace LmyDigitalHuman.Services
             }
         }
 
-        public async Task<List<SpeechRecognitionResult>> RecognizeBatchAudioAsync(List<string> audioPaths)
+        public async Task<List<Models.SpeechRecognitionResult>> RecognizeBatchAudioAsync(List<string> audioPaths)
         {
             _logger.LogInformation("开始批量语音识别: Count={Count}", audioPaths.Count);
 
@@ -242,11 +242,11 @@ namespace LmyDigitalHuman.Services
             return sessionId;
         }
 
-        public async Task<SpeechRecognitionResult> ProcessRealtimeAudioChunkAsync(string sessionId, byte[] audioChunk)
+        public async Task<Models.SpeechRecognitionResult> ProcessRealtimeAudioChunkAsync(string sessionId, byte[] audioChunk)
         {
             if (!_speechSessions.TryGetValue(sessionId, out var session))
             {
-                return new SpeechRecognitionResult
+                return new Models.SpeechRecognitionResult
                 {
                     Success = false,
                     Error = "语音识别会话不存在"
@@ -266,7 +266,7 @@ namespace LmyDigitalHuman.Services
                 return result;
             }
 
-            return new SpeechRecognitionResult
+            return new Models.SpeechRecognitionResult
             {
                 Success = true,
                 Text = "",
@@ -274,11 +274,11 @@ namespace LmyDigitalHuman.Services
             };
         }
 
-        public async Task<SpeechRecognitionResult> EndRealtimeSpeechRecognitionAsync(string sessionId)
+        public async Task<Models.SpeechRecognitionResult> EndRealtimeSpeechRecognitionAsync(string sessionId)
         {
             if (!_speechSessions.TryRemove(sessionId, out var session))
             {
-                return new SpeechRecognitionResult
+                return new Models.SpeechRecognitionResult
                 {
                     Success = false,
                     Error = "语音识别会话不存在"
@@ -295,7 +295,7 @@ namespace LmyDigitalHuman.Services
                 return result;
             }
 
-            return new SpeechRecognitionResult
+            return new Models.SpeechRecognitionResult
             {
                 Success = true,
                 Text = "",
@@ -1090,7 +1090,7 @@ namespace LmyDigitalHuman.Services
         internal class AudioProcessingJob
         {
             public string AudioPath { get; set; } = string.Empty;
-            public TaskCompletionSource<SpeechRecognitionResult> TaskCompletionSource { get; set; } = new();
+            public TaskCompletionSource<Models.SpeechRecognitionResult> TaskCompletionSource { get; set; } = new();
         }
 
         internal class TTSProcessingJob

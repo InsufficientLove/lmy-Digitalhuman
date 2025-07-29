@@ -651,4 +651,96 @@ namespace LmyDigitalHuman.Models
         public string Emotion { get; set; } = string.Empty;
         public float Confidence { get; set; }
     }
+
+    // ==================== 语音识别相关 ====================
+
+    /// <summary>
+    /// 语音识别结果
+    /// </summary>
+    public class SpeechRecognitionResult
+    {
+        public bool Success { get; set; }
+        public string Text { get; set; } = string.Empty;
+        public string Language { get; set; } = string.Empty;
+        public float Confidence { get; set; }
+        public TimeSpan Duration { get; set; }
+        public long ProcessingTime { get; set; }
+        public List<SpeechSegment> Segments { get; set; } = new();
+        public string Error { get; set; } = string.Empty;
+        public Dictionary<string, object>? Metadata { get; set; }
+    }
+
+    /// <summary>
+    /// 流式TTS请求
+    /// </summary>
+    public class StreamingTTSRequest
+    {
+        public string Text { get; set; } = string.Empty;
+        public string Voice { get; set; } = "zh-CN-XiaoxiaoNeural";
+        public string Rate { get; set; } = "1.0";
+        public string Pitch { get; set; } = "0Hz";
+        public string OutputFormat { get; set; } = "audio-16khz-128kbitrate-mono-mp3";
+        public string SessionId { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// 实时对话请求
+    /// </summary>
+    public class RealtimeConversationRequest
+    {
+        [Required]
+        public string TemplateId { get; set; } = string.Empty;
+        
+        public string? ConversationId { get; set; }
+        public string Quality { get; set; } = "fast";
+        public bool EnableEmotionDetection { get; set; } = true;
+        public string Language { get; set; } = "zh";
+        public VoiceSettings? VoiceSettings { get; set; }
+    }
+
+    /// <summary>
+    /// 实时对话响应
+    /// </summary>
+    public class RealtimeConversationResponse
+    {
+        public bool Success { get; set; }
+        public string ConversationId { get; set; } = string.Empty;
+        public string Message { get; set; } = string.Empty;
+        public string SessionId { get; set; } = string.Empty;
+        public Dictionary<string, object>? ConnectionInfo { get; set; }
+    }
+
+    /// <summary>
+    /// 创建数字人模板请求
+    /// </summary>
+    public class CreateDigitalHumanTemplateRequest
+    {
+        [Required]
+        public string TemplateName { get; set; } = string.Empty;
+        
+        [Required]
+        public IFormFile ImageFile { get; set; } = default!;
+        
+        public string Description { get; set; } = string.Empty;
+        public string TemplateType { get; set; } = "headshot";
+        public string Gender { get; set; } = "neutral";
+        public string AgeRange { get; set; } = "adult";
+        public string Style { get; set; } = "professional";
+        public bool EnableEmotion { get; set; } = true;
+        public VoiceSettings? DefaultVoiceSettings { get; set; }
+        public Dictionary<string, object>? CustomParameters { get; set; }
+    }
+
+    /// <summary>
+    /// 创建数字人模板响应
+    /// </summary>
+    public class CreateDigitalHumanTemplateResponse
+    {
+        public bool Success { get; set; }
+        public string TemplateId { get; set; } = string.Empty;
+        public string Message { get; set; } = string.Empty;
+        public DigitalHumanTemplate? Template { get; set; }
+        public string ProcessingTime { get; set; } = string.Empty;
+        public string PreviewUrl { get; set; } = string.Empty;
+    }
 }

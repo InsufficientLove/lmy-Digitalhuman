@@ -8,6 +8,7 @@ namespace LmyDigitalHuman.Services
     {
         Task<SpeechToTextResponse> TranscribeAsync(Stream audioStream, string language = "zh");
         Task<SpeechToTextResponse> TranscribeAsync(byte[] audioData, string language = "zh");
+        Task<SpeechToTextResponse> TranscribeAsync(string audioFilePath, string language = "zh");
         Task<bool> InitializeAsync();
         void Dispose();
     }
@@ -172,6 +173,44 @@ namespace LmyDigitalHuman.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "语音识别处理失败");
+                stopwatch.Stop();
+                
+                return new SpeechToTextResponse
+                {
+                    Success = false,
+                    Error = ex.Message,
+                    ProcessingTime = stopwatch.ElapsedMilliseconds
+                };
+            }
+        }
+
+        public async Task<SpeechToTextResponse> TranscribeAsync(string audioFilePath, string language = "zh")
+        {
+            var stopwatch = Stopwatch.StartNew();
+
+            try
+            {
+                if (!File.Exists(audioFilePath))
+                {
+                    return new SpeechToTextResponse
+                    {
+                        Success = false,
+                        Error = $"音频文件不存在: {audioFilePath}",
+                        ProcessingTime = stopwatch.ElapsedMilliseconds
+                    };
+                }
+
+                _logger.LogInformation("开始处理音频文件: {FilePath}", audioFilePath);
+
+                // 读取音频文件
+                var audioData = await File.ReadAllBytesAsync(audioFilePath);
+                
+                // 调用现有的字节数组处理方法
+                return await TranscribeAsync(audioData, language);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "处理音频文件失败: {FilePath}", audioFilePath);
                 stopwatch.Stop();
                 
                 return new SpeechToTextResponse

@@ -8,14 +8,14 @@ namespace LmyDigitalHuman.Services
     public interface IAudioPipelineService
     {
         // 语音识别
-        Task<SpeechRecognitionResult> RecognizeSpeechAsync(byte[] audioData, string format = "wav");
-        Task<SpeechRecognitionResult> RecognizeSpeechFromFileAsync(string audioPath);
-        Task<List<SpeechRecognitionResult>> RecognizeBatchAudioAsync(List<string> audioPaths);
+        Task<Models.SpeechRecognitionResult> RecognizeSpeechAsync(byte[] audioData, string format = "wav");
+        Task<Models.SpeechRecognitionResult> RecognizeSpeechFromFileAsync(string audioPath);
+        Task<List<Models.SpeechRecognitionResult>> RecognizeBatchAudioAsync(List<string> audioPaths);
 
         // 实时语音识别
         Task<string> StartRealtimeSpeechRecognitionAsync();
-        Task<SpeechRecognitionResult> ProcessRealtimeAudioChunkAsync(string sessionId, byte[] audioChunk);
-        Task<SpeechRecognitionResult> EndRealtimeSpeechRecognitionAsync(string sessionId);
+        Task<Models.SpeechRecognitionResult> ProcessRealtimeAudioChunkAsync(string sessionId, byte[] audioChunk);
+        Task<Models.SpeechRecognitionResult> EndRealtimeSpeechRecognitionAsync(string sessionId);
 
         // 文本转语音
         Task<TTSResult> ConvertTextToSpeechAsync(TTSRequest request);

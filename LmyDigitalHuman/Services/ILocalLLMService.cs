@@ -13,12 +13,12 @@ namespace LmyDigitalHuman.Services
         /// <summary>
         /// 文本对话
         /// </summary>
-        Task<LocalLLMResponse> ChatAsync(LocalLLMRequest request);
+        Task<Models.LocalLLMResponse> ChatAsync(Models.LocalLLMRequest request);
 
         /// <summary>
         /// 流式对话
         /// </summary>
-        IAsyncEnumerable<LocalLLMStreamResponse> ChatStreamAsync(LocalLLMRequest request);
+        IAsyncEnumerable<LocalLLMStreamResponse> ChatStreamAsync(Models.LocalLLMRequest request);
 
         /// <summary>
         /// 检查模型状态
@@ -63,37 +63,7 @@ namespace LmyDigitalHuman.Services
         public Dictionary<string, object> Parameters { get; set; } = new();
     }
 
-    /// <summary>
-    /// 本地LLM请求
-    /// </summary>
-    public class LocalLLMRequest
-    {
-        public string ModelName { get; set; } = "default";
-        public string Message { get; set; } = string.Empty;
-        public List<ChatMessage> History { get; set; } = new();
-        public string SystemPrompt { get; set; } = string.Empty;
-        public float Temperature { get; set; } = 0.7f;
-        public int MaxTokens { get; set; } = 1000;
-        public float TopP { get; set; } = 0.9f;
-        public int TopK { get; set; } = 40;
-        public bool Stream { get; set; } = false;
-        public string ConversationId { get; set; } = string.Empty;
-    }
-
-    /// <summary>
-    /// 本地LLM响应
-    /// </summary>
-    public class LocalLLMResponse
-    {
-        public bool Success { get; set; }
-        public string Message { get; set; } = string.Empty;
-        public string Response { get; set; } = string.Empty;
-        public string ModelName { get; set; } = string.Empty;
-        public string ConversationId { get; set; } = string.Empty;
-        public int TokensUsed { get; set; }
-        public string ProcessingTime { get; set; } = string.Empty;
-        public Dictionary<string, object> Metadata { get; set; } = new();
-    }
+    // 模型类已移至 LmyDigitalHuman.Models.UnifiedModels 中统一管理
 
     /// <summary>
     /// 流式响应

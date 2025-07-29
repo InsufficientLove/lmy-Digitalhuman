@@ -33,75 +33,7 @@ namespace LmyDigitalHuman.Services
         Task<string> GetOptimalResponseModeAsync(string templateId, ConversationMetrics metrics);
     }
 
-    /// <summary>
-    /// 文本对话请求
-    /// </summary>
-    public class TextConversationRequest
-    {
-        public string TemplateId { get; set; } = string.Empty;
-        public string Text { get; set; } = string.Empty;
-        public string? ConversationId { get; set; }
-        public string ResponseMode { get; set; } = "fast";
-        public string Quality { get; set; } = "medium";
-        public string Emotion { get; set; } = "neutral";
-        public bool UseCache { get; set; } = true;
-        public Dictionary<string, object>? CustomParameters { get; set; }
-    }
-
-    /// <summary>
-    /// 音频对话请求
-    /// </summary>
-    public class AudioConversationRequest
-    {
-        public string TemplateId { get; set; } = string.Empty;
-        public string AudioPath { get; set; } = string.Empty;
-        public string? ConversationId { get; set; }
-        public string ResponseMode { get; set; } = "fast";
-        public string Quality { get; set; } = "medium";
-        public bool EnableEmotionDetection { get; set; } = true;
-        public bool UseCache { get; set; } = true;
-        public Dictionary<string, object>? CustomParameters { get; set; }
-    }
-
-    /// <summary>
-    /// 对话响应
-    /// </summary>
-    public class ConversationResponse
-    {
-        public bool Success { get; set; }
-        public string Message { get; set; } = string.Empty;
-        public string ConversationId { get; set; } = string.Empty;
-        public string InputText { get; set; } = string.Empty;
-        public string ResponseText { get; set; } = string.Empty;
-        public string VideoUrl { get; set; } = string.Empty;
-        public string AudioUrl { get; set; } = string.Empty;
-        public string DetectedEmotion { get; set; } = string.Empty;
-        public long ProcessingTime { get; set; }
-        public bool FromCache { get; set; } = false;
-        public ConversationMetrics? Metrics { get; set; }
-    }
-
-    /// <summary>
-    /// 实时对话开始请求
-    /// </summary>
-    public class StartRealtimeConversationRequest
-    {
-        public string TemplateId { get; set; } = string.Empty;
-        public string Quality { get; set; } = "medium";
-        public bool EnableEmotionDetection { get; set; } = true;
-        public Dictionary<string, object>? CustomParameters { get; set; }
-    }
-
-    /// <summary>
-    /// 实时音频处理请求
-    /// </summary>
-    public class ProcessRealtimeAudioRequest
-    {
-        public string ConversationId { get; set; } = string.Empty;
-        public byte[] AudioData { get; set; } = Array.Empty<byte>();
-        public bool IsEndOfSpeech { get; set; } = false;
-        public string AudioFormat { get; set; } = "wav";
-    }
+    // 模型类已移至 LmyDigitalHuman.Models.UnifiedModels 中统一管理
 
     /// <summary>
     /// 对话上下文
