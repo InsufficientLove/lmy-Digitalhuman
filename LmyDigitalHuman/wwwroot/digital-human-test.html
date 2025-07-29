@@ -359,6 +359,75 @@
                 grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
             }
         }
+
+        /* 模态框样式 */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 10000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 30px;
+            border-radius: 15px;
+            width: 90%;
+            max-width: 600px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e9ecef;
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            color: #495057;
+        }
+
+        .close {
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            color: #aaa;
+        }
+
+        .close:hover {
+            color: #000;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .form-row .input-group {
+            flex: 1;
+        }
+
+        .preview-container {
+            text-align: center;
+            margin: 15px 0;
+        }
+
+        .preview-image {
+            max-width: 200px;
+            max-height: 200px;
+            border-radius: 10px;
+            border: 2px solid #e9ecef;
+        }
     </style>
 </head>
 <body>
@@ -415,7 +484,10 @@
                 <!-- 模板选择 -->
                 <div class="section">
                     <h3>📋 选择数字人模板</h3>
-                    <button class="btn btn-primary" onclick="loadTemplates()">🔄 刷新模板列表</button>
+                    <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                        <button class="btn btn-primary" onclick="loadTemplates()">🔄 刷新模板列表</button>
+                        <button class="btn btn-success" onclick="showCreateTemplateModal()">➕ 创建新模板</button>
+                    </div>
                     <div id="templatesContainer" class="templates-grid">
                         <!-- 动态加载模板 -->
                     </div>
@@ -500,6 +572,74 @@
             <div class="logs" id="systemLogs">
                 <div class="log-entry log-info">[系统] 数字人系统已初始化，等待用户操作...</div>
             </div>
+        </div>
+    </div>
+
+    <!-- 创建模板模态框 -->
+    <div id="createTemplateModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>🎭 创建新的数字人模板</h3>
+                <span class="close" onclick="hideCreateTemplateModal()">&times;</span>
+            </div>
+            
+            <form id="createTemplateForm" onsubmit="createTemplate(event)">
+                <div class="form-row">
+                    <div class="input-group">
+                        <label for="templateName">模板名称 *</label>
+                        <input type="text" id="templateName" class="form-control" required placeholder="请输入模板名称">
+                    </div>
+                    <div class="input-group">
+                        <label for="templateDescription">模板描述</label>
+                        <input type="text" id="templateDescription" class="form-control" placeholder="简短描述这个模板">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="input-group">
+                        <label for="templateGender">性别</label>
+                        <select id="templateGender" class="form-control">
+                            <option value="female">女性</option>
+                            <option value="male">男性</option>
+                            <option value="other">其他</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label for="templateStyle">风格</label>
+                        <select id="templateStyle" class="form-control">
+                            <option value="professional">专业</option>
+                            <option value="casual">休闲</option>
+                            <option value="elegant">优雅</option>
+                            <option value="modern">现代</option>
+                            <option value="classic">经典</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label for="templateImage">上传头像图片 *</label>
+                    <div class="file-upload">
+                        <input type="file" id="templateImage" accept="image/*" required onchange="previewTemplateImage(event)">
+                        <label for="templateImage" class="file-upload-label">
+                            📷 选择图片文件 (支持 JPG, PNG, WebP)
+                        </label>
+                    </div>
+                </div>
+
+                <div class="preview-container" id="imagePreviewContainer" style="display: none;">
+                    <img id="imagePreview" class="preview-image" alt="预览图片">
+                </div>
+
+                <div class="input-group">
+                    <label for="voiceSettings">语音设置</label>
+                    <textarea id="voiceSettings" class="form-control" placeholder="语音设置 (JSON格式，可选)">{"voice": "zh-CN-XiaoxiaoNeural", "rate": "medium", "pitch": "medium"}</textarea>
+                </div>
+
+                <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                    <button type="button" class="btn btn-secondary" onclick="hideCreateTemplateModal()">取消</button>
+                    <button type="submit" class="btn btn-primary" id="createTemplateBtn">🎭 创建模板</button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -1070,6 +1210,114 @@
                 sendTextMessage();
             }
         });
+
+        // 创建模板相关函数
+        function showCreateTemplateModal() {
+            document.getElementById('createTemplateModal').style.display = 'block';
+        }
+
+        function hideCreateTemplateModal() {
+            document.getElementById('createTemplateModal').style.display = 'none';
+            document.getElementById('createTemplateForm').reset();
+            document.getElementById('imagePreviewContainer').style.display = 'none';
+        }
+
+        function previewTemplateImage(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const preview = document.getElementById('imagePreview');
+                    preview.src = e.target.result;
+                    document.getElementById('imagePreviewContainer').style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+                
+                // 更新文件标签
+                const label = document.querySelector('label[for="templateImage"]');
+                label.textContent = `📷 已选择: ${file.name}`;
+            }
+        }
+
+        async function createTemplate(event) {
+            event.preventDefault();
+            
+            const createBtn = document.getElementById('createTemplateBtn');
+            createBtn.disabled = true;
+            createBtn.textContent = '⏳ 创建中...';
+            
+            addLog('开始创建新模板...', 'info');
+            updateProgress(10);
+
+            try {
+                const formData = new FormData();
+                formData.append('templateName', document.getElementById('templateName').value);
+                formData.append('description', document.getElementById('templateDescription').value);
+                formData.append('gender', document.getElementById('templateGender').value);
+                formData.append('style', document.getElementById('templateStyle').value);
+                formData.append('imageFile', document.getElementById('templateImage').files[0]);
+                
+                // 处理语音设置
+                const voiceSettingsText = document.getElementById('voiceSettings').value;
+                try {
+                    const voiceSettings = JSON.parse(voiceSettingsText);
+                    formData.append('voiceSettings', JSON.stringify(voiceSettings));
+                } catch (e) {
+                    addLog('语音设置JSON格式错误，使用默认设置', 'warning');
+                    formData.append('voiceSettings', JSON.stringify({
+                        voice: "zh-CN-XiaoxiaoNeural",
+                        rate: "medium",
+                        pitch: "medium"
+                    }));
+                }
+
+                updateProgress(30);
+
+                const response = await fetch('/api/digitalhumantemplate/create', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                updateProgress(70);
+                const result = await response.json();
+                updateProgress(90);
+
+                if (result.success) {
+                    addLog(`模板创建成功: ${result.template.templateName}`, 'success');
+                    hideCreateTemplateModal();
+                    
+                    // 刷新模板列表
+                    await loadTemplates();
+                    
+                    // 自动选择新创建的模板
+                    setTimeout(() => {
+                        const templateCards = document.querySelectorAll('.template-card');
+                        templateCards.forEach(card => {
+                            if (card.textContent.includes(result.template.templateName)) {
+                                card.click();
+                            }
+                        });
+                    }, 500);
+                } else {
+                    addLog(`模板创建失败: ${result.message}`, 'error');
+                }
+            } catch (error) {
+                addLog(`创建模板错误: ${error.message}`, 'error');
+            } finally {
+                createBtn.disabled = false;
+                createBtn.textContent = '🎭 创建模板';
+                updateProgress(100);
+                setTimeout(() => updateProgress(0), 1000);
+            }
+        }
+
+        // 点击模态框外部关闭
+        window.onclick = function(event) {
+            const modal = document.getElementById('createTemplateModal');
+            if (event.target === modal) {
+                hideCreateTemplateModal();
+            }
+        };
     </script>
 </body>
 </html>
