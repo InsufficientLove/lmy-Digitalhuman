@@ -304,4 +304,18 @@ namespace LmyDigitalHuman.Models
         public bool FromCache { get; set; } = false;
         public DigitalHumanTemplate? Template { get; set; }
     }
+
+    /// <summary>
+    /// 语音设置
+    /// </summary>
+    public class VoiceSettings
+    {
+        public string VoiceId { get; set; } = "zh-CN-XiaoxiaoNeural";
+        public float Speed { get; set; } = 1.0f;
+        public float Pitch { get; set; } = 1.0f;
+        public float Volume { get; set; } = 1.0f;
+        public string Style { get; set; } = "neutral";
+        public string Language { get; set; } = "zh-CN";
+        public Dictionary<string, object>? CustomParameters { get; set; }
+    }
 } 

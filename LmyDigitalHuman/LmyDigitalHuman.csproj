@@ -52,6 +52,18 @@
     
     <!-- FFmpeg for 音频/视频处理 -->
     <PackageReference Include="FFMpegCore" Version="5.1.0" />
+    
+    <!-- 音频处理增强 -->
+    <PackageReference Include="NAudio.Flac" Version="1.0.5432.35114" />
+    
+    <!-- 并发和任务处理 -->
+    <PackageReference Include="System.Threading.Channels" Version="8.0.0" />
+    
+    <!-- 性能监控 -->
+    <PackageReference Include="System.Diagnostics.PerformanceCounter" Version="8.0.0" />
+    
+    <!-- WebSocket支持增强 -->
+    <PackageReference Include="Microsoft.AspNetCore.WebSockets" Version="2.2.1" />
   </ItemGroup>
 
   <ItemGroup>

@@ -2,89 +2,53 @@ using LmyDigitalHuman.Models;
 
 namespace LmyDigitalHuman.Services
 {
-    /// <summary>
-    /// 数字人模板管理服务接口
-    /// </summary>
     public interface IDigitalHumanTemplateService
     {
-        /// <summary>
-        /// 创建数字人模板
-        /// </summary>
+        // 基础模板管理
         Task<CreateDigitalHumanTemplateResponse> CreateTemplateAsync(CreateDigitalHumanTemplateRequest request);
-
-        /// <summary>
-        /// 获取模板列表
-        /// </summary>
         Task<GetTemplatesResponse> GetTemplatesAsync(GetTemplatesRequest request);
-
-        /// <summary>
-        /// 根据ID获取模板详情
-        /// </summary>
         Task<DigitalHumanTemplate?> GetTemplateByIdAsync(string templateId);
-
-        /// <summary>
-        /// 更新模板信息
-        /// </summary>
-        Task<bool> UpdateTemplateAsync(string templateId, CreateDigitalHumanTemplateRequest request);
-
-        /// <summary>
-        /// 删除模板
-        /// </summary>
         Task<bool> DeleteTemplateAsync(string templateId);
+        Task<bool> UpdateTemplateAsync(string templateId, UpdateDigitalHumanTemplateRequest request);
 
-        /// <summary>
-        /// 使用模板生成视频
-        /// </summary>
+        // 模板生成与对话
         Task<GenerateWithTemplateResponse> GenerateWithTemplateAsync(GenerateWithTemplateRequest request);
+        Task<RealtimeConversationResponse> ProcessRealtimeConversationAsync(RealtimeConversationRequest request);
 
-        /// <summary>
-        /// 批量预渲染常用内容
-        /// </summary>
+        // 批处理与预渲染
         Task<BatchPreRenderResponse> BatchPreRenderAsync(BatchPreRenderRequest request);
+        Task<List<string>> GetPreRenderedVideosAsync(string templateId);
+        Task<bool> ClearPreRenderedCacheAsync(string templateId);
 
-        /// <summary>
-        /// 实时对话（使用模板）
-        /// </summary>
-        Task<RealtimeConversationResponse> RealtimeConversationAsync(RealtimeConversationRequest request);
+        // 统计与监控
+        Task<TemplateStatistics> GetStatisticsAsync();
+        Task<bool> IncrementUsageCountAsync(string templateId);
 
-        /// <summary>
-        /// 获取模板统计信息
-        /// </summary>
-        Task<TemplateStatistics> GetTemplateStatisticsAsync();
-
-        /// <summary>
-        /// 验证模板是否可用
-        /// </summary>
+        // 性能优化
         Task<bool> ValidateTemplateAsync(string templateId);
+        Task<string> GetOptimalQualitySettingAsync(string templateId, string responseMode);
+        Task<bool> WarmupTemplateAsync(string templateId);
 
-        /// <summary>
-        /// 获取模板预览视频
-        /// </summary>
-        Task<string?> GetTemplatePreviewAsync(string templateId);
+        // 并发处理
+        Task<List<GenerateWithTemplateResponse>> ProcessBatchRequestsAsync(List<GenerateWithTemplateRequest> requests);
+        Task<bool> IsTemplateAvailableForProcessingAsync(string templateId);
+        
+        // 缓存管理
+        Task<bool> RefreshTemplateCacheAsync(string? templateId = null);
+        Task<long> GetCacheSizeAsync();
+        Task<bool> ClearExpiredCacheAsync();
+    }
 
-        /// <summary>
-        /// 复制模板
-        /// </summary>
-        Task<CreateDigitalHumanTemplateResponse> CloneTemplateAsync(string templateId, string newName);
-
-        /// <summary>
-        /// 导出模板配置
-        /// </summary>
-        Task<byte[]> ExportTemplateAsync(string templateId);
-
-        /// <summary>
-        /// 导入模板配置
-        /// </summary>
-        Task<CreateDigitalHumanTemplateResponse> ImportTemplateAsync(IFormFile configFile);
-
-        /// <summary>
-        /// 获取模板缓存状态
-        /// </summary>
-        Task<Dictionary<string, object>> GetTemplateCacheStatusAsync(string templateId);
-
-        /// <summary>
-        /// 清理模板缓存
-        /// </summary>
-        Task<bool> ClearTemplateCacheAsync(string templateId);
+    /// <summary>
+    /// 更新数字人模板请求
+    /// </summary>
+    public class UpdateDigitalHumanTemplateRequest
+    {
+        public string? TemplateName { get; set; }
+        public string? Description { get; set; }
+        public bool? EnableEmotion { get; set; }
+        public VoiceSettings? DefaultVoiceSettings { get; set; }
+        public Dictionary<string, object>? CustomParameters { get; set; }
+        public bool? IsActive { get; set; }
     }
 } 

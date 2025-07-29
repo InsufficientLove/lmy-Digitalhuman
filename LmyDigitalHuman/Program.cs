@@ -55,6 +55,10 @@ builder.Services.AddSingleton<IDigitalHumanTemplateService, DigitalHumanTemplate
 // Register Edge TTS service
 builder.Services.AddSingleton<IEdgeTTSService, EdgeTTSService>();
 
+// Register new digital human services
+builder.Services.AddSingleton<IConversationService, ConversationService>();
+builder.Services.AddSingleton<IAudioPipelineService, AudioPipelineService>();
+
 // Add memory caching
 builder.Services.AddMemoryCache();
 
@@ -151,6 +155,9 @@ app.UseStaticFiles(new StaticFileOptions
 app.UseAuthorization();
 
 app.MapControllers();
+
+// Map SignalR Hubs
+app.MapHub<LmyDigitalHuman.Controllers.ConversationHub>("/conversationHub");
 
 // 健康检查端点
 app.MapHealthChecks("/health", new HealthCheckOptions
