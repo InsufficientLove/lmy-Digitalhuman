@@ -308,5 +308,6 @@ namespace LmyDigitalHuman.Services
         public string Language { get; set; } = "zh";
         public string Error { get; set; } = string.Empty;
         public List<string> Segments { get; set; } = new();
+        public double Duration { get; internal set; }
     }
 }

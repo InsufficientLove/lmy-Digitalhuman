@@ -114,5 +114,11 @@ namespace LmyDigitalHuman.Services
         public double CacheHitRate { get; set; }
         public string QualityUsed { get; set; } = string.Empty;
         public string ResponseModeUsed { get; set; } = string.Empty;
+        public int ActiveWorkers { get; set; }
+        public int QueueLength { get; set; }
+        public double AverageProcessingTime { get; set; }
+        public double ThroughputPerHour { get; set; }
+        public Dictionary<string, object> ResourceUsage { get; set; }
+        public List<string> PerformanceWarnings { get; set; }
     }
 }
