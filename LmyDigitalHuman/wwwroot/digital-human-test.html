@@ -680,36 +680,8 @@
             const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
             
             if (!isHttps && isLocalhost) {
-                // 在HTTP环境下显示警告
-                const warning = document.createElement('div');
-                warning.style.cssText = `
-                    position: fixed;
-                    top: 0;
-                    left: 0;
-                    right: 0;
-                    background: #ff6b6b;
-                    color: white;
-                    padding: 15px;
-                    text-align: center;
-                    z-index: 10000;
-                    font-size: 14px;
-                    box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-                `;
-                warning.innerHTML = `
-                    ⚠️ <strong>注意</strong>: 当前使用HTTP访问，麦克风功能可能受限。
-                    <a href="https://localhost:7001/digital-human-test.html" 
-                       style="color: #fff; text-decoration: underline; margin-left: 10px;">
-                       点击切换到HTTPS
-                    </a>
-                    <button onclick="this.parentElement.remove()" 
-                            style="margin-left: 10px; background: rgba(255,255,255,0.2); border: none; color: white; padding: 5px 10px; border-radius: 3px; cursor: pointer;">
-                       关闭
-                    </button>
-                `;
-                document.body.insertBefore(warning, document.body.firstChild);
-                
-                addLog('当前使用HTTP访问，部分功能可能受限', 'warning');
-            } else if (isHttps && isLocalhost) {
+                addLog('当前使用HTTP访问，麦克风功能需要用户授权', 'info');
+            } else if (isHttps) {
                 addLog('HTTPS环境检测完成', 'success');
             }
         }

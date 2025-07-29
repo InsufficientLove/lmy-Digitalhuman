@@ -71,7 +71,7 @@ echo [信息] 启动应用程序进行快速测试...
 start /B dotnet run --no-build >nul 2>&1
 timeout /t 10 /nobreak >nul
 
-curl -s http://localhost:5001/api/digitalhumantemplate/list >nul 2>&1
+curl -s http://localhost:5000/api/digitalhumantemplate/list >nul 2>&1
 if %errorlevel% neq 0 (
     echo [⚠️] 应用程序启动测试未完成 - 请手动验证
 ) else (
@@ -92,8 +92,7 @@ if %ERRORS%==0 (
     echo    startup.bat
     echo.
     echo 🌐 访问地址：
-    echo    HTTP:  http://localhost:5001/digital-human-test.html
-    echo    HTTPS: https://localhost:7001/digital-human-test.html
+echo    HTTP:  http://localhost:5000/digital-human-test.html
 ) else (
     echo                    ❌ 发现 %ERRORS% 个问题
     echo.

@@ -59,8 +59,7 @@ echo [✓] 依赖包已就绪
 echo [✓] 项目编译成功
 echo.
 echo 🌐 系统启动后访问地址：
-echo     HTTPS: https://localhost:7001
-echo     HTTP:  http://localhost:5001
+echo     HTTP:  http://localhost:5000
 echo.
 echo 💡 提示：
 echo     - 首次启动可能需要较长时间
@@ -69,7 +68,7 @@ echo     - 如需开发模式，请使用 dev-start.bat
 echo.
 
 cd LmyDigitalHuman
-dotnet run --configuration Release --urls "https://localhost:7001;http://localhost:5001"
+dotnet run --configuration Release
 
 echo.
 echo 系统已停止运行
