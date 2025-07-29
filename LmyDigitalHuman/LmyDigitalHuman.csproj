@@ -5,7 +5,6 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>d2abf430-cffd-4129-b6bb-5b2d4bc59295</UserSecretsId>
-    <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
     <AssemblyName>LmyDigitalHuman</AssemblyName>
     <RootNamespace>LmyDigitalHuman</RootNamespace>
   </PropertyGroup>
@@ -13,20 +12,17 @@
   <ItemGroup>
     <!-- 核心框架 -->
     <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.0" />
-    <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.22.1-Preview.1" />
-    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.8.1" />
     
-    <!-- 日志 -->
-    <PackageReference Include="Serilog.AspNetCore" Version="9.0.0" />
-    <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+    <!-- 日志 (降级到稳定版本避免依赖冲突) -->
+    <PackageReference Include="Serilog.AspNetCore" Version="8.0.2" />
+    <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
     
-    <!-- JSON处理 -->
+    <!-- JSON处理 (统一版本) -->
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-    <PackageReference Include="System.Text.Json" Version="8.0.0" />
     
     <!-- 音频处理 -->
     <PackageReference Include="NAudio" Version="2.2.1" />
-    <PackageReference Include="NAudio.Lame" Version="2.1.0" />
     <PackageReference Include="NAudio.Vorbis" Version="1.5.0" />
     
     <!-- 现代化语音识别 - Whisper.NET -->
@@ -34,42 +30,24 @@
     <PackageReference Include="Whisper.net.Runtime" Version="1.4.7" />
     
     <!-- 图像处理 -->
-    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.0" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.5" />
     
     <!-- HTTP客户端增强 -->
     <PackageReference Include="Microsoft.Extensions.Http" Version="8.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Http.Polly" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Http.Polly" Version="8.0.8" />
     
-    <!-- 实时通信 -->
-    <PackageReference Include="Microsoft.AspNetCore.SignalR" Version="8.0.0" />
-    
-    <!-- 内存缓存和分布式缓存 -->
+    <!-- 内存缓存 -->
     <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="8.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="8.0.0" />
-    
-    <!-- 后台任务 -->
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
     
     <!-- FFmpeg for 音频/视频处理 -->
     <PackageReference Include="FFMpegCore" Version="5.1.0" />
     
-    <!-- 音频处理增强 -->
-    <PackageReference Include="NAudio.Flac" Version="1.0.5432.35114" />
-    
     <!-- 并发和任务处理 -->
     <PackageReference Include="System.Threading.Channels" Version="8.0.0" />
-    
-    <!-- 高性能消息队列 -->
     <PackageReference Include="System.Threading.Tasks.Dataflow" Version="8.0.0" />
     
-    <!-- 性能监控 -->
-    <PackageReference Include="System.Diagnostics.PerformanceCounter" Version="8.0.0" />
-    
-    <!-- WebSocket支持增强 -->
-    <PackageReference Include="Microsoft.AspNetCore.WebSockets" Version="2.2.1" />
-    
     <!-- .NET原生TTS支持 -->
-    <PackageReference Include="Microsoft.CognitiveServices.Speech" Version="1.32.1" />
+    <PackageReference Include="Microsoft.CognitiveServices.Speech" Version="1.38.0" />
   </ItemGroup>
 
   <ItemGroup>
