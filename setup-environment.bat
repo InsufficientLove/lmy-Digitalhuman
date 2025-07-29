@@ -162,16 +162,13 @@ echo [✓] 环境部署成功完成！
 echo.
 echo 🚀 接下来您可以：
 echo.
-echo   1. 开发模式启动（支持热重载）:
-echo      双击运行: dev-start.bat
+echo   1. 使用 Visual Studio 2022 开发:
+echo      打开文件: LmyDigitalHuman.sln
 echo.
 echo   2. 生产模式启动:
 echo      双击运行: startup.bat
 echo.
-echo   3. 使用 Visual Studio 2022 打开项目:
-echo      打开文件: LmyDigitalHuman.sln
-echo.
-echo   4. 查看启动指南:
+echo   3. 查看启动指南:
 echo      阅读文件: STARTUP_GUIDE.md
 echo.
 echo 🌐 系统启动后访问地址:

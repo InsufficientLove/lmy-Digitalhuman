@@ -183,9 +183,9 @@ app.MapGet("/", () => Results.Redirect("/realtime-digital-human.html"));
 
 // 记录启动信息
 app.Logger.LogInformation("🚀 实时数字人API服务启动成功");
-app.Logger.LogInformation("📱 访问地址: https://localhost:7135");
-app.Logger.LogInformation("📊 健康检查: https://localhost:7135/health");
-app.Logger.LogInformation("📖 API文档: https://localhost:7135/swagger");
+app.Logger.LogInformation("📱 访问地址: https://localhost:7001");
+app.Logger.LogInformation("📊 健康检查: https://localhost:7001/health");
+app.Logger.LogInformation("📖 API文档: https://localhost:7001/swagger");
 
 // 记录Whisper配置信息
 app.Logger.LogInformation("🎤 Whisper提供程序: Python");
