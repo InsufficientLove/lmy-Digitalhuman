@@ -37,6 +37,14 @@
    ./startup.sh         # Linux/macOS
    ```
 
+### 🔧 环境验证
+
+在启动系统前，建议运行环境验证脚本：
+```bash
+# 自动检查所有依赖和配置
+verify-environment.bat
+```
+
 ### 🔧 常见问题解决
 
 #### Edge-TTS 语音合成问题
