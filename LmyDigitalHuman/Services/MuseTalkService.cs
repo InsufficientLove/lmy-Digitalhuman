@@ -274,25 +274,24 @@ namespace LmyDigitalHuman.Services
         public async Task<DigitalHumanTemplate> CreateTemplateAsync(CreateTemplateRequest request)
         {
             var templateId = Guid.NewGuid().ToString("N");
-            var sanitizedName = SanitizeFileName(request.Name);
+            var sanitizedName = SanitizeFileName(request.TemplateName);
             var imageFileName = $"{sanitizedName}_{templateId}.jpg";
             var jsonFileName = $"{sanitizedName}_{templateId}.json";
             
             var imageTargetPath = Path.Combine(_templatesPath, imageFileName);
             var jsonTargetPath = Path.Combine(_templatesPath, jsonFileName);
 
-            // 复制图片文件
-            if (File.Exists(request.ImagePath))
+            // 保存上传的图片文件
+            if (request.ImageFile != null)
             {
-                File.Copy(request.ImagePath, imageTargetPath, true);
+                using var stream = new FileStream(imageTargetPath, FileMode.Create);
+                await request.ImageFile.CopyToAsync(stream);
             }
 
             var template = new DigitalHumanTemplate
             {
                 TemplateId = templateId,
-                Id = templateId, // 兼容性别名
-                TemplateName = request.Name,
-                Name = request.Name, // 兼容性别名
+                TemplateName = request.TemplateName,
                 Description = request.Description,
                 ImagePath = imageFileName,
                 ImageUrl = $"/templates/{imageFileName}",
@@ -312,7 +311,7 @@ namespace LmyDigitalHuman.Services
             
             await File.WriteAllTextAsync(jsonTargetPath, jsonContent, Encoding.UTF8);
 
-            _logger.LogInformation("创建数字人模板成功: {TemplateName} ({TemplateId})", request.Name, templateId);
+            _logger.LogInformation("创建数字人模板成功: {TemplateName} ({TemplateId})", request.TemplateName, templateId);
             return template;
         }
 
