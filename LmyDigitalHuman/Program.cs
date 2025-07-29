@@ -136,6 +136,32 @@ if (!app.Environment.IsDevelopment())
 {
     app.UseHttpsRedirection();
 }
+
+// 开发环境安全头配置
+if (app.Environment.IsDevelopment())
+{
+    app.Use(async (context, next) =>
+    {
+        // 添加开发环境的安全头，允许不安全的请求
+        context.Response.Headers.Add("Access-Control-Allow-Origin", "*");
+        context.Response.Headers.Add("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+        context.Response.Headers.Add("Access-Control-Allow-Headers", "*");
+        context.Response.Headers.Add("Access-Control-Allow-Credentials", "true");
+        
+        // 允许混合内容和不安全请求
+        context.Response.Headers.Add("Content-Security-Policy", 
+            "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; " +
+            "script-src * 'unsafe-inline' 'unsafe-eval'; " +
+            "connect-src * 'unsafe-inline'; " +
+            "img-src * data: blob: 'unsafe-inline'; " +
+            "frame-src *; " +
+            "style-src * 'unsafe-inline'; " +
+            "media-src * data: blob:;");
+            
+        await next();
+    });
+}
+
 app.UseCors("AllowLocalhost");
 
 // 确保必要的目录存在
