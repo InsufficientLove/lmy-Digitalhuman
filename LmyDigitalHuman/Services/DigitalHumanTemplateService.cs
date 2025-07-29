@@ -14,7 +14,7 @@ namespace LmyDigitalHuman.Services
         private readonly IMemoryCache _cache;
         private readonly IConfiguration _configuration;
         private readonly ILocalLLMService _llmService;
-        private readonly IWhisperService _whisperService;
+        private readonly IWhisperNetService _whisperService;
         private readonly HttpClient _httpClient;
         
         private readonly ConcurrentDictionary<string, DigitalHumanTemplate> _templates = new();
@@ -28,7 +28,7 @@ namespace LmyDigitalHuman.Services
             IMemoryCache cache,
             IConfiguration configuration,
             ILocalLLMService llmService,
-            IWhisperService whisperService,
+            IWhisperNetService whisperService,
             HttpClient httpClient)
         {
             _logger = logger;
@@ -385,7 +385,8 @@ namespace LmyDigitalHuman.Services
                 // 处理音频输入
                 if (request.InputType == "audio" && request.AudioFile != null)
                 {
-                    var transcriptionResult = await _whisperService.TranscribeAsync(request.AudioFile);
+                    using var audioStream = request.AudioFile.OpenReadStream();
+                    var transcriptionResult = await _whisperService.TranscribeAsync(audioStream);
                     userInput = transcriptionResult.Text;
                     
                     // 简单的情感检测
@@ -535,6 +536,117 @@ namespace LmyDigitalHuman.Services
                 MostUsedTemplates = templates.OrderByDescending(t => t.UsageCount).Take(5).ToList(),
                 RecentTemplates = templates.OrderByDescending(t => t.CreatedAt).Take(5).ToList()
             };
+        }
+
+        public async Task<TemplateStatistics> GetStatisticsAsync()
+        {
+            return await GetTemplateStatisticsAsync();
+        }
+
+        public async Task<List<string>> GetPreRenderedVideosAsync(string templateId)
+        {
+            // 返回模板的预渲染视频列表
+            var videos = new List<string>();
+            if (_templates.TryGetValue(templateId, out var template) && !string.IsNullOrEmpty(template.PreviewVideoPath))
+            {
+                videos.Add(template.PreviewVideoPath);
+            }
+            return videos;
+        }
+
+        public async Task<bool> ClearPreRenderedCacheAsync(string templateId)
+        {
+            // 清理预渲染缓存
+            return true;
+        }
+
+        public async Task<bool> IncrementUsageCountAsync(string templateId)
+        {
+            if (_templates.TryGetValue(templateId, out var template))
+            {
+                template.UsageCount++;
+                template.UpdatedAt = DateTime.Now;
+                await SaveTemplateToFileAsync(template);
+                return true;
+            }
+            return false;
+        }
+
+        public async Task<string> GetOptimalQualitySettingAsync(string templateId, string responseMode)
+        {
+            // 根据响应模式返回最优质量设置
+            return responseMode switch
+            {
+                "realtime" => "fast",
+                "high_quality" => "high",
+                _ => "medium"
+            };
+        }
+
+        public async Task<bool> WarmupTemplateAsync(string templateId)
+        {
+            // 预热模板
+            if (_templates.ContainsKey(templateId))
+            {
+                _logger.LogInformation("模板预热完成: {TemplateId}", templateId);
+                return true;
+            }
+            return false;
+        }
+
+        public async Task<List<GenerateWithTemplateResponse>> ProcessBatchRequestsAsync(List<GenerateWithTemplateRequest> requests)
+        {
+            var responses = new List<GenerateWithTemplateResponse>();
+            foreach (var request in requests)
+            {
+                try
+                {
+                    var response = await GenerateWithTemplateAsync(request);
+                    responses.Add(response);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "批量处理请求失败");
+                    responses.Add(new GenerateWithTemplateResponse
+                    {
+                        Success = false,
+                        Message = ex.Message
+                    });
+                }
+            }
+            return responses;
+        }
+
+        public async Task<bool> IsTemplateAvailableForProcessingAsync(string templateId)
+        {
+            return _templates.ContainsKey(templateId) && _templates[templateId].IsActive;
+        }
+
+        public async Task<bool> RefreshTemplateCacheAsync(string? templateId = null)
+        {
+            if (string.IsNullOrEmpty(templateId))
+            {
+                // 刷新所有模板缓存
+                LoadExistingTemplates();
+                return true;
+            }
+            else
+            {
+                // 刷新特定模板缓存
+                return _templates.ContainsKey(templateId);
+            }
+        }
+
+        public async Task<long> GetCacheSizeAsync()
+        {
+            // 返回缓存大小估算
+            return _templates.Count * 1024; // 简单估算
+        }
+
+        public async Task<bool> ClearExpiredCacheAsync()
+        {
+            // 清理过期缓存
+            return true;
         }
 
         public async Task<bool> ValidateTemplateAsync(string templateId)

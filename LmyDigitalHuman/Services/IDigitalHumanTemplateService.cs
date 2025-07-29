@@ -9,11 +9,11 @@ namespace LmyDigitalHuman.Services
         Task<GetTemplatesResponse> GetTemplatesAsync(GetTemplatesRequest request);
         Task<DigitalHumanTemplate?> GetTemplateByIdAsync(string templateId);
         Task<bool> DeleteTemplateAsync(string templateId);
-        Task<bool> UpdateTemplateAsync(string templateId, UpdateDigitalHumanTemplateRequest request);
+        Task<bool> UpdateTemplateAsync(string templateId, CreateDigitalHumanTemplateRequest request);
 
         // 模板生成与对话
         Task<GenerateWithTemplateResponse> GenerateWithTemplateAsync(GenerateWithTemplateRequest request);
-        Task<RealtimeConversationResponse> ProcessRealtimeConversationAsync(RealtimeConversationRequest request);
+        Task<RealtimeConversationResponse> RealtimeConversationAsync(RealtimeConversationRequest request);
 
         // 批处理与预渲染
         Task<BatchPreRenderResponse> BatchPreRenderAsync(BatchPreRenderRequest request);
