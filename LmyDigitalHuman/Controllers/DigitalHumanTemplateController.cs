@@ -382,7 +382,7 @@ namespace LmyDigitalHuman.Controllers
                     return BadRequest(new { error = "模板ID不能为空" });
                 }
 
-                var cacheStatus = await _templateService.GetTemplateCacheStatusAsync(templateId);
+                var cacheStatus = await _templateService.GetTemplateCacheStatusAsync();
                 
                 return Ok(new { success = true, cacheStatus });
             }

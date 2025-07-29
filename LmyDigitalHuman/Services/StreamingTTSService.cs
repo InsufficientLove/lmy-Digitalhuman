@@ -95,7 +95,7 @@ namespace LmyDigitalHuman.Services
                     OutputFormat = session.Request.OutputFormat
                 };
 
-                var result = await _edgeTTSService.ConvertTextToSpeechAsync(ttsRequest);
+                var result = await _edgeTTSService.ConvertTextToSpeechAsync(session.Request.Text, session.Request.Voice);
                 // 处理结果...
             }
             catch (Exception ex)

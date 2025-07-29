@@ -154,9 +154,17 @@ namespace LmyDigitalHuman.Services
                     VideoUrl = videoResponse.VideoUrl,
                     AudioUrl = $"/temp/{Path.GetFileName(ttsResult.AudioPath)}",
                     DetectedEmotion = request.Emotion,
-                    ProcessingTime = stopwatch.ElapsedMilliseconds,
+                    ProcessingTime = $"{stopwatch.ElapsedMilliseconds}ms",
                     FromCache = false,
-                    Metrics = metrics
+                    Metrics = new ServiceMetrics
+                    {
+                        ActiveWorkers = metrics.ActiveWorkers,
+                        QueueLength = metrics.QueueLength,
+                        AverageProcessingTime = metrics.AverageProcessingTime,
+                        ThroughputPerHour = metrics.ThroughputPerHour,
+                        ResourceUsage = metrics.ResourceUsage,
+                        PerformanceWarnings = metrics.PerformanceWarnings
+                    }
                 };
 
                 // 更新对话上下文
@@ -312,9 +320,17 @@ namespace LmyDigitalHuman.Services
                     VideoUrl = videoResponse.VideoUrl,
                     AudioUrl = $"/temp/{Path.GetFileName(ttsResult.AudioPath)}",
                     DetectedEmotion = detectedEmotion,
-                    ProcessingTime = stopwatch.ElapsedMilliseconds,
+                    ProcessingTime = $"{stopwatch.ElapsedMilliseconds}ms",
                     FromCache = false,
-                    Metrics = metrics
+                    Metrics = new ServiceMetrics
+                    {
+                        ActiveWorkers = metrics.ActiveWorkers,
+                        QueueLength = metrics.QueueLength,
+                        AverageProcessingTime = metrics.AverageProcessingTime,
+                        ThroughputPerHour = metrics.ThroughputPerHour,
+                        ResourceUsage = metrics.ResourceUsage,
+                        PerformanceWarnings = metrics.PerformanceWarnings
+                    }
                 };
 
                 // 更新对话上下文

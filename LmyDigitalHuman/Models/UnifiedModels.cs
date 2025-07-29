@@ -190,7 +190,9 @@ namespace LmyDigitalHuman.Models
         public string? ConversationId { get; set; }
         public string Quality { get; set; } = "medium";
         public string ResponseMode { get; set; } = "sync";
+        public string Emotion { get; set; } = "neutral";
         public bool EnableEmotionDetection { get; set; } = true;
+        public bool UseCache { get; set; } = true;
     }
 
     /// <summary>
@@ -205,10 +207,13 @@ namespace LmyDigitalHuman.Models
         public IFormFile AudioFile { get; set; } = default!;
         
         public string? ConversationId { get; set; }
+        public string AudioPath { get; set; } = string.Empty;
         public string Quality { get; set; } = "medium";
         public string ResponseMode { get; set; } = "sync";
         public bool EnableEmotionDetection { get; set; } = true;
         public string Language { get; set; } = "zh";
+        public bool UseCache { get; set; } = true;
+        public Dictionary<string, object>? CustomParameters { get; set; }
     }
 
     /// <summary>
@@ -256,7 +261,9 @@ namespace LmyDigitalHuman.Models
         public byte[] AudioData { get; set; } = Array.Empty<byte>();
         
         public bool IsComplete { get; set; }
+        public bool IsEndOfSpeech { get; set; }
         public int ChunkIndex { get; set; }
+        public string AudioFormat { get; set; } = "wav";
     }
 
     // ==================== 语音相关 ====================
@@ -392,6 +399,7 @@ namespace LmyDigitalHuman.Models
     {
         public bool Success { get; set; }
         public string Response { get; set; } = string.Empty;
+        public string ResponseText { get; set; } = string.Empty;
         public string Message { get; set; } = string.Empty;
         public string ModelName { get; set; } = string.Empty;
         public string? ConversationId { get; set; }
@@ -402,6 +410,19 @@ namespace LmyDigitalHuman.Models
     }
 
     // ==================== 统计和监控相关 ====================
+
+    /// <summary>
+    /// 对话指标
+    /// </summary>
+    public class ConversationMetrics
+    {
+        public int ActiveWorkers { get; set; }
+        public int QueueLength { get; set; }
+        public double AverageProcessingTime { get; set; }
+        public double ThroughputPerHour { get; set; }
+        public Dictionary<string, object> ResourceUsage { get; set; } = new();
+        public List<string> PerformanceWarnings { get; set; } = new();
+    }
 
     /// <summary>
     /// 模板统计
@@ -720,6 +741,9 @@ namespace LmyDigitalHuman.Models
         public string TemplateId { get; set; } = string.Empty;
         
         public string? ConversationId { get; set; }
+        public string InputType { get; set; } = "text"; // text, audio
+        public string Text { get; set; } = string.Empty;
+        public IFormFile? AudioFile { get; set; }
         public string Quality { get; set; } = "fast";
         public string ResponseMode { get; set; } = "stream";
         public bool EnableEmotionDetection { get; set; } = true;

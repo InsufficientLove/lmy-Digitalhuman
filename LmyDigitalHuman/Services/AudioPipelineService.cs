@@ -330,10 +330,18 @@ namespace LmyDigitalHuman.Services
                 // 优先使用Edge TTS，Azure Speech作为备选
                 try
                 {
-                    var edgeTTSResult = await _edgeTTSService.GenerateAudioAsync(request.Text, request.VoiceId, outputPath);
+                    var ttsRequest = new TTSRequest
+                    {
+                        Text = request.Text,
+                        VoiceId = request.VoiceId,
+                        OutputPath = outputPath
+                    };
+                    var edgeTTSAudioData = await _edgeTTSService.GenerateAudioAsync(ttsRequest);
+                    var edgeTTSResult = new { Success = edgeTTSAudioData.Length > 0 };
                     
                     if (edgeTTSResult.Success)
                     {
+                        await File.WriteAllBytesAsync(outputPath, edgeTTSAudioData);
                         result = CreateTTSResult(outputPath, stopwatch.ElapsedMilliseconds);
                     }
                     else if (_speechSynthesizer != null)
@@ -758,7 +766,7 @@ namespace LmyDigitalHuman.Services
                     Duration = audioInfo.Duration,
                     SampleRate = audioStream.SampleRateHz,
                     Channels = audioStream.Channels,
-                    BitDepth = audioStream.BitDepth,
+                    BitDepth = audioStream.BitDepth ?? 16,
                     Format = Path.GetExtension(audioPath).TrimStart('.'),
                     FileSize = fileInfo.Length,
                     IsSuitableForMuseTalk = isSuitableForMuseTalk,

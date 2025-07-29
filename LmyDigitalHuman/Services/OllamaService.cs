@@ -99,10 +99,12 @@ namespace LmyDigitalHuman.Services
                 {
                     Success = true,
                     Response = result?.Response ?? "",
+                    ResponseText = result?.Response ?? "",
+                    Message = result?.Response ?? "",
                     ModelName = request.ModelName,
                     ConversationId = request.ConversationId,
                     TokensUsed = result?.PromptEvalCount + result?.EvalCount ?? 0,
-                    ProcessingTime = $"{processingTime.TotalMilliseconds:F0}ms",
+                    ProcessingTime = (long)processingTime.TotalMilliseconds,
                     Metadata = new Dictionary<string, object>
                     {
                         ["prompt_eval_count"] = result?.PromptEvalCount ?? 0,
@@ -117,8 +119,9 @@ namespace LmyDigitalHuman.Services
                 return new LocalLLMResponse
                 {
                     Success = false,
+                    Error = $"对话失败: {ex.Message}",
                     Message = $"对话失败: {ex.Message}",
-                    ProcessingTime = $"{(DateTime.Now - startTime).TotalMilliseconds:F0}ms"
+                    ProcessingTime = (long)(DateTime.Now - startTime).TotalMilliseconds
                 };
             }
         }
