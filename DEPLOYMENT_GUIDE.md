@@ -4,9 +4,14 @@
 
 ### 基础要求
 - **操作系统**: Windows 10/11 (64位)
-- **Python**: 3.10.11 ✅
-- **CUDA**: 建议升级到 12.1 (当前11.8也支持)
+- **Python**: 3.10.11+ ⚠️ **必须升级到 3.10.11+**
+- **CUDA**: 12.1+ ⚠️ **必须升级到 CUDA 12.1+**
 - **.NET**: 8.0 ✅
+
+### ⚠️ 重要版本要求
+- **Python 3.10.11+**: vLLM和最新PyTorch需要
+- **CUDA 12.1+**: TensorRT 8.6.1和PyTorch 2.1.0优化版本需要
+- **NVIDIA驱动**: 535.0+ (支持CUDA 12.1)
 
 ### GPU配置选择
 
@@ -24,18 +29,27 @@
 
 ## 🛠️ 部署步骤
 
-### 步骤1: 环境准备
+### 步骤1: 环境准备 (必须完成)
 
-#### 选项A: 保持当前CUDA 11.8
-```bash
-# 使用兼容版本配置
-setup-environment-compatible.bat
-```
+#### 🔧 升级到CUDA 12.1 (必需)
+1. **卸载当前CUDA 11.8**
+   ```bash
+   # 控制面板 → 程序和功能 → 卸载CUDA相关程序
+   ```
 
-#### 选项B: 升级到CUDA 12.1 (推荐)
-1. 卸载当前CUDA 11.8
-2. 下载安装CUDA 12.1: https://developer.nvidia.com/cuda-12-1-0-download-archive
-3. 更新NVIDIA驱动到最新版本
+2. **安装CUDA 12.1**
+   - 下载地址: https://developer.nvidia.com/cuda-12-1-0-download-archive
+   - 选择: Windows → x86_64 → 10/11 → exe (network)
+
+3. **更新NVIDIA驱动**
+   - 最低版本: 535.0+
+   - 推荐版本: 最新版本
+
+4. **验证安装**
+   ```bash
+   nvcc --version  # 应显示 release 12.1
+   nvidia-smi      # 应显示驱动版本 535.0+
+   ```
 
 ### 步骤2: 选择部署模式
 
@@ -145,9 +159,9 @@ monitor-performance.bat
 # 压力测试
 stress-test.bat
 
-# 环境验证
-verify-compatible.bat  # 兼容版
-verify-environment.bat # 标准版
+# 环境验证 - 在对应虚拟环境中验证
+call venv_single\Scripts\activate.bat && python -c "import torch; print(f'PyTorch: {torch.__version__}, CUDA: {torch.cuda.is_available()}')"
+call venv_commercial\Scripts\activate.bat && python -c "import torch; print(f'PyTorch: {torch.__version__}, CUDA: {torch.cuda.is_available()}')"
 ```
 
 ### 日志查看
@@ -284,9 +298,6 @@ start-single-gpu.bat
 
 # 4GPU商用模式  
 start-commercial.bat
-
-# 兼容模式
-startup-compatible.bat
 ```
 
 ### 配置文件位置
