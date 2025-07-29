@@ -337,9 +337,9 @@ namespace LmyDigitalHuman.Services
                         OutputPath = outputPath
                     };
                     var edgeTTSAudioData = await _edgeTTSService.GenerateAudioAsync(ttsRequest);
-                    var edgeTTSResult = new { Success = edgeTTSAudioData.Length > 0 };
+                    var edgeTTSSuccess = edgeTTSAudioData.Length > 0;
                     
-                    if (edgeTTSResult.Success)
+                    if (edgeTTSSuccess)
                     {
                         await File.WriteAllBytesAsync(outputPath, edgeTTSAudioData);
                         result = CreateTTSResult(outputPath, stopwatch.ElapsedMilliseconds);
@@ -354,7 +354,7 @@ namespace LmyDigitalHuman.Services
                         result = new TTSResult
                         {
                             Success = false,
-                            Error = edgeTTSResult.Error,
+                            Error = "Edge TTS生成音频失败",
                             ProcessingTime = stopwatch.ElapsedMilliseconds
                         };
                     }
@@ -556,8 +556,7 @@ namespace LmyDigitalHuman.Services
                 await FFMpegArguments
                     .FromFileInput(inputPath)
                     .OutputToFile(outputPath, true, options => options
-                        .WithAudioFilters(filterOptions => filterOptions
-                            .Arguments("dynaudnorm"))
+                        .WithCustomArgument("-af dynaudnorm")
                         .WithAudioCodec("pcm_s16le"))
                     .ProcessAsynchronously();
 
@@ -602,8 +601,7 @@ namespace LmyDigitalHuman.Services
                 await FFMpegArguments
                     .FromFileInput(inputPath)
                     .OutputToFile(outputPath, true, options => options
-                        .WithAudioFilters(filterOptions => filterOptions
-                            .Arguments("highpass=f=200,lowpass=f=8000,dynaudnorm"))
+                        .WithCustomArgument("-af highpass=f=200,lowpass=f=8000,dynaudnorm")
                         .WithAudioCodec("pcm_s16le"))
                     .ProcessAsynchronously();
 
@@ -649,8 +647,7 @@ namespace LmyDigitalHuman.Services
                 await FFMpegArguments
                     .FromFileInput(inputPath)
                     .OutputToFile(outputPath, true, options => options
-                        .WithAudioFilters(filterOptions => filterOptions
-                            .Arguments("afftdn,dynaudnorm"))
+                        .WithCustomArgument("-af afftdn,dynaudnorm")
                         .WithAudioCodec("pcm_s16le"))
                     .ProcessAsynchronously();
 
@@ -693,8 +690,7 @@ namespace LmyDigitalHuman.Services
                 await FFMpegArguments
                     .FromFileInput(inputPath)
                     .OutputToFile(outputPath, true, options => options
-                        .WithAudioFilters(filterOptions => filterOptions
-                            .Arguments($"volume={volumeMultiplier}"))
+                        .WithCustomArgument($"-af volume={volumeMultiplier}")
                         .WithAudioCodec("pcm_s16le"))
                     .ProcessAsynchronously();
 
