@@ -702,11 +702,13 @@ class DigitalHumanManager {
 // 全局实例
 window.digitalHumanManager = new DigitalHumanManager();
 
-// 自动初始化
+// 自动初始化（暂时禁用，等WebSocket端点实现后再启用）
 document.addEventListener('DOMContentLoaded', async () => {
     try {
-        await window.digitalHumanManager.init();
-        console.log('🎉 数字人WebRTC系统就绪');
+        // 暂时跳过WebRTC初始化，避免WebSocket连接错误
+        console.log('⚠️ WebRTC功能暂时禁用，等待WebSocket端点实现');
+        // await window.digitalHumanManager.init();
+        // console.log('🎉 数字人WebRTC系统就绪');
     } catch (error) {
         console.error('💥 数字人系统初始化失败:', error);
     }

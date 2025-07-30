@@ -311,7 +311,7 @@ namespace LmyDigitalHuman.Services
             try
             {
                 _logger.LogInformation("开始TTS转换: Text={Text}, Voice={Voice}", 
-                    request.Text[..Math.Min(50, request.Text.Length)], request.VoiceId);
+                    request.Text[..Math.Min(50, request.Text.Length)], request.Voice);
 
                 // 检查缓存
                 var cacheKey = GenerateTTSCacheKey(request);
@@ -333,7 +333,10 @@ namespace LmyDigitalHuman.Services
                     var ttsRequest = new TTSRequest
                     {
                         Text = request.Text,
-                        VoiceId = request.VoiceId,
+                        Voice = request.Voice,
+                        VoiceId = request.Voice,
+                        Rate = request.Rate,
+                        Pitch = request.Pitch,
                         OutputPath = outputPath
                     };
                     var edgeTTSAudioData = await _edgeTTSService.GenerateAudioAsync(ttsRequest);

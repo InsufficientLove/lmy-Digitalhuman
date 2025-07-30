@@ -111,20 +111,34 @@ namespace LmyDigitalHuman.Services
                 }
 
                 // 3. 文本转语音
+                _logger.LogInformation("开始TTS转换: ResponseText={ResponseText}, Voice={Voice}", 
+                    llmResponse.ResponseText?.Length > 50 ? llmResponse.ResponseText.Substring(0, 50) + "..." : llmResponse.ResponseText, 
+                    template.DefaultVoiceSettings?.Voice ?? "zh-CN-XiaoxiaoNeural");
+                
                 metricsStopwatch.Restart();
-                var ttsResult = await _audioPipelineService.ConvertTextToSpeechAsync(new TTSRequest
+                var ttsOutputPath = Path.Combine("temp", $"tts_{Guid.NewGuid():N}.wav");
+                var ttsRequest = new TTSRequest
                 {
                     Text = llmResponse.ResponseText,
                     Voice = template.DefaultVoiceSettings?.Voice ?? "zh-CN-XiaoxiaoNeural",
                     Rate = template.DefaultVoiceSettings?.Rate ?? "medium",
                     Pitch = template.DefaultVoiceSettings?.Pitch ?? "medium",
                     Emotion = request.Emotion,
-                    OutputPath = Path.Combine("temp", $"tts_{Guid.NewGuid():N}.wav")
-                });
+                    OutputPath = ttsOutputPath
+                };
+                
+                _logger.LogInformation("TTS请求参数: Text长度={TextLength}, Voice={Voice}, Rate={Rate}, Pitch={Pitch}, OutputPath={OutputPath}",
+                    ttsRequest.Text?.Length ?? 0, ttsRequest.Voice, ttsRequest.Rate, ttsRequest.Pitch, ttsRequest.OutputPath);
+                
+                var ttsResult = await _audioPipelineService.ConvertTextToSpeechAsync(ttsRequest);
                 metrics.TTSProcessingTime = metricsStopwatch.ElapsedMilliseconds;
+
+                _logger.LogInformation("TTS转换结果: Success={Success}, Error={Error}, AudioPath={AudioPath}",
+                    ttsResult.Success, ttsResult.Error, ttsResult.AudioPath);
 
                 if (!ttsResult.Success)
                 {
+                    _logger.LogError("TTS转换失败: {Error}", ttsResult.Error);
                     return new ConversationResponse
                     {
                         Success = false,
@@ -249,7 +263,7 @@ namespace LmyDigitalHuman.Services
                 metricsStopwatch.Restart();
                 var llmResponse = await _llmService.GenerateResponseAsync(new LocalLLMRequest
                 {
-                    Prompt = speechResult.Text,
+                    Message = speechResult.Text,
                     MaxTokens = 500,
                     Temperature = 0.7f
                 });
