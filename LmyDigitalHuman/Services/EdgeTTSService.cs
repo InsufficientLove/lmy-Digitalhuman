@@ -40,6 +40,12 @@ namespace LmyDigitalHuman.Services
             _configuration = configuration;
             _outputPath = _configuration["RealtimeDigitalHuman:EdgeTTS:OutputPath"] ?? "temp";
             _defaultVoice = _configuration["RealtimeDigitalHuman:EdgeTTS:DefaultVoice"] ?? "zh-CN-XiaoxiaoNeural";
+            
+            // 确保路径是绝对路径
+            if (!Path.IsPathRooted(_outputPath))
+            {
+                _outputPath = Path.Combine(Directory.GetCurrentDirectory(), _outputPath);
+            }
 
             // 确保输出目录存在
             Directory.CreateDirectory(_outputPath);
@@ -62,6 +68,16 @@ namespace LmyDigitalHuman.Services
                 // 生成输出文件名
                 var fileName = $"tts_{Guid.NewGuid()}.mp3";
                 outputFile = Path.Combine(_outputPath, fileName);
+                
+                // 确保输出目录存在
+                var outputDir = Path.GetDirectoryName(outputFile);
+                if (!string.IsNullOrEmpty(outputDir) && !Directory.Exists(outputDir))
+                {
+                    Directory.CreateDirectory(outputDir);
+                    _logger.LogInformation("创建输出目录: {Directory}", outputDir);
+                }
+                
+                _logger.LogInformation("TTS输出文件路径: {OutputFile}", outputFile);
 
                 // 构建edge-tts命令
                 var arguments = BuildEdgeTTSArguments(request.Text, request.Voice, request.Rate, request.Pitch, outputFile);
@@ -248,7 +264,10 @@ namespace LmyDigitalHuman.Services
             // 基本参数
             args.Add($"--voice \"{voice}\"");
             args.Add($"--text \"{text.Replace("\"", "\\\"")}\"");
-            args.Add($"--write-media \"{outputFile}\"");
+            
+            // 确保输出文件路径使用正斜杠（edge-tts在Windows上的路径处理问题）
+            var normalizedPath = outputFile.Replace('\\', '/');
+            args.Add($"--write-media \"{normalizedPath}\"");
 
             // 可选参数
             if (!string.IsNullOrEmpty(rate) && rate != "1.0")
@@ -284,7 +303,7 @@ namespace LmyDigitalHuman.Services
                     RedirectStandardError = true,
                     UseShellExecute = false,
                     CreateNoWindow = true,
-                    WorkingDirectory = _outputPath,
+                    WorkingDirectory = Directory.GetCurrentDirectory(),
                     StandardOutputEncoding = System.Text.Encoding.UTF8,
                     StandardErrorEncoding = System.Text.Encoding.UTF8
                 };
