@@ -79,22 +79,25 @@ namespace LmyDigitalHuman.Services
                 _logger.LogInformation("开始生成数字人视频: Avatar={Avatar}, Audio={Audio}", 
                     request.AvatarImagePath, request.AudioPath);
 
-                // 验证输入文件
-                if (!File.Exists(request.AvatarImagePath))
+                // 转换和验证输入文件路径
+                var fullImagePath = ResolveImagePath(request.AvatarImagePath);
+                var fullAudioPath = ResolveAudioPath(request.AudioPath);
+                
+                if (!File.Exists(fullImagePath))
                 {
                     return new DigitalHumanResponse
                     {
                         Success = false,
-                        Error = $"头像图片不存在: {request.AvatarImagePath}"
+                        Error = $"头像图片不存在: {request.AvatarImagePath} (解析为: {fullImagePath})"
                     };
                 }
 
-                if (!File.Exists(request.AudioPath))
+                if (!File.Exists(fullAudioPath))
                 {
                     return new DigitalHumanResponse
                     {
                         Success = false,
-                        Error = $"音频文件不存在: {request.AudioPath}"
+                        Error = $"音频文件不存在: {request.AudioPath} (解析为: {fullAudioPath})"
                     };
                 }
 
@@ -116,8 +119,21 @@ namespace LmyDigitalHuman.Services
                 await _processingLimiter.WaitAsync();
                 try
                 {
-                    // 直接调用Python脚本
-                    var result = await ExecuteMuseTalkPythonAsync(request, outputFilePath);
+                    // 使用解析后的完整路径调用Python脚本
+                    var updatedRequest = new DigitalHumanRequest
+                    {
+                        AvatarImagePath = fullImagePath,
+                        AudioPath = fullAudioPath,
+                        Quality = request.Quality,
+                        Fps = request.Fps,
+                        BatchSize = request.BatchSize,
+                        BboxShift = request.BboxShift,
+                        EnableEmotion = request.EnableEmotion,
+                        Priority = request.Priority,
+                        CacheKey = request.CacheKey
+                    };
+                    
+                    var result = await ExecuteMuseTalkPythonAsync(updatedRequest, outputFilePath);
                     
                     stopwatch.Stop();
 
@@ -832,6 +848,57 @@ namespace LmyDigitalHuman.Services
         {
             var sanitized = System.Text.RegularExpressions.Regex.Replace(name, @"[^\w\-_\.]", "_");
             return sanitized.Length > 50 ? sanitized.Substring(0, 50) : sanitized;
+        }
+
+        private string ResolveImagePath(string imagePath)
+        {
+            if (Path.IsPathRooted(imagePath))
+            {
+                return imagePath;
+            }
+
+            // 移除开头的斜杠并构建完整路径
+            var relativePath = imagePath.TrimStart('/', '\\');
+            
+            // 如果是web路径格式 (/templates/xxx)，需要转换为实际文件路径
+            if (relativePath.StartsWith("templates/") || relativePath.StartsWith("templates\\"))
+            {
+                return Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", relativePath));
+            }
+            else
+            {
+                // 可能是直接的文件名，尝试在templates目录中查找
+                var templatesPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "templates", relativePath);
+                if (File.Exists(templatesPath))
+                {
+                    return Path.GetFullPath(templatesPath);
+                }
+                
+                // 否则按原路径处理
+                return Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), relativePath));
+            }
+        }
+
+        private string ResolveAudioPath(string audioPath)
+        {
+            if (Path.IsPathRooted(audioPath))
+            {
+                return audioPath;
+            }
+
+            // 移除开头的斜杠并构建完整路径
+            var relativePath = audioPath.TrimStart('/', '\\');
+            
+            // 如果是web路径格式 (/temp/xxx)，需要转换为实际文件路径
+            if (relativePath.StartsWith("temp/") || relativePath.StartsWith("temp\\"))
+            {
+                return Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), relativePath));
+            }
+            else
+            {
+                // 否则按原路径处理
+                return Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), relativePath));
+            }
         }
 
         public void Dispose()
