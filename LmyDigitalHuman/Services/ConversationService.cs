@@ -82,7 +82,7 @@ namespace LmyDigitalHuman.Services
                 metricsStopwatch.Restart();
                 var llmResponse = await _llmService.GenerateResponseAsync(new LocalLLMRequest
                 {
-                    Prompt = request.Text,
+                    Message = request.Text,
                     MaxTokens = 500,
                     Temperature = 0.7f
                 });
@@ -98,11 +98,26 @@ namespace LmyDigitalHuman.Services
                     };
                 }
 
-                // 2. 文本转语音
+                // 2. 获取模板语音设置
+                var template = await _templateService.GetTemplateByIdAsync(request.TemplateId);
+                if (template == null)
+                {
+                    return new ConversationResponse
+                    {
+                        Success = false,
+                        Message = "模板不存在",
+                        ConversationId = conversationId
+                    };
+                }
+
+                // 3. 文本转语音
                 metricsStopwatch.Restart();
                 var ttsResult = await _audioPipelineService.ConvertTextToSpeechAsync(new TTSRequest
                 {
                     Text = llmResponse.ResponseText,
+                    Voice = template.DefaultVoiceSettings?.Voice ?? "zh-CN-XiaoxiaoNeural",
+                    Rate = template.DefaultVoiceSettings?.Rate ?? "medium",
+                    Pitch = template.DefaultVoiceSettings?.Pitch ?? "medium",
                     Emotion = request.Emotion,
                     OutputPath = Path.Combine("temp", $"tts_{Guid.NewGuid():N}.wav")
                 });
@@ -118,18 +133,7 @@ namespace LmyDigitalHuman.Services
                     };
                 }
 
-                // 3. 获取模板并生成数字人视频
-                var template = await _templateService.GetTemplateByIdAsync(request.TemplateId);
-                if (template == null)
-                {
-                    return new ConversationResponse
-                    {
-                        Success = false,
-                        Message = "模板不存在",
-                        ConversationId = conversationId
-                    };
-                }
-
+                // 4. 生成数字人视频
                 metricsStopwatch.Restart();
                 var videoResponse = await _museTalkService.GenerateVideoAsync(new DigitalHumanRequest
                 {

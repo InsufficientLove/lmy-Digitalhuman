@@ -811,7 +811,7 @@
             templates.forEach(template => {
                 const templateCard = document.createElement('div');
                 templateCard.className = 'template-card';
-                templateCard.onclick = () => selectTemplate(template);
+                templateCard.onclick = (event) => selectTemplate(template, event);
                 
                 templateCard.innerHTML = `
                     <img src="${template.imageUrl || '/images/default-avatar.svg'}" 
@@ -825,7 +825,7 @@
             });
         }
 
-        function selectTemplate(template) {
+        function selectTemplate(template, event) {
             // 移除之前的选中状态
             document.querySelectorAll('.template-card').forEach(card => {
                 card.classList.remove('selected');
