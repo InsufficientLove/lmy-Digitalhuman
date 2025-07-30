@@ -1,5 +1,6 @@
 using LmyDigitalHuman.Models;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Text;
 
 namespace LmyDigitalHuman.Services
@@ -339,22 +340,46 @@ namespace LmyDigitalHuman.Services
     // Ollama API响应模型
     public class OllamaResponse
     {
+        [JsonPropertyName("response")]
         public string Response { get; set; } = "";
+        
+        [JsonPropertyName("done")]
         public bool Done { get; set; } = false;
+        
+        [JsonPropertyName("prompt_eval_count")]
         public int PromptEvalCount { get; set; } = 0;
+        
+        [JsonPropertyName("eval_count")]
         public int EvalCount { get; set; } = 0;
+        
+        [JsonPropertyName("total_duration")]
         public long TotalDuration { get; set; } = 0;
+        
+        [JsonPropertyName("model")]
+        public string Model { get; set; } = "";
+        
+        [JsonPropertyName("created_at")]
+        public string CreatedAt { get; set; } = "";
+        
+        [JsonPropertyName("done_reason")]
+        public string DoneReason { get; set; } = "";
     }
 
     public class OllamaTagsResponse
     {
+        [JsonPropertyName("models")]
         public List<OllamaModel> Models { get; set; } = new();
     }
 
     public class OllamaModel
     {
+        [JsonPropertyName("name")]
         public string Name { get; set; } = "";
+        
+        [JsonPropertyName("size")]
         public long Size { get; set; } = 0;
+        
+        [JsonPropertyName("modified_at")]
         public DateTime? Modified { get; set; }
     }
 } 
