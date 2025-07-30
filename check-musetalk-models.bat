@@ -138,11 +138,11 @@ if exist "face-parse-bisent\79999_iter.pth" set /a complete_count+=1
 echo [📊] 模型完整性: %complete_count%/%total_count%
 
 if %complete_count% equ %total_count% (
-    echo [🎉] 所有MuseTalk模型下载完成！
-    echo [✅] 可以开始使用数字人功能
+    echo [SUCCESS] All MuseTalk models downloaded!
+    echo [READY] Can start using digital human features
 ) else (
-    echo [⚠️] 部分模型缺失，功能可能受限
-    echo [💡] 如需补充下载，请运行官方下载脚本
+    echo [WARNING] Some models missing, features may be limited
+    echo [INFO] Run official download script to complete
 )
 
 cd ..\..\..\..
@@ -152,15 +152,15 @@ echo ===========================================================================
 echo                           检查完成
 echo ================================================================================
 
-echo [🚀] 下一步建议:
+echo [NEXT STEPS]:
 if %complete_count% equ %total_count% (
-    echo   1. 所有模型已就绪
-    echo   2. 可以运行 deploy-production-now.bat 部署系统
-    echo   3. 或先测试各个组件功能
+    echo   1. All models ready
+    echo   2. Run deploy-production-now.bat to deploy system
+    echo   3. Or test individual components first
 ) else (
-    echo   1. 等待剩余模型下载完成
-    echo   2. 或手动补充缺失的模型文件
-    echo   3. 重新运行此检查脚本验证
+    echo   1. Wait for remaining model downloads
+    echo   2. Or manually add missing model files
+    echo   3. Re-run this check script to verify
 )
 
 echo.
