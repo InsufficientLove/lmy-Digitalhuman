@@ -383,7 +383,7 @@ namespace LmyDigitalHuman.Models
         public string Message { get; set; } = string.Empty;
         
         public string Prompt { get; set; } = string.Empty;
-        public string ModelName { get; set; } = "qwen2.5:14b-instruct-q4_0";
+        public string ModelName { get; set; } = "qwen2.5vl:7b";
         public string? ConversationId { get; set; }
         public float Temperature { get; set; } = 0.7f;
         public float TopP { get; set; } = 0.9f;
