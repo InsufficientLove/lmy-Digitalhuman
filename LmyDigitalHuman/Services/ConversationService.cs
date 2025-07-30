@@ -88,6 +88,9 @@ namespace LmyDigitalHuman.Services
                 });
                 metrics.LLMResponseTime = metricsStopwatch.ElapsedMilliseconds;
 
+                _logger.LogInformation("LLM响应结果: Success={Success}, ResponseText长度={ResponseLength}, Error={Error}",
+                    llmResponse.Success, llmResponse.ResponseText?.Length ?? 0, llmResponse.Error);
+
                 if (!llmResponse.Success)
                 {
                     return new ConversationResponse
@@ -96,6 +99,13 @@ namespace LmyDigitalHuman.Services
                         Message = "LLM响应失败: " + llmResponse.Error,
                         ConversationId = conversationId
                     };
+                }
+
+                // 检查LLM响应是否为空
+                if (string.IsNullOrWhiteSpace(llmResponse.ResponseText))
+                {
+                    _logger.LogWarning("LLM返回空响应，使用默认回复");
+                    llmResponse.ResponseText = "抱歉，我现在无法理解您的问题，请稍后再试。";
                 }
 
                 // 2. 获取模板语音设置

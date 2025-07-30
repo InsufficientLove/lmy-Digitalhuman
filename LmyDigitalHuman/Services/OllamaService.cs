@@ -94,7 +94,13 @@ namespace LmyDigitalHuman.Services
                 response.EnsureSuccessStatusCode();
 
                 var responseContent = await response.Content.ReadAsStringAsync();
+                _logger.LogInformation("Ollama原始响应: {ResponseContent}", 
+                    responseContent.Length > 200 ? responseContent.Substring(0, 200) + "..." : responseContent);
+                
                 var result = JsonSerializer.Deserialize<OllamaResponse>(responseContent);
+                _logger.LogInformation("Ollama解析结果: Response={Response}, Done={Done}", 
+                    result?.Response?.Length > 50 ? result.Response.Substring(0, 50) + "..." : result?.Response, 
+                    result?.Done);
 
                 var processingTime = DateTime.Now - startTime;
 
