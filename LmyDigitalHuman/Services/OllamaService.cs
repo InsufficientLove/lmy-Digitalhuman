@@ -19,11 +19,14 @@ namespace LmyDigitalHuman.Services
             _httpClient = httpClient;
             _logger = logger;
             _configuration = configuration;
-            _baseUrl = _configuration["LocalLLM:BaseUrl"] ?? "http://localhost:11434";
+            _baseUrl = _configuration["Ollama:BaseUrl"] ?? 
+                      _configuration["LocalLLM:BaseUrl"] ?? 
+                      "http://localhost:11434";
             
-            // 设置超时时间
-            _httpClient.Timeout = TimeSpan.FromSeconds(
-                _configuration.GetValue<int>("LocalLLM:Timeout", 30000) / 1000);
+            // 设置超时时间 - 优先使用Ollama配置，然后是LocalLLM配置
+            var timeoutSeconds = _configuration.GetValue<int>("Ollama:Timeout", 
+                _configuration.GetValue<int>("LocalLLM:Timeout", 120000) / 1000);
+            _httpClient.Timeout = TimeSpan.FromSeconds(timeoutSeconds);
         }
 
         public async Task<List<LocalLLMModel>> GetAvailableModelsAsync()
