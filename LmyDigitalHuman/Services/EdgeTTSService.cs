@@ -80,7 +80,12 @@ namespace LmyDigitalHuman.Services
                 _logger.LogInformation("TTS输出文件路径: {OutputFile}", outputFile);
 
                 // 构建edge-tts命令
+                _logger.LogInformation("转换TTS参数: Rate={Rate} → {EdgeRate}, Pitch={Pitch} → {EdgePitch}", 
+                    request.Rate, ConvertRateToEdgeFormat(request.Rate), 
+                    request.Pitch, ConvertPitchToEdgeFormat(request.Pitch));
+                
                 var arguments = BuildEdgeTTSArguments(request.Text, request.Voice, request.Rate, request.Pitch, outputFile);
+                _logger.LogInformation("Edge-TTS命令参数: {Arguments}", arguments);
                 
                 // 执行edge-tts
                 var result = await RunEdgeTTSCommandAsync(arguments);
@@ -269,18 +274,74 @@ namespace LmyDigitalHuman.Services
             var normalizedPath = outputFile.Replace('\\', '/');
             args.Add($"--write-media \"{normalizedPath}\"");
 
-            // 可选参数
-            if (!string.IsNullOrEmpty(rate) && rate != "1.0")
+            // 可选参数 - 转换为edge-tts期望的格式
+            var edgeRate = ConvertRateToEdgeFormat(rate);
+            if (!string.IsNullOrEmpty(edgeRate))
             {
-                args.Add($"--rate \"{rate}\"");
+                args.Add($"--rate \"{edgeRate}\"");
             }
 
-            if (!string.IsNullOrEmpty(pitch) && pitch != "0Hz")
+            var edgePitch = ConvertPitchToEdgeFormat(pitch);
+            if (!string.IsNullOrEmpty(edgePitch))
             {
-                args.Add($"--pitch \"{pitch}\"");
+                args.Add($"--pitch \"{edgePitch}\"");
             }
 
             return string.Join(" ", args);
+        }
+
+        /// <summary>
+        /// 转换rate参数为edge-tts格式
+        /// </summary>
+        private string ConvertRateToEdgeFormat(string rate)
+        {
+            if (string.IsNullOrEmpty(rate))
+                return "+0%";
+
+            // 如果已经是百分比格式，直接返回
+            if (rate.EndsWith("%") && (rate.StartsWith("+") || rate.StartsWith("-") || char.IsDigit(rate[0])))
+            {
+                return rate.StartsWith("+") || rate.StartsWith("-") ? rate : "+" + rate;
+            }
+
+            // 转换预设值为百分比
+            return rate.ToLower() switch
+            {
+                "slow" => "-50%",
+                "medium" => "+0%",
+                "fast" => "+50%",
+                "x-slow" => "-75%",
+                "x-fast" => "+100%",
+                "1.0" => "+0%",
+                _ => "+0%"
+            };
+        }
+
+        /// <summary>
+        /// 转换pitch参数为edge-tts格式
+        /// </summary>
+        private string ConvertPitchToEdgeFormat(string pitch)
+        {
+            if (string.IsNullOrEmpty(pitch))
+                return "+0Hz";
+
+            // 如果已经是Hz格式，直接返回
+            if (pitch.EndsWith("Hz") && (pitch.StartsWith("+") || pitch.StartsWith("-") || char.IsDigit(pitch[0])))
+            {
+                return pitch.StartsWith("+") || pitch.StartsWith("-") ? pitch : "+" + pitch;
+            }
+
+            // 转换预设值为Hz
+            return pitch.ToLower() switch
+            {
+                "low" => "-100Hz",
+                "medium" => "+0Hz",
+                "high" => "+100Hz",
+                "x-low" => "-200Hz",
+                "x-high" => "+200Hz",
+                "0hz" => "+0Hz",
+                _ => "+0Hz"
+            };
         }
 
         /// <summary>
