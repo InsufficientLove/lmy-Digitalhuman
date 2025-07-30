@@ -84,6 +84,7 @@ namespace LmyDigitalHuman.Services
                     Style = request.Style,
                     EnableEmotion = request.EnableEmotion,
                     ImagePath = $"/templates/{imageFileName}",
+                    ImageUrl = $"/templates/{imageFileName}",
                     DefaultVoiceSettings = request.DefaultVoiceSettings ?? new VoiceSettings(),
                     CustomParameters = request.CustomParameters ?? new Dictionary<string, object>(),
                     CreatedAt = DateTime.Now,
@@ -820,8 +821,9 @@ namespace LmyDigitalHuman.Services
                             
                             if (!string.IsNullOrEmpty(imageFileName) && File.Exists(fullImagePath))
                             {
-                                // 确保ImagePath格式正确
+                                // 确保ImagePath和ImageUrl格式正确
                                 template.ImagePath = $"/templates/{imageFileName}";
+                                template.ImageUrl = $"/templates/{imageFileName}";
                                 _templates[template.TemplateId] = template;
                                 _logger.LogInformation("成功加载模板: {Name} ({Id})", template.TemplateName, template.TemplateId);
                             }
@@ -868,6 +870,7 @@ namespace LmyDigitalHuman.Services
                         Style = "professional",
                         EnableEmotion = true,
                         ImagePath = "/images/default-avatar.svg",
+                        ImageUrl = "/images/default-avatar.svg",
                         DefaultVoiceSettings = new VoiceSettings
                         {
                             Voice = "zh-CN-XiaoxiaoNeural",
@@ -895,6 +898,7 @@ namespace LmyDigitalHuman.Services
                         Style = "friendly",
                         EnableEmotion = true,
                         ImagePath = "/images/default-avatar.svg",
+                        ImageUrl = "/images/default-avatar.svg",
                         DefaultVoiceSettings = new VoiceSettings
                         {
                             Voice = "zh-CN-YunxiNeural",
@@ -922,6 +926,7 @@ namespace LmyDigitalHuman.Services
                         Style = "casual",
                         EnableEmotion = true,
                         ImagePath = "/images/default-avatar.svg",
+                        ImageUrl = "/images/default-avatar.svg",
                         DefaultVoiceSettings = new VoiceSettings
                         {
                             Voice = "zh-CN-XiaohanNeural",
@@ -1073,7 +1078,15 @@ namespace LmyDigitalHuman.Services
                 {
                     // 移除开头的斜杠并构建完整路径
                     var relativePath = imagePath.TrimStart('/', '\\');
-                    fullImagePath = Path.Combine(Directory.GetCurrentDirectory(), relativePath);
+                    // 如果是web路径格式 (/templates/xxx)，需要转换为实际文件路径
+                    if (relativePath.StartsWith("templates/") || relativePath.StartsWith("templates\\"))
+                    {
+                        fullImagePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", relativePath);
+                    }
+                    else
+                    {
+                        fullImagePath = Path.Combine(Directory.GetCurrentDirectory(), relativePath);
+                    }
                 }
                 
                 // 规范化路径以处理中文字符
