@@ -34,10 +34,13 @@ namespace LmyDigitalHuman.Services
             new VoiceInfo { Name = "zh-CN-YunjianNeural", DisplayName = "云健", Language = "zh-CN", Gender = "Male", Style = "成熟" },
         };
 
-        public EdgeTTSService(ILogger<EdgeTTSService> logger, IConfiguration configuration)
+        private readonly IPathManager _pathManager;
+
+        public EdgeTTSService(ILogger<EdgeTTSService> logger, IConfiguration configuration, IPathManager pathManager)
         {
             _logger = logger;
             _configuration = configuration;
+            _pathManager = pathManager;
             _outputPath = _configuration["RealtimeDigitalHuman:EdgeTTS:OutputPath"] ?? "temp";
             _defaultVoice = _configuration["RealtimeDigitalHuman:EdgeTTS:DefaultVoice"] ?? "zh-CN-XiaoxiaoNeural";
             
@@ -365,10 +368,28 @@ namespace LmyDigitalHuman.Services
         {
             try
             {
-                // 使用配置的Python路径（SadTalker虚拟环境）
-                var pythonPath = _configuration["RealtimeDigitalHuman:SadTalker:PythonPath"] ?? 
+                // 使用MuseTalk虚拟环境的Python路径
+                var configuredPythonPath = _configuration["DigitalHuman:MuseTalk:PythonPath"] ?? 
+                    _configuration["RealtimeDigitalHuman:SadTalker:PythonPath"] ?? 
                     _configuration["RealtimeDigitalHuman:Whisper:PythonPath"] ?? 
                     "python";
+                
+                // 解析Python路径（支持相对路径）
+                var pythonPath = configuredPythonPath;
+                if (!string.IsNullOrEmpty(configuredPythonPath) && 
+                    configuredPythonPath != "python" && 
+                    !Path.IsPathRooted(configuredPythonPath))
+                {
+                    pythonPath = _pathManager.ResolvePath(configuredPythonPath);
+                    _logger.LogInformation("EdgeTTS Python路径解析: {Original} → {Resolved}", configuredPythonPath, pythonPath);
+                }
+                
+                // 验证Python路径
+                if (!File.Exists(pythonPath) && pythonPath != "python")
+                {
+                    _logger.LogWarning("EdgeTTS Python路径不存在: {PythonPath}，回退到系统python", pythonPath);
+                    pythonPath = "python";
+                }
 
                 var processInfo = new ProcessStartInfo
                 {
