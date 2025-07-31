@@ -16,6 +16,7 @@ namespace LmyDigitalHuman.Services
         private readonly IEdgeTTSService _edgeTTSService;
         private readonly IStreamingTTSService _streamingTTSService;
         private readonly IMemoryCache _cache;
+        private readonly IPathManager _pathManager;
         private readonly ILogger<AudioPipelineService> _logger;
         private readonly IConfiguration _configuration;
         private readonly SpeechSynthesizer? _speechSynthesizer; // Azure TTS备选方案
@@ -43,6 +44,7 @@ namespace LmyDigitalHuman.Services
             IEdgeTTSService edgeTTSService,
             IStreamingTTSService streamingTTSService,
             IMemoryCache cache,
+            IPathManager pathManager,
             ILogger<AudioPipelineService> logger,
             IConfiguration configuration)
         {
@@ -50,6 +52,7 @@ namespace LmyDigitalHuman.Services
             _edgeTTSService = edgeTTSService;
             _streamingTTSService = streamingTTSService;
             _cache = cache;
+            _pathManager = pathManager;
             _logger = logger;
             _configuration = configuration;
 

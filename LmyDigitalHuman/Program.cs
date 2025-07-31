@@ -37,6 +37,7 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 // Register services
+builder.Services.AddSingleton<IPathManager, PathManager>();  // 路径管理服务 - 必须最先注册
 builder.Services.AddSingleton<IWhisperNetService, WhisperNetService>();
 builder.Services.AddSingleton<IStreamingTTSService, StreamingTTSService>();
 builder.Services.AddSingleton<IMuseTalkService, MuseTalkService>();

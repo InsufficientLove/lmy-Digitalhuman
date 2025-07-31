@@ -13,8 +13,7 @@ namespace LmyDigitalHuman.Services
         private readonly ILogger<MuseTalkService> _logger;
         private readonly IConfiguration _configuration;
         private readonly IMemoryCache _cache;
-        private readonly string _templatesPath;
-        private readonly string _outputPath;
+        private readonly IPathManager _pathManager;
         private readonly string _pythonPath;
         private readonly string _museTalkScriptPath;
         
@@ -34,20 +33,16 @@ namespace LmyDigitalHuman.Services
         public MuseTalkService(
             ILogger<MuseTalkService> logger,
             IConfiguration configuration,
-            IMemoryCache cache)
+            IMemoryCache cache,
+            IPathManager pathManager)
         {
             _logger = logger;
             _configuration = configuration;
             _cache = cache;
+            _pathManager = pathManager;
             
-            _templatesPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "templates");
-            _outputPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "videos");
             _pythonPath = configuration["DigitalHuman:MuseTalk:PythonPath"] ?? "python";
-            _museTalkScriptPath = Path.Combine(Directory.GetCurrentDirectory(), "musetalk_service_complete.py");
-            
-            // 确保目录存在
-            Directory.CreateDirectory(_templatesPath);
-            Directory.CreateDirectory(_outputPath);
+            _museTalkScriptPath = _pathManager.ResolvePath("musetalk_service_complete.py");
             
             // 高并发支持：200个同时处理
             var maxConcurrentJobs = configuration.GetValue<int>("DigitalHuman:MaxVideoGeneration", 8);
@@ -80,8 +75,8 @@ namespace LmyDigitalHuman.Services
                     request.AvatarImagePath, request.AudioPath);
 
                 // 转换和验证输入文件路径
-                var fullImagePath = ResolveImagePath(request.AvatarImagePath);
-                var fullAudioPath = ResolveAudioPath(request.AudioPath);
+                var fullImagePath = _pathManager.ResolveImagePath(request.AvatarImagePath);
+                var fullAudioPath = _pathManager.ResolveAudioPath(request.AudioPath);
                 
                 if (!File.Exists(fullImagePath))
                 {
@@ -113,8 +108,7 @@ namespace LmyDigitalHuman.Services
                 }
 
                 // 生成输出文件名
-                var outputFileName = $"musetalk_{Guid.NewGuid():N}.mp4";
-                var outputFilePath = Path.Combine(_outputPath, outputFileName);
+                var outputFilePath = _pathManager.CreateTempVideoPath("mp4");
 
                 await _processingLimiter.WaitAsync();
                 try
@@ -241,12 +235,13 @@ namespace LmyDigitalHuman.Services
             {
                 var templates = new List<DigitalHumanTemplate>();
                 
-                if (!Directory.Exists(_templatesPath))
+                var templatesPath = _pathManager.GetTemplatesPath();
+                if (!Directory.Exists(templatesPath))
                 {
                     return templates;
                 }
 
-                var jsonFiles = Directory.GetFiles(_templatesPath, "*.json");
+                var jsonFiles = Directory.GetFiles(templatesPath, "*.json");
                 
                 foreach (var jsonFile in jsonFiles)
                 {
@@ -263,7 +258,7 @@ namespace LmyDigitalHuman.Services
                             if (string.IsNullOrEmpty(template.Name) && !string.IsNullOrEmpty(template.TemplateName))
                                 template.Name = template.TemplateName;
                                 
-                            var imagePath = Path.Combine(_templatesPath, template.ImagePath);
+                            var imagePath = _pathManager.ResolveImagePath(template.ImagePath);
                             if (File.Exists(imagePath))
                             {
                                 template.ImageUrl = $"/templates/{template.ImagePath}";
@@ -294,8 +289,9 @@ namespace LmyDigitalHuman.Services
             var imageFileName = $"{sanitizedName}_{templateId}.jpg";
             var jsonFileName = $"{sanitizedName}_{templateId}.json";
             
-            var imageTargetPath = Path.Combine(_templatesPath, imageFileName);
-            var jsonTargetPath = Path.Combine(_templatesPath, jsonFileName);
+            var templatesPath = _pathManager.GetTemplatesPath();
+            var imageTargetPath = Path.Combine(templatesPath, imageFileName);
+            var jsonTargetPath = Path.Combine(templatesPath, jsonFileName);
 
             // 保存上传的图片文件
             if (request.ImageFile != null)
@@ -335,7 +331,8 @@ namespace LmyDigitalHuman.Services
         {
             try
             {
-                var jsonFiles = Directory.GetFiles(_templatesPath, "*.json");
+                var templatesPath = _pathManager.GetTemplatesPath();
+                var jsonFiles = Directory.GetFiles(templatesPath, "*.json");
                 
                 foreach (var jsonFile in jsonFiles)
                 {
@@ -346,7 +343,7 @@ namespace LmyDigitalHuman.Services
                     {
                         File.Delete(jsonFile);
                         
-                        var imagePath = Path.Combine(_templatesPath, template.ImagePath);
+                        var imagePath = _pathManager.ResolveImagePath(template.ImagePath);
                         if (File.Exists(imagePath))
                         {
                             File.Delete(imagePath);
@@ -704,7 +701,7 @@ namespace LmyDigitalHuman.Services
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                     CreateNoWindow = true,
-                    WorkingDirectory = Directory.GetCurrentDirectory()
+                    WorkingDirectory = _pathManager.GetContentRootPath()
                 };
 
                 using var process = Process.Start(processInfo);
@@ -850,56 +847,7 @@ namespace LmyDigitalHuman.Services
             return sanitized.Length > 50 ? sanitized.Substring(0, 50) : sanitized;
         }
 
-        private string ResolveImagePath(string imagePath)
-        {
-            if (Path.IsPathRooted(imagePath))
-            {
-                return imagePath;
-            }
 
-            // 移除开头的斜杠并构建完整路径
-            var relativePath = imagePath.TrimStart('/', '\\');
-            
-            // 如果是web路径格式 (/templates/xxx)，需要转换为实际文件路径
-            if (relativePath.StartsWith("templates/") || relativePath.StartsWith("templates\\"))
-            {
-                return Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", relativePath));
-            }
-            else
-            {
-                // 可能是直接的文件名，尝试在templates目录中查找
-                var templatesPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "templates", relativePath);
-                if (File.Exists(templatesPath))
-                {
-                    return Path.GetFullPath(templatesPath);
-                }
-                
-                // 否则按原路径处理
-                return Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), relativePath));
-            }
-        }
-
-        private string ResolveAudioPath(string audioPath)
-        {
-            if (Path.IsPathRooted(audioPath))
-            {
-                return audioPath;
-            }
-
-            // 移除开头的斜杠并构建完整路径
-            var relativePath = audioPath.TrimStart('/', '\\');
-            
-            // 如果是web路径格式 (/temp/xxx)，需要转换为实际文件路径
-            if (relativePath.StartsWith("temp/") || relativePath.StartsWith("temp\\"))
-            {
-                return Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), relativePath));
-            }
-            else
-            {
-                // 否则按原路径处理
-                return Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), relativePath));
-            }
-        }
 
         public void Dispose()
         {

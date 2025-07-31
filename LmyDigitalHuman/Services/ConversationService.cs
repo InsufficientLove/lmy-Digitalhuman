@@ -13,6 +13,7 @@ namespace LmyDigitalHuman.Services
         private readonly IAudioPipelineService _audioPipelineService;
         private readonly ILocalLLMService _llmService;
         private readonly IMemoryCache _cache;
+        private readonly IPathManager _pathManager;
         private readonly ILogger<ConversationService> _logger;
         
         // 并发字典用于管理对话上下文
@@ -33,6 +34,7 @@ namespace LmyDigitalHuman.Services
             IAudioPipelineService audioPipelineService,
             ILocalLLMService llmService,
             IMemoryCache cache,
+            IPathManager pathManager,
             ILogger<ConversationService> logger,
             IConfiguration configuration)
         {
@@ -41,6 +43,7 @@ namespace LmyDigitalHuman.Services
             _audioPipelineService = audioPipelineService;
             _llmService = llmService;
             _cache = cache;
+            _pathManager = pathManager;
             _logger = logger;
             
             // 从配置中获取并发限制
@@ -126,7 +129,7 @@ namespace LmyDigitalHuman.Services
                     template.DefaultVoiceSettings?.Voice ?? "zh-CN-XiaoxiaoNeural");
                 
                 metricsStopwatch.Restart();
-                var ttsOutputPath = Path.Combine("temp", $"tts_{Guid.NewGuid():N}.wav");
+                var ttsOutputPath = _pathManager.CreateTempAudioPath("wav");
                 var ttsRequest = new TTSRequest
                 {
                     Text = llmResponse.ResponseText,
@@ -296,7 +299,7 @@ namespace LmyDigitalHuman.Services
                 {
                     Text = llmResponse.ResponseText,
                     Emotion = detectedEmotion,
-                    OutputPath = Path.Combine("temp", $"tts_{Guid.NewGuid():N}.wav")
+                    OutputPath = _pathManager.CreateTempAudioPath("wav")
                 });
                 metrics.TTSProcessingTime = metricsStopwatch.ElapsedMilliseconds;
 
