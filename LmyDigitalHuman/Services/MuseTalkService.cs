@@ -751,6 +751,9 @@ namespace LmyDigitalHuman.Services
             
             if (request.BboxShift.HasValue)
                 args.Append($" --bbox_shift {request.BboxShift.Value}");
+            
+            // 跳过音频优化，避免FFmpeg依赖问题
+            args.Append(" --no_optimize");
                 
             return args.ToString();
         }
