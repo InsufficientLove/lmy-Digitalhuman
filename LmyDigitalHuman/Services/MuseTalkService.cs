@@ -78,21 +78,84 @@ namespace LmyDigitalHuman.Services
                 var fullImagePath = _pathManager.ResolveImagePath(request.AvatarImagePath);
                 var fullAudioPath = _pathManager.ResolveAudioPath(request.AudioPath);
                 
+                _logger.LogInformation("路径解析结果:");
+                _logger.LogInformation("  原始图片路径: {OriginalImagePath}", request.AvatarImagePath);
+                _logger.LogInformation("  解析图片路径: {ResolvedImagePath}", fullImagePath);
+                _logger.LogInformation("  图片文件存在: {ImageExists}", File.Exists(fullImagePath));
+                _logger.LogInformation("  原始音频路径: {OriginalAudioPath}", request.AudioPath);
+                _logger.LogInformation("  解析音频路径: {ResolvedAudioPath}", fullAudioPath);
+                _logger.LogInformation("  音频文件存在: {AudioExists}", File.Exists(fullAudioPath));
+                
+                // 图片路径验证 - 如果是Web路径且文件不存在，尝试其他方式
                 if (!File.Exists(fullImagePath))
                 {
+                    _logger.LogWarning("图片文件不存在，尝试其他路径解析方式...");
+                    
+                    // 尝试直接在templates目录查找
+                    if (request.AvatarImagePath.StartsWith("/templates/"))
+                    {
+                        var fileName = request.AvatarImagePath.Substring("/templates/".Length);
+                        var alternativePath = Path.Combine(_pathManager.GetTemplatesPath(), fileName);
+                        _logger.LogInformation("  尝试备用路径: {AlternativePath}", alternativePath);
+                        
+                        if (File.Exists(alternativePath))
+                        {
+                            fullImagePath = alternativePath;
+                            _logger.LogInformation("  使用备用路径成功");
+                        }
+                    }
+                }
+                
+                // 音频路径验证 - 如果是相对路径且文件不存在，尝试其他方式
+                if (!File.Exists(fullAudioPath))
+                {
+                    _logger.LogWarning("音频文件不存在，尝试其他路径解析方式...");
+                    
+                    // 尝试直接在temp目录查找
+                    if (request.AudioPath.StartsWith("temp/"))
+                    {
+                        var fileName = request.AudioPath.Substring("temp/".Length);
+                        var alternativePath = Path.Combine(_pathManager.GetTempPath(), fileName);
+                        _logger.LogInformation("  尝试备用路径: {AlternativePath}", alternativePath);
+                        
+                        if (File.Exists(alternativePath))
+                        {
+                            fullAudioPath = alternativePath;
+                            _logger.LogInformation("  使用备用路径成功");
+                        }
+                    }
+                    else if (!Path.IsPathRooted(request.AudioPath))
+                    {
+                        // 尝试作为相对于temp目录的路径
+                        var alternativePath = Path.Combine(_pathManager.GetTempPath(), request.AudioPath);
+                        _logger.LogInformation("  尝试temp相对路径: {AlternativePath}", alternativePath);
+                        
+                        if (File.Exists(alternativePath))
+                        {
+                            fullAudioPath = alternativePath;
+                            _logger.LogInformation("  使用temp相对路径成功");
+                        }
+                    }
+                }
+                
+                // 最终验证
+                if (!File.Exists(fullImagePath))
+                {
+                    _logger.LogError("最终图片路径验证失败: {FinalImagePath}", fullImagePath);
                     return new DigitalHumanResponse
                     {
                         Success = false,
-                        Error = $"头像图片不存在: {request.AvatarImagePath} (解析为: {fullImagePath})"
+                        Error = $"头像图片不存在: {request.AvatarImagePath} (最终解析为: {fullImagePath})"
                     };
                 }
 
                 if (!File.Exists(fullAudioPath))
                 {
+                    _logger.LogError("最终音频路径验证失败: {FinalAudioPath}", fullAudioPath);
                     return new DigitalHumanResponse
                     {
                         Success = false,
-                        Error = $"音频文件不存在: {request.AudioPath} (解析为: {fullAudioPath})"
+                        Error = $"音频文件不存在: {request.AudioPath} (最终解析为: {fullAudioPath})"
                     };
                 }
 

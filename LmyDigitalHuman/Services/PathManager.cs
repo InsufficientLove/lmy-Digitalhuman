@@ -201,13 +201,23 @@ namespace LmyDigitalHuman.Services
         public string CreateTempAudioPath(string extension = "wav")
         {
             var fileName = $"audio_{Guid.NewGuid():N}.{extension.TrimStart('.')}";
-            return Path.Combine(_tempPath, fileName);
+            var fullPath = Path.GetFullPath(Path.Combine(_tempPath, fileName));
+            
+            // 确保目录存在
+            EnsureDirectoryExists(Path.GetDirectoryName(fullPath)!);
+            
+            return fullPath;
         }
 
         public string CreateTempVideoPath(string extension = "mp4")
         {
             var fileName = $"video_{Guid.NewGuid():N}.{extension.TrimStart('.')}";
-            return Path.Combine(_videosPath, fileName);
+            var fullPath = Path.GetFullPath(Path.Combine(_videosPath, fileName));
+            
+            // 确保目录存在
+            EnsureDirectoryExists(Path.GetDirectoryName(fullPath)!);
+            
+            return fullPath;
         }
 
         public bool EnsureDirectoryExists(string path)
