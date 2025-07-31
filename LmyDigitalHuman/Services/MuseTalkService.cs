@@ -741,16 +741,21 @@ namespace LmyDigitalHuman.Services
         private string BuildPythonArguments(DigitalHumanRequest request, string outputPath)
         {
             var args = new StringBuilder();
-            args.Append($"\"{_museTalkScriptPath}\"");
+            
+            // 使用官方MuseTalk集成脚本
+            args.Append($"\"integrate-official-musetalk.py\"");
             args.Append($" --avatar \"{request.AvatarImagePath}\"");
             args.Append($" --audio \"{request.AudioPath}\"");
             args.Append($" --output \"{outputPath}\"");
             args.Append($" --fps {request.Fps ?? 25}");
             args.Append($" --batch_size {request.BatchSize ?? 4}");
-            args.Append($" --quality {request.Quality}");
             
             if (request.BboxShift.HasValue)
                 args.Append($" --bbox_shift {request.BboxShift.Value}");
+            
+            // 添加超时和详细输出
+            args.Append($" --timeout 600");
+            args.Append($" --verbose");
                 
             return args.ToString();
         }
