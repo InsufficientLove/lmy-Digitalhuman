@@ -1,61 +1,45 @@
-# 更新日志
+# 📋 更新日志
 
-## [2024-07-29] 重大修复和功能增强
+## v2.0 - 官方MuseTalk集成 (2025-01-31)
 
-### 🔧 编译错误修复
-- ✅ 修复 `SpeechRecognitionResult` 类型二义性问题
-- ✅ 解决 `TextConversationRequest` 重复定义问题
-- ✅ 修复 `StartRealtimeConversationRequest` 命名空间冲突
-- ✅ 解决 `LocalLLMRequest` 重复引用问题
-- ✅ 添加缺失的 `CreateDigitalHumanTemplateRequest` 类
-- ✅ 添加缺失的 `RealtimeConversationRequest` 类
-- ✅ 修复 `AudioPipelineService` 接口实现不匹配问题
+### ✨ 新特性
+- 🎯 集成官方MuseTalk GitHub仓库
+- 🧹 简化项目结构，删除多余批处理文件
+- 📦 统一环境安装脚本 `setup-environment.bat`
+- 🔧 优化路径管理，支持开发和生产环境
 
-### 🆕 新增功能
-- ✨ 新增 `IStreamingTTSService` 流式TTS服务接口
-- ✨ 实现 `StreamingTTSService` 流式TTS服务
-- ✨ 添加 `SpeechRecognitionResult` 语音识别结果模型
-- ✨ 扩展 `WhisperNetService` 支持文件路径输入
+### 🔧 改进
+- 直接使用官方MuseTalk `scripts.inference` 模块
+- 统一模型管理，使用官方模型路径
+- 简化批处理文件从24个减少到3个核心文件
+- 整合文档，删除过时的README
 
-### 🚀 启动脚本和部署工具
-- ✨ 添加 `startup.bat` Windows生产环境启动脚本
-- ✨ 添加 `startup.sh` Linux/macOS生产环境启动脚本
-- ✨ 添加 `dev-start.bat` Windows开发环境启动脚本（支持热重载）
-- ✨ 添加 `dev-start.sh` Linux/macOS开发环境启动脚本（支持热重载）
-- ✨ 添加 `docker-start.bat` Docker容器启动脚本
-- ✨ 添加 `STARTUP_GUIDE.md` 详细启动指南
+### 🐛 修复
+- 修正MuseTalkService使用官方API
+- 解决路径不一致问题
+- 修复虚拟环境激活问题
 
-### 🏗️ 架构优化
-- 🔄 统一模型定义到 `UnifiedModels.cs`
-- 🔄 消除重复类定义和命名空间冲突
-- 🔄 优化服务接口设计
-- 🔄 改进错误处理和类型安全
+## v1.5 - 虚拟环境支持 (2025-01-30)
 
-### 📝 文档改进
-- 📚 添加完整的启动指南
-- 📚 提供多平台支持说明
-- 📚 包含常见问题解决方案
-- 📚 添加开发和部署最佳实践
+### ✨ 新特性
+- 🐍 添加Python虚拟环境支持
+- 🔧 统一路径管理服务
+- 🎯 4GPU优化配置
 
-### 🛠️ 开发体验提升
-- 🔧 支持热重载开发模式
-- 🔧 自动环境检查和错误提示
-- 🔧 跨平台启动脚本支持
-- 🔧 Docker容器化部署支持
+### 🔧 改进
+- 优化MuseTalk模型下载
+- 改进错误处理和日志记录
+- 支持IIS生产环境部署
 
-## 下一步计划
+## v1.0 - 初始版本 (2025-01-29)
 
-### 待修复问题
-- 🔲 第三方库API兼容性问题（Whisper.NET, FFMpegCore）
-- 🔲 模型属性匹配问题
-- 🔲 服务方法实现完善
+### ✨ 核心功能
+- 🗣️ Edge-TTS语音合成
+- 🧠 Ollama本地LLM集成
+- 🎬 MuseTalk数字人生成
+- 🌐 Web界面和API
 
-### 功能增强
-- 🔲 完善实时语音识别功能
-- 🔲 优化流式TTS性能
-- 🔲 增强错误处理和日志记录
-- 🔲 添加API文档和示例
-
----
-
-**注意**: 当前版本已解决主要的编译错误，但仍有部分功能需要进一步完善。建议在VS 2022中继续开发和调试。
+### 🛠️ 技术架构
+- .NET 8.0 Web应用
+- Python集成和进程管理
+- 统一数据模型设计
