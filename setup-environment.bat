@@ -86,7 +86,22 @@ if errorlevel 1 (
     echo ⚠️  MMLab安装可能有问题，但不影响基本功能
 )
 
-echo 📥 下载MuseTalk模型权重...
+echo 📥 检查MuseTalk模型权重...
+
+REM 检查是否已有模型备份
+if exist "..\Models\musetalk\MuseTalk\models" (
+    echo ✅ 发现已有MuseTalk模型备份
+    echo 🔄 复制模型到官方位置...
+    xcopy /E /I /Y "..\Models\musetalk\MuseTalk\models\*" "models\"
+    if errorlevel 1 (
+        echo ⚠️  模型复制失败，尝试官方下载...
+    ) else (
+        echo ✅ 模型复制成功，跳过下载
+        goto skip_download
+    )
+)
+
+REM 尝试官方下载脚本
 if exist "download_weights.bat" (
     echo 运行官方权重下载脚本...
     call download_weights.bat
@@ -99,6 +114,8 @@ if exist "download_weights.bat" (
     echo    2. 下载模型权重文件
     echo    3. 解压到 MuseTalk/models/ 目录
 )
+
+:skip_download
 
 cd ..
 
