@@ -742,20 +742,22 @@ namespace LmyDigitalHuman.Services
         {
             var args = new StringBuilder();
             
-            // 使用官方MuseTalk集成脚本
-            args.Append($"\"integrate-official-musetalk.py\"");
-            args.Append($" --avatar \"{request.AvatarImagePath}\"");
-            args.Append($" --audio \"{request.AudioPath}\"");
-            args.Append($" --output \"{outputPath}\"");
-            args.Append($" --fps {request.Fps ?? 25}");
-            args.Append($" --batch_size {request.BatchSize ?? 4}");
+            // 直接使用官方MuseTalk的inference脚本
+            args.Append($"-m scripts.inference");
+            
+            // 使用官方MuseTalk的配置文件路径
+            args.Append($" --inference_config \"MuseTalk/configs/inference/test.yaml\"");
+            args.Append($" --result_dir \"{Path.GetDirectoryName(outputPath)}\"");
+            
+            // 模型路径 - 使用官方MuseTalk的模型位置
+            args.Append($" --unet_model_path \"MuseTalk/models/musetalk/pytorch_model.bin\"");
+            args.Append($" --unet_config \"MuseTalk/models/musetalk/musetalk.json\"");
+            
+            // 版本和其他参数
+            args.Append($" --version v1");
             
             if (request.BboxShift.HasValue)
                 args.Append($" --bbox_shift {request.BboxShift.Value}");
-            
-            // 添加超时和详细输出
-            args.Append($" --timeout 600");
-            args.Append($" --verbose");
                 
             return args.ToString();
         }
@@ -775,7 +777,7 @@ namespace LmyDigitalHuman.Services
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                     CreateNoWindow = true,
-                    WorkingDirectory = _pathManager.GetContentRootPath()
+                    WorkingDirectory = Path.Combine(_pathManager.GetContentRootPath(), "MuseTalk")
                 };
                 
                 // 设置环境变量解决中文乱码问题
