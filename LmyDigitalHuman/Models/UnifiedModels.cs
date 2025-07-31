@@ -309,6 +309,7 @@ namespace LmyDigitalHuman.Models
         public int Duration { get; set; }
         public long FileSize { get; set; }
         public int ProcessingTime { get; set; }
+        public string Error { get; set; } = string.Empty;
     }
 
     /// <summary>

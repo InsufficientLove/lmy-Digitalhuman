@@ -68,14 +68,14 @@ namespace LmyDigitalHuman.Services
                 if (string.IsNullOrWhiteSpace(request.Text))
                 {
                     _logger.LogWarning("TTS请求文本为空，跳过语音合成");
-                    return new TTSResponse
-                    {
-                        Success = false,
-                        Error = "TTS文本为空，无法进行语音合成",
-                        AudioPath = "",
-                        Duration = 0,
-                        ProcessingTime = stopwatch.ElapsedMilliseconds
-                    };
+                                    return new TTSResponse
+                {
+                    Success = false,
+                    Error = "TTS文本为空，无法进行语音合成",
+                    AudioPath = "",
+                    Duration = 0,
+                    ProcessingTime = (int)stopwatch.ElapsedMilliseconds
+                };
                 }
 
                 _logger.LogInformation("开始文本转语音: {Text}, 语音: {Voice}", 
@@ -143,6 +143,7 @@ namespace LmyDigitalHuman.Services
                 return new TTSResponse
                 {
                     Success = false,
+                    Error = ex.Message,
                     ProcessingTime = (int)stopwatch.ElapsedMilliseconds
                 };
             }
