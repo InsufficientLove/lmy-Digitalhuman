@@ -41,8 +41,11 @@ namespace LmyDigitalHuman.Services
             _cache = cache;
             _pathManager = pathManager;
             
-            _pythonPath = configuration["DigitalHuman:MuseTalk:PythonPath"] ?? "python";
+            _pythonPath = DetectPythonPath(configuration["DigitalHuman:MuseTalk:PythonPath"] ?? "python");
             _museTalkScriptPath = _pathManager.ResolvePath("musetalk_service_complete.py");
+            
+            _logger.LogInformation("MuseTalk Python路径: {PythonPath}", _pythonPath);
+            _logger.LogInformation("MuseTalk脚本路径: {ScriptPath}", _museTalkScriptPath);
             
             // 高并发支持：200个同时处理
             var maxConcurrentJobs = configuration.GetValue<int>("DigitalHuman:MaxVideoGeneration", 8);
@@ -756,6 +759,9 @@ namespace LmyDigitalHuman.Services
         {
             try
             {
+                _logger.LogInformation("执行Python命令: {PythonPath} {Arguments}", _pythonPath, arguments);
+                _logger.LogInformation("工作目录: {WorkingDirectory}", _pathManager.GetContentRootPath());
+                
                 var processInfo = new ProcessStartInfo
                 {
                     FileName = _pythonPath,
@@ -766,6 +772,32 @@ namespace LmyDigitalHuman.Services
                     CreateNoWindow = true,
                     WorkingDirectory = _pathManager.GetContentRootPath()
                 };
+                
+                // 设置环境变量解决中文乱码问题
+                processInfo.Environment["PYTHONIOENCODING"] = "utf-8";
+                processInfo.Environment["PYTHONUNBUFFERED"] = "1";
+                processInfo.Environment["PYTHONUTF8"] = "1";
+                
+                // 检查Python路径和脚本文件是否存在
+                if (!File.Exists(_pythonPath) && !_pythonPath.Equals("python", StringComparison.OrdinalIgnoreCase))
+                {
+                    _logger.LogError("Python可执行文件不存在: {PythonPath}", _pythonPath);
+                    return new PythonResult
+                    {
+                        Success = false,
+                        Output = $"Python可执行文件不存在: {_pythonPath}"
+                    };
+                }
+                
+                if (!File.Exists(_museTalkScriptPath))
+                {
+                    _logger.LogError("MuseTalk脚本文件不存在: {ScriptPath}", _museTalkScriptPath);
+                    return new PythonResult
+                    {
+                        Success = false,
+                        Output = $"MuseTalk脚本文件不存在: {_museTalkScriptPath}"
+                    };
+                }
 
                 using var process = Process.Start(processInfo);
                 if (process != null)
@@ -783,10 +815,55 @@ namespace LmyDigitalHuman.Services
                         var output = await outputTask;
                         var error = await errorTask;
                         
+                        _logger.LogInformation("Python进程退出码: {ExitCode}", process.ExitCode);
+                        _logger.LogInformation("Python标准输出: {Output}", 
+                            string.IsNullOrEmpty(output) ? "[空]" : (output.Length > 500 ? output.Substring(0, 500) + "..." : output));
+                        _logger.LogInformation("Python错误输出: {Error}", 
+                            string.IsNullOrEmpty(error) ? "[空]" : (error.Length > 500 ? error.Substring(0, 500) + "..." : error));
+                        
+                        var isSuccess = process.ExitCode == 0;
+                        var resultOutput = string.IsNullOrEmpty(error) ? output : error;
+                        
+                        // 尝试解析JSON输出
+                        if (isSuccess && !string.IsNullOrEmpty(output))
+                        {
+                            try
+                            {
+                                // 查找JSON输出（通常在最后几行）
+                                var lines = output.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+                                for (int i = lines.Length - 1; i >= 0; i--)
+                                {
+                                    var line = lines[i].Trim();
+                                    if (line.StartsWith("{") && line.EndsWith("}"))
+                                    {
+                                        var jsonResult = JsonSerializer.Deserialize<JsonElement>(line);
+                                        if (jsonResult.TryGetProperty("success", out var successProp))
+                                        {
+                                            isSuccess = successProp.GetBoolean();
+                                            if (jsonResult.TryGetProperty("error", out var errorProp))
+                                            {
+                                                var errorMsg = errorProp.GetString();
+                                                if (!string.IsNullOrEmpty(errorMsg))
+                                                {
+                                                    resultOutput = errorMsg;
+                                                    isSuccess = false;
+                                                }
+                                            }
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                            catch (Exception jsonEx)
+                            {
+                                _logger.LogWarning(jsonEx, "解析Python JSON输出失败");
+                            }
+                        }
+                        
                         return new PythonResult
                         {
-                            Success = process.ExitCode == 0,
-                            Output = string.IsNullOrEmpty(error) ? output : error,
+                            Success = isSuccess,
+                            Output = resultOutput ?? "",
                             ExitCode = process.ExitCode
                         };
                     }
@@ -908,6 +985,80 @@ namespace LmyDigitalHuman.Services
         {
             var sanitized = System.Text.RegularExpressions.Regex.Replace(name, @"[^\w\-_\.]", "_");
             return sanitized.Length > 50 ? sanitized.Substring(0, 50) : sanitized;
+        }
+
+        private string DetectPythonPath(string configuredPath)
+        {
+            // 1. 首先尝试配置的路径
+            if (!string.IsNullOrEmpty(configuredPath) && configuredPath != "python")
+            {
+                if (File.Exists(configuredPath))
+                {
+                    _logger.LogInformation("使用配置的Python路径: {Path}", configuredPath);
+                    return configuredPath;
+                }
+            }
+
+            // 2. 尝试常见的Python路径
+            var commonPaths = new[]
+            {
+                "python",
+                "py",
+                @"C:\Python310\python.exe",
+                @"C:\Python311\python.exe",
+                @"C:\Python312\python.exe",
+                @"C:\Program Files\Python310\python.exe",
+                @"C:\Program Files\Python311\python.exe",
+                @"C:\Program Files\Python312\python.exe",
+                @"C:\Users\Administrator\AppData\Local\Programs\Python\Python310\python.exe",
+                @"C:\Users\Administrator\AppData\Local\Programs\Python\Python311\python.exe",
+                @"C:\Users\Administrator\AppData\Local\Programs\Python\Python312\python.exe"
+            };
+
+            foreach (var path in commonPaths)
+            {
+                try
+                {
+                    if (path == "python" || path == "py")
+                    {
+                        // 测试命令行Python
+                        var testProcess = new ProcessStartInfo
+                        {
+                            FileName = path,
+                            Arguments = "--version",
+                            UseShellExecute = false,
+                            RedirectStandardOutput = true,
+                            RedirectStandardError = true,
+                            CreateNoWindow = true
+                        };
+
+                        using var process = Process.Start(testProcess);
+                        if (process != null)
+                        {
+                            process.WaitForExit(5000); // 5秒超时
+                            if (process.ExitCode == 0)
+                            {
+                                var output = process.StandardOutput.ReadToEnd();
+                                _logger.LogInformation("检测到Python: {Path}, 版本: {Version}", path, output.Trim());
+                                return path;
+                            }
+                        }
+                    }
+                    else if (File.Exists(path))
+                    {
+                        _logger.LogInformation("检测到Python文件: {Path}", path);
+                        return path;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug(ex, "测试Python路径失败: {Path}", path);
+                }
+            }
+
+            // 3. 如果都找不到，返回原始配置
+            _logger.LogWarning("未找到有效的Python路径，使用默认值: {Path}", configuredPath);
+            return configuredPath;
         }
 
 
