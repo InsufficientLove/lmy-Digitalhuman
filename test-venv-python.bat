@@ -1,5 +1,5 @@
 @echo off
-chcp 65001 >nul
+chcp 65001 >nul 2>&1
 echo ================================================================================
 echo                   Test Virtual Environment Python Path
 echo ================================================================================
@@ -57,6 +57,11 @@ echo.
 echo If you see these logs, the virtual environment is being used correctly.
 echo.
 
-dotnet run
+echo 如果要启动应用请手动运行: dotnet run
+echo 或使用: start-with-venv.bat
 
+echo.
+echo ================================================================================
+echo 测试完成
+echo ================================================================================
 pause

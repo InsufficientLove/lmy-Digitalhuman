@@ -778,6 +778,9 @@ namespace LmyDigitalHuman.Services
                 processInfo.Environment["PYTHONUNBUFFERED"] = "1";
                 processInfo.Environment["PYTHONUTF8"] = "1";
                 
+                // 配置虚拟环境
+                ConfigureVirtualEnvironment(processInfo);
+                
                 // 检查Python路径和脚本文件是否存在
                 if (!File.Exists(_pythonPath) && !_pythonPath.Equals("python", StringComparison.OrdinalIgnoreCase))
                 {
@@ -967,6 +970,59 @@ namespace LmyDigitalHuman.Services
         {
             // 简化的缓存命中率计算
             return _totalProcessedJobs > 0 ? 0.3 : 0; // 假设30%的命中率
+        }
+
+        private void ConfigureVirtualEnvironment(ProcessStartInfo processInfo)
+        {
+            try
+            {
+                // 检查是否使用虚拟环境
+                var pythonPath = _pythonPath;
+                if (pythonPath.Contains("venv_musetalk"))
+                {
+                    _logger.LogInformation("配置虚拟环境: {PythonPath}", pythonPath);
+                    
+                    // 获取虚拟环境目录
+                    var venvDir = Path.GetDirectoryName(Path.GetDirectoryName(pythonPath)); // Scripts的上级目录
+                    if (!string.IsNullOrEmpty(venvDir) && Directory.Exists(venvDir))
+                    {
+                        // 设置虚拟环境相关的环境变量
+                        processInfo.Environment["VIRTUAL_ENV"] = venvDir;
+                        processInfo.Environment["VIRTUAL_ENV_PROMPT"] = "(venv_musetalk)";
+                        
+                        // 设置Python路径，确保使用虚拟环境的包
+                        var sitePackages = Path.Combine(venvDir, "Lib", "site-packages");
+                        if (Directory.Exists(sitePackages))
+                        {
+                            processInfo.Environment["PYTHONPATH"] = sitePackages;
+                            _logger.LogInformation("设置PYTHONPATH: {SitePackages}", sitePackages);
+                        }
+                        
+                        // 修改PATH环境变量，优先使用虚拟环境的Scripts目录
+                        var scriptsDir = Path.Combine(venvDir, "Scripts");
+                        if (Directory.Exists(scriptsDir))
+                        {
+                            var currentPath = Environment.GetEnvironmentVariable("PATH") ?? "";
+                            processInfo.Environment["PATH"] = scriptsDir + ";" + currentPath;
+                            _logger.LogInformation("更新PATH，优先使用虚拟环境Scripts: {ScriptsDir}", scriptsDir);
+                        }
+                        
+                        _logger.LogInformation("虚拟环境配置完成: {VenvDir}", venvDir);
+                    }
+                    else
+                    {
+                        _logger.LogWarning("虚拟环境目录不存在: {VenvDir}", venvDir);
+                    }
+                }
+                else
+                {
+                    _logger.LogInformation("使用系统Python: {PythonPath}", pythonPath);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning("配置虚拟环境时发生错误: {Error}", ex.Message);
+            }
         }
 
         private string GetVideoResolution(string quality)
