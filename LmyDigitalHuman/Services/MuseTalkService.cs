@@ -751,9 +751,6 @@ namespace LmyDigitalHuman.Services
             
             if (request.BboxShift.HasValue)
                 args.Append($" --bbox_shift {request.BboxShift.Value}");
-            
-            // 跳过音频优化，避免FFmpeg依赖问题
-            args.Append(" --no_optimize");
                 
             return args.ToString();
         }
@@ -1001,16 +998,23 @@ namespace LmyDigitalHuman.Services
                             _logger.LogInformation("设置PYTHONPATH: {SitePackages}", sitePackages);
                         }
                         
-                        // 修改PATH环境变量，优先使用虚拟环境的Scripts目录
+                        // 修改PATH环境变量，优先使用虚拟环境的Scripts目录，同时保持系统FFmpeg可用
                         var scriptsDir = Path.Combine(venvDir, "Scripts");
                         if (Directory.Exists(scriptsDir))
                         {
                             var currentPath = Environment.GetEnvironmentVariable("PATH") ?? "";
+                            // 确保系统PATH中的FFmpeg仍然可用
                             processInfo.Environment["PATH"] = scriptsDir + ";" + currentPath;
                             _logger.LogInformation("更新PATH，优先使用虚拟环境Scripts: {ScriptsDir}", scriptsDir);
                         }
                         
+                        // 设置4x GPU环境变量
+                        processInfo.Environment["CUDA_VISIBLE_DEVICES"] = "0,1,2,3";
+                        processInfo.Environment["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:512";
+                        processInfo.Environment["OMP_NUM_THREADS"] = "8";
+                        
                         _logger.LogInformation("虚拟环境配置完成: {VenvDir}", venvDir);
+                        _logger.LogInformation("GPU配置: CUDA_VISIBLE_DEVICES=0,1,2,3");
                     }
                     else
                     {
