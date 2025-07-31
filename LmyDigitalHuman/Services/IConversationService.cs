@@ -118,7 +118,7 @@ namespace LmyDigitalHuman.Services
         public int QueueLength { get; set; }
         public double AverageProcessingTime { get; set; }
         public double ThroughputPerHour { get; set; }
-        public Dictionary<string, object> ResourceUsage { get; set; }
-        public List<string> PerformanceWarnings { get; set; }
+        public Dictionary<string, object> ResourceUsage { get; set; } = new();
+        public List<string> PerformanceWarnings { get; set; } = new();
     }
 }
