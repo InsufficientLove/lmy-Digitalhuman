@@ -992,10 +992,23 @@ namespace LmyDigitalHuman.Services
             // 1. 首先尝试配置的路径
             if (!string.IsNullOrEmpty(configuredPath) && configuredPath != "python")
             {
-                if (File.Exists(configuredPath))
+                // 如果是相对路径，转换为绝对路径
+                var resolvedPath = configuredPath;
+                if (!Path.IsPathRooted(configuredPath))
                 {
-                    _logger.LogInformation("使用配置的Python路径: {Path}", configuredPath);
-                    return configuredPath;
+                    resolvedPath = _pathManager.ResolvePath(configuredPath);
+                }
+                
+                _logger.LogInformation("检查配置的Python路径: {OriginalPath} → {ResolvedPath}", configuredPath, resolvedPath);
+                
+                if (File.Exists(resolvedPath))
+                {
+                    _logger.LogInformation("使用配置的Python路径: {Path}", resolvedPath);
+                    return resolvedPath;
+                }
+                else
+                {
+                    _logger.LogWarning("配置的Python路径不存在: {Path}", resolvedPath);
                 }
             }
 
