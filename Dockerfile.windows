@@ -1,0 +1,55 @@
+# Windows容器版本的Dockerfile
+# 适用于Windows Server 2019
+
+# ===== 阶段1: .NET 构建阶段 =====
+FROM mcr.microsoft.com/dotnet/sdk:8.0-nanoserver-ltsc2019 AS build
+WORKDIR /src
+
+# 复制项目文件并还原依赖
+COPY ["LmyDigitalHuman/LmyDigitalHuman.csproj", "LmyDigitalHuman/"]
+RUN dotnet restore "LmyDigitalHuman/LmyDigitalHuman.csproj"
+
+# 复制源代码并构建
+COPY . .
+WORKDIR "/src/LmyDigitalHuman"
+RUN dotnet build "LmyDigitalHuman.csproj" -c Release -o /app/build
+
+# 发布应用
+RUN dotnet publish "LmyDigitalHuman.csproj" -c Release -o /app/publish
+
+# ===== 阶段2: 运行时阶段 =====
+FROM mcr.microsoft.com/dotnet/aspnet:8.0-nanoserver-ltsc2019 AS final
+WORKDIR /app
+
+# 安装Python (使用Chocolatey)
+USER ContainerAdministrator
+RUN powershell -Command \
+    Set-ExecutionPolicy Bypass -Scope Process -Force; \
+    [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; \
+    iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1')); \
+    choco install python3 -y; \
+    refreshenv
+
+# 安装Python依赖
+COPY requirements.txt .
+RUN python -m pip install --upgrade pip && \
+    python -m pip install -r requirements.txt
+
+# 复制应用程序
+COPY --from=build /app/publish .
+
+# 创建必要的目录
+RUN mkdir wwwroot\templates && \
+    mkdir wwwroot\videos && \
+    mkdir temp && \
+    mkdir logs
+
+# 设置环境变量
+ENV ASPNETCORE_ENVIRONMENT=Docker
+ENV ASPNETCORE_URLS=http://+:5000
+
+# 暴露端口
+EXPOSE 5000
+
+# 启动应用
+ENTRYPOINT ["dotnet", "LmyDigitalHuman.dll"]
