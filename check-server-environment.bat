@@ -1,4 +1,5 @@
 @echo off
+chcp 65001 >nul 2>&1
 setlocal enabledelayedexpansion
 
 echo ========================================
@@ -112,19 +113,8 @@ if exist "LmyDigitalHuman\musetalk_service_complete.py" (
 
 echo.
 echo [7] 测试 Python 包导入...
-python -c "
-try:
-    import edge_tts
-    print('✅ edge_tts 导入成功')
-except ImportError as e:
-    print('❌ edge_tts 导入失败:', e)
-
-try:
-    import requests
-    print('✅ requests 导入成功')
-except ImportError as e:
-    print('❌ requests 导入失败:', e)
-"
+python -c "import edge_tts; print('✅ edge_tts 导入成功')" 2>nul || echo ❌ edge_tts 导入失败
+python -c "import requests; print('✅ requests 导入成功')" 2>nul || echo ❌ requests 导入失败
 
 echo.
 echo ========================================
@@ -157,7 +147,7 @@ if "%ALL_GOOD%"=="true" (
 
 echo 💡 提示：
 echo    - VS调试使用系统Python环境
-echo    - Docker部署使用容器内Python环境
+echo    - Docker部署使用容器内Python环境  
 echo    - 两种模式可以并存，互不干扰
 echo.
 

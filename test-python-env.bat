@@ -1,4 +1,5 @@
 @echo off
+chcp 65001 >nul 2>&1
 echo 测试Python环境和edge-tts包...
 echo.
 
