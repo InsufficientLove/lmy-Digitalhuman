@@ -105,7 +105,7 @@ namespace LmyDigitalHuman.Services
             foreach (var configPath in configuredPaths)
             {
                 var resolvedPath = _pathManager.ResolvePath(configPath!);
-                if (await ValidatePythonEnvironmentAsync(resolvedPath, "edge-tts"))
+                if (await ValidatePythonEnvironmentAsync(resolvedPath, "edge_tts"))
                 {
                     _logger.LogInformation("使用配置文件中的Python路径: {PythonPath}", resolvedPath);
                     return resolvedPath;
