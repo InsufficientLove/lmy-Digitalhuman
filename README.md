@@ -19,11 +19,39 @@
 
 ### 安装步骤
 
-1. **安装Docker Engine**
+1. **手动安装Docker Engine**
+
+**步骤1: 关闭Hyper-V（如果需要）**
 ```cmd
 # 以管理员身份运行PowerShell
-powershell -ExecutionPolicy Bypass -File setup-docker-simple.ps1 -DisableHyperV
+Disable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-All -NoRestart
 # 重启服务器
+```
+
+**步骤2: 启用容器功能**
+```cmd
+# 以管理员身份运行PowerShell
+Enable-WindowsOptionalFeature -Online -FeatureName Containers -All -NoRestart
+```
+
+**步骤3: 安装Chocolatey**
+```cmd
+# 以管理员身份运行PowerShell
+Set-ExecutionPolicy Bypass -Scope Process -Force
+[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+```
+
+**步骤4: 安装Docker和Docker Compose**
+```cmd
+choco install docker-engine -y
+choco install docker-compose -y
+```
+
+**步骤5: 启动Docker服务**
+```cmd
+Start-Service docker
+Set-Service docker -StartupType Automatic
 ```
 
 2. **部署应用**
@@ -68,7 +96,7 @@ lmy-Digitalhuman/
 │   └── digital-human-test.html  # 测试页面
 ├── docker-compose.yml       # Docker编排
 ├── Dockerfile              # Docker镜像
-├── setup-docker-simple.ps1  # Docker安装脚本
+
 └── deploy-app.bat          # 应用部署脚本
 ```
 

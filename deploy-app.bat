@@ -8,8 +8,8 @@ echo.
 REM 检查Docker是否运行
 docker info >nul 2>&1
 if %errorLevel% neq 0 (
-    echo ❌ Docker未运行！请先安装Docker Engine
-    echo 运行: powershell -ExecutionPolicy Bypass -File setup-docker-simple.ps1 -DisableHyperV
+    echo ❌ Docker未运行！请先手动安装Docker Engine
+    echo 参考README中的手动安装步骤
     pause
     exit /b 1
 )
