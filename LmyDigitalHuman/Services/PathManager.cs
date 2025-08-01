@@ -133,21 +133,7 @@ namespace LmyDigitalHuman.Services
             }
             else
             {
-                // 直接文件名，在templates目录中查找
-                var templatesFilePath = Path.Combine(_templatesPath, relativePath);
-                if (File.Exists(templatesFilePath))
-                {
-                    return Path.GetFullPath(templatesFilePath);
-                }
-                
-                // 在images目录中查找
-                var imagesFilePath = Path.Combine(_webRootPath, "images", relativePath);
-                if (File.Exists(imagesFilePath))
-                {
-                    return Path.GetFullPath(imagesFilePath);
-                }
-                
-                // 默认返回templates路径
+                // 默认所有模板文件都在templates目录中
                 return Path.GetFullPath(Path.Combine(_templatesPath, relativePath));
             }
         }

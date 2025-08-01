@@ -39,14 +39,16 @@ namespace LmyDigitalHuman.Services
             "py.exe", "py", // Windows Python Launcher
         };
 
-        // 常见的虚拟环境路径模式
+        // 常见的虚拟环境路径模式（优先级顺序）
         private readonly string[] _commonVenvPatterns = new[]
         {
-            "venv_musetalk/Scripts/python.exe",
+            "venv_musetalk/Scripts/python.exe",  // 项目专用虚拟环境
+            "../venv_musetalk/Scripts/python.exe", // 上级目录
             "venv/Scripts/python.exe", 
             "env/Scripts/python.exe",
             ".venv/Scripts/python.exe",
             "venv_musetalk/bin/python",
+            "../venv_musetalk/bin/python",
             "venv/bin/python",
             "env/bin/python", 
             ".venv/bin/python"
