@@ -43,10 +43,16 @@ wwwroot/audio/*
 # 模型文件（太大，需要单独下载）
 checkpoints/
 gfpgan/
+MuseTalk/
+models/
 *.pth
 *.ckpt
 *.safetensors
 *.tar
+*.bin
+*.h5
+*.pkl
+*.model
 
 # Docker 相关
 Dockerfile
@@ -61,6 +67,17 @@ deploy-*.bat
 
 # 数据目录（运行时挂载）
 data/
+# 虚拟环境（容器内重建）
+venv_musetalk/
+# 大文件和缓存
+*.zip
+*.rar
+*.7z
+*.tar.gz
+# VS和构建缓存
+**/bin/
+**/obj/
+.vs/
 
 # 系统文件
 .DS_Store
