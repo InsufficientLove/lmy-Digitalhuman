@@ -321,8 +321,12 @@ namespace LmyDigitalHuman.Services
                     return (false, "", "无法启动Python进程");
                 }
 
-                var completed = await process.WaitForExitAsync(TimeSpan.FromSeconds(10));
-                if (!completed)
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                try
+                {
+                    await process.WaitForExitAsync(cts.Token);
+                }
+                catch (OperationCanceledException)
                 {
                     try { process.Kill(true); } catch { }
                     return (false, "", "Python命令执行超时");
