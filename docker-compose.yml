@@ -13,8 +13,8 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Docker
       - ASPNETCORE_URLS=http://+:5000
-      # 暂时禁用Ollama服务
-      - Ollama__BaseUrl=http://localhost:11434
+      # 连接到宿主机上的Ollama服务
+      - Ollama__BaseUrl=http://host.docker.internal:11434
     volumes:
       # 持久化存储用户上传的模板和生成的视频
       - ./data/templates:/app/wwwroot/templates
