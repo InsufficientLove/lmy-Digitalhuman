@@ -243,17 +243,25 @@ namespace LmyDigitalHuman.Services
             {
                 var simpleKey = configKey.Split(':').Last();
                 configuredPath = _configuration[$"Paths:{simpleKey}"];
+                
+                // 如果还是没找到，直接尝试简化键
+                if (string.IsNullOrEmpty(configuredPath))
+                {
+                    configuredPath = _configuration[simpleKey];
+                }
             }
             
             if (!string.IsNullOrEmpty(configuredPath))
             {
-                _logger.LogDebug("使用配置路径: {ConfigKey} = {ConfiguredPath}", configKey, configuredPath);
+                _logger.LogInformation("使用配置路径: {ConfigKey} = {ConfiguredPath} (环境: {Environment})", 
+                    configKey, configuredPath, _environment.EnvironmentName);
                 return Path.IsPathRooted(configuredPath) 
                     ? Path.GetFullPath(configuredPath)
                     : Path.GetFullPath(Path.Combine(_contentRootPath, configuredPath));
             }
             
-            _logger.LogDebug("使用默认路径: {ConfigKey} = {DefaultPath}", configKey, defaultPath);
+            _logger.LogInformation("使用默认路径: {ConfigKey} = {DefaultPath} (环境: {Environment})", 
+                configKey, defaultPath, _environment.EnvironmentName);
             return Path.GetFullPath(defaultPath);
         }
     }
