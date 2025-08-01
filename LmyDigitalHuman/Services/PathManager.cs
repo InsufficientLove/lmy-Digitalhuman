@@ -52,7 +52,8 @@ namespace LmyDigitalHuman.Services
             _webRootPath = _environment.WebRootPath ?? Path.Combine(_contentRootPath, "wwwroot");
             
             // 配置各种路径，支持配置文件覆盖
-            _templatesPath = GetConfiguredPath("Paths:Templates", Path.Combine(_webRootPath, "templates"));
+            // 强制使用正确的templates路径，避免配置错误
+            _templatesPath = Path.GetFullPath(Path.Combine(_webRootPath, "templates"));
             _videosPath = GetConfiguredPath("Paths:Videos", Path.Combine(_webRootPath, "videos"));
             _tempPath = GetConfiguredPath("Paths:Temp", Path.Combine(_contentRootPath, "temp"));
             _modelsPath = GetConfiguredPath("Paths:Models", Path.Combine(_contentRootPath, "models"));
