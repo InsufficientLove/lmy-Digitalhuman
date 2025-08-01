@@ -120,14 +120,19 @@ namespace LmyDigitalHuman.Services
             if (Path.IsPathRooted(imagePath))
                 return Path.GetFullPath(imagePath);
 
-            // 对于web路径格式（如 /templates/xxx.jpg），转换为物理路径
+            // 对于web路径格式（如 /templates/xxx.jpg），直接转换为物理路径
+            if (imagePath.StartsWith("/templates/"))
+            {
+                // 直接使用已配置的_templatesPath + 文件名
+                var fileName = imagePath.Substring("/templates/".Length);
+                return Path.GetFullPath(Path.Combine(_templatesPath, fileName));
+            }
+            
+            // 对于其他web路径（如 /images/xxx.jpg）
             if (imagePath.StartsWith("/"))
             {
-                // 移除开头的斜杠，组合成物理路径
                 var relativePath = imagePath.TrimStart('/');
-                var fullPath = Path.GetFullPath(Path.Combine(_webRootPath, relativePath));
-                _logger.LogDebug("Web路径转换: {WebPath} → {PhysicalPath}", imagePath, fullPath);
-                return fullPath;
+                return Path.GetFullPath(Path.Combine(_webRootPath, relativePath));
             }
             
             // 其他情况，默认在templates目录中查找
