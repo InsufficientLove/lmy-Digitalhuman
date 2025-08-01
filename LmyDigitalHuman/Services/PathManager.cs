@@ -115,15 +115,23 @@ namespace LmyDigitalHuman.Services
         {
             if (string.IsNullOrEmpty(imagePath))
                 return _templatesPath;
+
+            // 检查是否是错误的绝对路径 C:\templates\xxx
+            if (imagePath.StartsWith("C:\\templates\\") || imagePath.StartsWith("C:/templates/"))
+            {
+                // 提取文件名，使用正确的templates路径
+                var fileName = Path.GetFileName(imagePath);
+                _logger.LogWarning("修正错误的绝对路径: {ErrorPath} → {CorrectPath}", imagePath, Path.Combine(_templatesPath, fileName));
+                return Path.GetFullPath(Path.Combine(_templatesPath, fileName));
+            }
                 
-            // 如果已经是绝对路径，直接返回
-            if (Path.IsPathRooted(imagePath))
+            // 如果是其他绝对路径且文件存在，直接返回
+            if (Path.IsPathRooted(imagePath) && File.Exists(imagePath))
                 return Path.GetFullPath(imagePath);
 
             // 对于web路径格式（如 /templates/xxx.jpg），直接转换为物理路径
             if (imagePath.StartsWith("/templates/"))
             {
-                // 直接使用已配置的_templatesPath + 文件名
                 var fileName = imagePath.Substring("/templates/".Length);
                 return Path.GetFullPath(Path.Combine(_templatesPath, fileName));
             }
