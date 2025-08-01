@@ -9,7 +9,7 @@
         "ASPNETCORE_HTTP2_ENABLED": "false"
       },
       "dotnetRunMessages": true,
-      "applicationUrl": "http://localhost:5001"
+      "applicationUrl": "http://localhost:5000"
     },
     "https": {
       "commandName": "Project",
@@ -20,7 +20,7 @@
         "ASPNETCORE_HTTP2_ENABLED": "false"
       },
       "dotnetRunMessages": true,
-      "applicationUrl": "https://localhost:7001;http://localhost:5001"
+      "applicationUrl": "https://localhost:7000;http://localhost:5000"
     },
     "IIS Express": {
       "commandName": "IISExpress",
