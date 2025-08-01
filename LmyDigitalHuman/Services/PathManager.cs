@@ -52,8 +52,7 @@ namespace LmyDigitalHuman.Services
             _webRootPath = _environment.WebRootPath ?? Path.Combine(_contentRootPath, "wwwroot");
             
             // 配置各种路径，支持配置文件覆盖
-            // 强制使用正确的templates路径，避免配置错误
-            _templatesPath = Path.GetFullPath(Path.Combine(_webRootPath, "templates"));
+            _templatesPath = GetConfiguredPath("Paths:Templates", Path.Combine(_webRootPath, "templates"));
             _videosPath = GetConfiguredPath("Paths:Videos", Path.Combine(_webRootPath, "videos"));
             _tempPath = GetConfiguredPath("Paths:Temp", Path.Combine(_contentRootPath, "temp"));
             _modelsPath = GetConfiguredPath("Paths:Models", Path.Combine(_contentRootPath, "models"));
@@ -236,14 +235,25 @@ namespace LmyDigitalHuman.Services
 
         private string GetConfiguredPath(string configKey, string defaultPath)
         {
+            // 首先尝试完整的配置键 (如 "Paths:Templates")
             var configuredPath = _configuration[configKey];
+            
+            // 如果没有找到，尝试简化的键 (如 "Templates")，主要用于Docker环境
+            if (string.IsNullOrEmpty(configuredPath) && configKey.Contains(":"))
+            {
+                var simpleKey = configKey.Split(':').Last();
+                configuredPath = _configuration[$"Paths:{simpleKey}"];
+            }
+            
             if (!string.IsNullOrEmpty(configuredPath))
             {
+                _logger.LogDebug("使用配置路径: {ConfigKey} = {ConfiguredPath}", configKey, configuredPath);
                 return Path.IsPathRooted(configuredPath) 
                     ? Path.GetFullPath(configuredPath)
                     : Path.GetFullPath(Path.Combine(_contentRootPath, configuredPath));
             }
             
+            _logger.LogDebug("使用默认路径: {ConfigKey} = {DefaultPath}", configKey, defaultPath);
             return Path.GetFullPath(defaultPath);
         }
     }
