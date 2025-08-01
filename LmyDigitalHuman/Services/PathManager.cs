@@ -72,6 +72,9 @@ namespace LmyDigitalHuman.Services
             _logger.LogInformation("  Temp: {Temp}", _tempPath);
             _logger.LogInformation("  Models: {Models}", _modelsPath);
             _logger.LogInformation("  Scripts: {Scripts}", _scriptsPath);
+            
+            // 验证templates目录是否存在
+            _logger.LogInformation("Templates目录存在: {Exists}", Directory.Exists(_templatesPath));
         }
 
         public string GetContentRootPath() => _contentRootPath;
@@ -110,11 +113,9 @@ namespace LmyDigitalHuman.Services
 
         public string ResolveImagePath(string imagePath)
         {
+            // 直接使用已经配置好的_templatesPath，它在构造函数中已经正确设置
             if (string.IsNullOrEmpty(imagePath))
-            {
-                var webRoot = string.IsNullOrEmpty(_webRootPath) ? Path.Combine(_contentRootPath, "wwwroot") : _webRootPath;
-                return Path.GetFullPath(Path.Combine(webRoot, "templates"));
-            }
+                return _templatesPath;
                 
             if (Path.IsPathRooted(imagePath))
                 return Path.GetFullPath(imagePath);
@@ -122,19 +123,16 @@ namespace LmyDigitalHuman.Services
             // 移除开头的斜杠
             var relativePath = imagePath.TrimStart('/', '\\');
             
-            _logger.LogDebug("ResolveImagePath调试: 原始路径={OriginalPath}, 相对路径={RelativePath}, WebRoot={WebRoot}", 
-                imagePath, relativePath, _webRootPath);
+            _logger.LogDebug("ResolveImagePath调试: 原始路径={OriginalPath}, 相对路径={RelativePath}, TemplatesPath={TemplatesPath}", 
+                imagePath, relativePath, _templatesPath);
             
             // 检查是否是web路径格式
             if (relativePath.StartsWith("templates/") || relativePath.StartsWith("templates\\"))
             {
-                // 移除templates前缀，直接使用wwwroot/templates
+                // 移除templates前缀，直接使用_templatesPath
                 var fileName = relativePath.Substring("templates/".Length);
-                
-                // 确保使用正确的webroot路径
-                var webRoot = string.IsNullOrEmpty(_webRootPath) ? Path.Combine(_contentRootPath, "wwwroot") : _webRootPath;
-                var fullPath = Path.GetFullPath(Path.Combine(webRoot, "templates", fileName));
-                _logger.LogDebug("Templates路径解析: 文件名={FileName}, WebRoot={WebRoot}, 完整路径={FullPath}", fileName, webRoot, fullPath);
+                var fullPath = Path.GetFullPath(Path.Combine(_templatesPath, fileName));
+                _logger.LogDebug("Templates路径解析: 文件名={FileName}, TemplatesPath={TemplatesPath}, 完整路径={FullPath}", fileName, _templatesPath, fullPath);
                 return fullPath;
             }
             else if (relativePath.StartsWith("images/") || relativePath.StartsWith("images\\"))
@@ -144,9 +142,8 @@ namespace LmyDigitalHuman.Services
             }
             else
             {
-                // 默认所有模板文件都在wwwroot/templates目录中
-                var webRoot = string.IsNullOrEmpty(_webRootPath) ? Path.Combine(_contentRootPath, "wwwroot") : _webRootPath;
-                return Path.GetFullPath(Path.Combine(webRoot, "templates", relativePath));
+                // 默认所有模板文件都在templates目录中
+                return Path.GetFullPath(Path.Combine(_templatesPath, relativePath));
             }
         }
 
