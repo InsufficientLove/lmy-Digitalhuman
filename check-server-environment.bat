@@ -147,7 +147,7 @@ if "%ALL_GOOD%"=="true" (
 
 echo 💡 提示：
 echo    - VS调试使用系统Python环境
-echo    - Docker部署使用容器内Python环境  
+echo    - Docker部署使用容器内Python环境
 echo    - 两种模式可以并存，互不干扰
 echo.
 
