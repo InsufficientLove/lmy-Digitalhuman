@@ -41,7 +41,12 @@ namespace LmyDigitalHuman.Services
             _cache = cache;
             _pathManager = pathManager;
             
-            _pythonPath = DetectPythonPath(configuration["DigitalHuman:MuseTalk:PythonPath"] ?? "python");
+            // 使用Python环境服务获取最佳路径
+            _pythonPath = configuration["DigitalHuman:MuseTalk:PythonPath"];
+            if (string.IsNullOrEmpty(_pythonPath))
+            {
+                _pythonPath = "python"; // 临时默认值，运行时会通过PythonEnvironmentService获取
+            }
             _museTalkScriptPath = _pathManager.ResolvePath("musetalk_service_complete.py");
             
             _logger.LogInformation("MuseTalk Python路径: {PythonPath}", _pythonPath);
@@ -766,12 +771,15 @@ namespace LmyDigitalHuman.Services
         {
             try
             {
-                _logger.LogInformation("执行Python命令: {PythonPath} {Arguments}", _pythonPath, arguments);
+                // 使用Python环境服务获取最佳Python路径
+                var bestPythonPath = await _pythonEnvironmentService.GetRecommendedPythonPathAsync();
+                
+                _logger.LogInformation("执行Python命令: {PythonPath} {Arguments}", bestPythonPath, arguments);
                 _logger.LogInformation("工作目录: {WorkingDirectory}", _pathManager.GetContentRootPath());
                 
                 var processInfo = new ProcessStartInfo
                 {
-                    FileName = _pythonPath,
+                    FileName = bestPythonPath,
                     Arguments = arguments,
                     UseShellExecute = false,
                     RedirectStandardOutput = true,
@@ -786,12 +794,12 @@ namespace LmyDigitalHuman.Services
                 processInfo.Environment["PYTHONUTF8"] = "1";
                 
                 // 配置虚拟环境
-                ConfigureVirtualEnvironment(processInfo);
+                ConfigureVirtualEnvironment(processInfo, bestPythonPath);
                 
                 // 检查Python路径和脚本文件是否存在
-                if (!File.Exists(_pythonPath) && !_pythonPath.Equals("python", StringComparison.OrdinalIgnoreCase))
+                if (!File.Exists(bestPythonPath) && !bestPythonPath.Equals("python", StringComparison.OrdinalIgnoreCase))
                 {
-                    _logger.LogError("Python可执行文件不存在: {PythonPath}", _pythonPath);
+                    _logger.LogError("Python可执行文件不存在: {PythonPath}", bestPythonPath);
                     return new PythonResult
                     {
                         Success = false,
@@ -979,12 +987,11 @@ namespace LmyDigitalHuman.Services
             return _totalProcessedJobs > 0 ? 0.3 : 0; // 假设30%的命中率
         }
 
-        private void ConfigureVirtualEnvironment(ProcessStartInfo processInfo)
+        private void ConfigureVirtualEnvironment(ProcessStartInfo processInfo, string pythonPath)
         {
             try
             {
                 // 检查是否使用虚拟环境
-                var pythonPath = _pythonPath;
                 if (pythonPath.Contains("venv_musetalk"))
                 {
                     _logger.LogInformation("配置虚拟环境: {PythonPath}", pythonPath);

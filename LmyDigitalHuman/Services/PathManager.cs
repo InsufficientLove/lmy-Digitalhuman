@@ -122,9 +122,9 @@ namespace LmyDigitalHuman.Services
             // 检查是否是web路径格式
             if (relativePath.StartsWith("templates/") || relativePath.StartsWith("templates\\"))
             {
-                // 移除templates前缀
+                // 移除templates前缀，直接使用wwwroot/templates
                 var fileName = relativePath.Substring("templates/".Length);
-                return Path.GetFullPath(Path.Combine(_templatesPath, fileName));
+                return Path.GetFullPath(Path.Combine(_webRootPath, "templates", fileName));
             }
             else if (relativePath.StartsWith("images/") || relativePath.StartsWith("images\\"))
             {
@@ -133,8 +133,8 @@ namespace LmyDigitalHuman.Services
             }
             else
             {
-                // 默认所有模板文件都在templates目录中
-                return Path.GetFullPath(Path.Combine(_templatesPath, relativePath));
+                // 默认所有模板文件都在wwwroot/templates目录中
+                return Path.GetFullPath(Path.Combine(_webRootPath, "templates", relativePath));
             }
         }
 
