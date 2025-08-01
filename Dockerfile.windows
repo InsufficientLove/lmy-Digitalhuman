@@ -2,7 +2,7 @@
 # 适用于Windows Server 2019
 
 # ===== 阶段1: .NET 构建阶段 =====
-FROM mcr.microsoft.com/dotnet/sdk:8.0-nanoserver-ltsc2019 AS build
+FROM mcr.microsoft.com/dotnet/sdk:8.0-windowsservercore-ltsc2019 AS build
 WORKDIR /src
 
 # 复制项目文件并还原依赖
@@ -18,7 +18,7 @@ RUN dotnet build "LmyDigitalHuman.csproj" -c Release -o /app/build
 RUN dotnet publish "LmyDigitalHuman.csproj" -c Release -o /app/publish
 
 # ===== 阶段2: 运行时阶段 =====
-FROM mcr.microsoft.com/dotnet/aspnet:8.0-nanoserver-ltsc2019 AS final
+FROM mcr.microsoft.com/dotnet/aspnet:8.0-windowsservercore-ltsc2019 AS final
 WORKDIR /app
 
 # 安装Python (使用Chocolatey)
