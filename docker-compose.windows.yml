@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  # 数字人主服务 (Windows容器版本)
+  digitalhuman:
+    build:
+      context: .
+      dockerfile: Dockerfile.windows
+    container_name: lmy-digitalhuman-windows
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Docker
+      - ASPNETCORE_URLS=http://+:5000
+      # 连接到宿主机上的Ollama服务
+      - Ollama__BaseUrl=http://host.docker.internal:11434
+    volumes:
+      # 持久化存储用户上传的模板和生成的视频
+      - ./data/templates:C:/app/wwwroot/templates
+      - ./data/videos:C:/app/wwwroot/videos
+      - ./data/temp:C:/app/temp
+      - ./data/logs:C:/app/logs
+      # 如果有预训练模型，可以挂载到容器中
+      - ./models:C:/app/models
+    healthcheck:
+      test: ["CMD", "powershell", "-Command", "try { Invoke-WebRequest -Uri http://localhost:5000/health -UseBasicParsing | Out-Null; exit 0 } catch { exit 1 }"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  default:
+    driver: nat
+
+volumes:
+  digitalhuman_data:
+    driver: local
