@@ -111,7 +111,10 @@ namespace LmyDigitalHuman.Services
         public string ResolveImagePath(string imagePath)
         {
             if (string.IsNullOrEmpty(imagePath))
-                return _templatesPath;
+            {
+                var webRoot = string.IsNullOrEmpty(_webRootPath) ? Path.Combine(_contentRootPath, "wwwroot") : _webRootPath;
+                return Path.GetFullPath(Path.Combine(webRoot, "templates"));
+            }
                 
             if (Path.IsPathRooted(imagePath))
                 return Path.GetFullPath(imagePath);
@@ -119,12 +122,20 @@ namespace LmyDigitalHuman.Services
             // 移除开头的斜杠
             var relativePath = imagePath.TrimStart('/', '\\');
             
+            _logger.LogDebug("ResolveImagePath调试: 原始路径={OriginalPath}, 相对路径={RelativePath}, WebRoot={WebRoot}", 
+                imagePath, relativePath, _webRootPath);
+            
             // 检查是否是web路径格式
             if (relativePath.StartsWith("templates/") || relativePath.StartsWith("templates\\"))
             {
                 // 移除templates前缀，直接使用wwwroot/templates
                 var fileName = relativePath.Substring("templates/".Length);
-                return Path.GetFullPath(Path.Combine(_webRootPath, "templates", fileName));
+                
+                // 确保使用正确的webroot路径
+                var webRoot = string.IsNullOrEmpty(_webRootPath) ? Path.Combine(_contentRootPath, "wwwroot") : _webRootPath;
+                var fullPath = Path.GetFullPath(Path.Combine(webRoot, "templates", fileName));
+                _logger.LogDebug("Templates路径解析: 文件名={FileName}, WebRoot={WebRoot}, 完整路径={FullPath}", fileName, webRoot, fullPath);
+                return fullPath;
             }
             else if (relativePath.StartsWith("images/") || relativePath.StartsWith("images\\"))
             {
@@ -134,7 +145,8 @@ namespace LmyDigitalHuman.Services
             else
             {
                 // 默认所有模板文件都在wwwroot/templates目录中
-                return Path.GetFullPath(Path.Combine(_webRootPath, "templates", relativePath));
+                var webRoot = string.IsNullOrEmpty(_webRootPath) ? Path.Combine(_contentRootPath, "wwwroot") : _webRootPath;
+                return Path.GetFullPath(Path.Combine(webRoot, "templates", relativePath));
             }
         }
 
