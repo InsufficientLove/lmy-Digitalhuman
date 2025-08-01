@@ -113,38 +113,25 @@ namespace LmyDigitalHuman.Services
 
         public string ResolveImagePath(string imagePath)
         {
-            // 直接使用已经配置好的_templatesPath，它在构造函数中已经正确设置
             if (string.IsNullOrEmpty(imagePath))
                 return _templatesPath;
                 
+            // 如果已经是绝对路径，直接返回
             if (Path.IsPathRooted(imagePath))
                 return Path.GetFullPath(imagePath);
 
-            // 移除开头的斜杠
-            var relativePath = imagePath.TrimStart('/', '\\');
-            
-            _logger.LogDebug("ResolveImagePath调试: 原始路径={OriginalPath}, 相对路径={RelativePath}, TemplatesPath={TemplatesPath}", 
-                imagePath, relativePath, _templatesPath);
-            
-            // 检查是否是web路径格式
-            if (relativePath.StartsWith("templates/") || relativePath.StartsWith("templates\\"))
+            // 对于web路径格式（如 /templates/xxx.jpg），转换为物理路径
+            if (imagePath.StartsWith("/"))
             {
-                // 移除templates前缀，直接使用_templatesPath
-                var fileName = relativePath.Substring("templates/".Length);
-                var fullPath = Path.GetFullPath(Path.Combine(_templatesPath, fileName));
-                _logger.LogDebug("Templates路径解析: 文件名={FileName}, TemplatesPath={TemplatesPath}, 完整路径={FullPath}", fileName, _templatesPath, fullPath);
+                // 移除开头的斜杠，组合成物理路径
+                var relativePath = imagePath.TrimStart('/');
+                var fullPath = Path.GetFullPath(Path.Combine(_webRootPath, relativePath));
+                _logger.LogDebug("Web路径转换: {WebPath} → {PhysicalPath}", imagePath, fullPath);
                 return fullPath;
             }
-            else if (relativePath.StartsWith("images/") || relativePath.StartsWith("images\\"))
-            {
-                // 处理images路径
-                return Path.GetFullPath(Path.Combine(_webRootPath, relativePath));
-            }
-            else
-            {
-                // 默认所有模板文件都在templates目录中
-                return Path.GetFullPath(Path.Combine(_templatesPath, relativePath));
-            }
+            
+            // 其他情况，默认在templates目录中查找
+            return Path.GetFullPath(Path.Combine(_templatesPath, imagePath));
         }
 
         public string ResolveAudioPath(string audioPath)

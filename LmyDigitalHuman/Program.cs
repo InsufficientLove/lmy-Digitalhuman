@@ -83,6 +83,11 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+// 启动时显示环境信息
+app.Logger.LogInformation("🌍 当前运行环境: {Environment}", app.Environment.EnvironmentName);
+app.Logger.LogInformation("📁 内容根目录: {ContentRoot}", app.Environment.ContentRootPath);
+app.Logger.LogInformation("🌐 Web根目录: {WebRoot}", app.Environment.WebRootPath);
+
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
