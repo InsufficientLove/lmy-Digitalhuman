@@ -13,8 +13,8 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Docker
       - ASPNETCORE_URLS=http://+:5000
-      # Ollama服务地址
-      - Ollama__BaseUrl=http://ollama:11434
+      # 暂时禁用Ollama服务
+      - Ollama__BaseUrl=http://localhost:11434
     volumes:
       # 持久化存储用户上传的模板和生成的视频
       - ./data/templates:/app/wwwroot/templates
@@ -25,43 +25,17 @@ services:
       - ./models:/app/models
     networks:
       - digitalhuman-network
-    depends_on:
-      - ollama
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/api/diagnostics/system-info"]
+      test: ["CMD-SHELL", "curl -f http://localhost:5000/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
-
-  # Ollama LLM服务
-  ollama:
-    image: ollama/ollama:latest
-    container_name: ollama-service
-    restart: unless-stopped
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    environment:
-      - OLLAMA_HOST=0.0.0.0
-    networks:
-      - digitalhuman-network
-    # 如果服务器支持GPU
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: 1
-    #           capabilities: [gpu]
-
-
 
 networks:
   digitalhuman-network:
     driver: bridge
 
 volumes:
-  ollama_data:
+  digitalhuman_data:
     driver: local
