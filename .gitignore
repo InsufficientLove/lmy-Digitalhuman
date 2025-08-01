@@ -23,6 +23,7 @@ __pycache__/
 
 # 部署相关
 deploy-python-env.log
+environment-check.log
 
 # Visual Studio
 .vs/
