@@ -21,8 +21,8 @@
 
 1. **安装Docker Engine**
 ```cmd
-# 以管理员身份运行
-powershell -ExecutionPolicy Bypass -File install-docker.ps1 -DisableHyperV
+# 以管理员身份运行PowerShell
+powershell -ExecutionPolicy Bypass -File setup-docker-simple.ps1 -DisableHyperV
 # 重启服务器
 ```
 
@@ -68,7 +68,7 @@ lmy-Digitalhuman/
 │   └── digital-human-test.html  # 测试页面
 ├── docker-compose.yml       # Docker编排
 ├── Dockerfile              # Docker镜像
-├── install-docker.ps1      # Docker安装脚本
+├── setup-docker-simple.ps1  # Docker安装脚本
 └── deploy-app.bat          # 应用部署脚本
 ```
 
