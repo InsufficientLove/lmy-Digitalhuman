@@ -14,6 +14,7 @@ namespace LmyDigitalHuman.Services
         private readonly IConfiguration _configuration;
         private readonly IMemoryCache _cache;
         private readonly IPathManager _pathManager;
+        private readonly IPythonEnvironmentService _pythonEnvironmentService;
         private readonly string _pythonPath;
         private readonly string _museTalkScriptPath;
         
@@ -34,12 +35,14 @@ namespace LmyDigitalHuman.Services
             ILogger<MuseTalkService> logger,
             IConfiguration configuration,
             IMemoryCache cache,
-            IPathManager pathManager)
+            IPathManager pathManager,
+            IPythonEnvironmentService pythonEnvironmentService)
         {
             _logger = logger;
             _configuration = configuration;
             _cache = cache;
             _pathManager = pathManager;
+            _pythonEnvironmentService = pythonEnvironmentService;
             
             // 使用Python环境服务获取最佳路径
             _pythonPath = configuration["DigitalHuman:MuseTalk:PythonPath"];
@@ -94,56 +97,16 @@ namespace LmyDigitalHuman.Services
                 _logger.LogInformation("  解析音频路径: {ResolvedAudioPath}", fullAudioPath);
                 _logger.LogInformation("  音频文件存在: {AudioExists}", File.Exists(fullAudioPath));
                 
-                // 图片路径验证 - 如果是Web路径且文件不存在，尝试其他方式
+                // 图片路径验证
                 if (!File.Exists(fullImagePath))
                 {
-                    _logger.LogWarning("图片文件不存在，尝试其他路径解析方式...");
-                    
-                    // 尝试直接在templates目录查找
-                    if (request.AvatarImagePath.StartsWith("/templates/"))
-                    {
-                        var fileName = request.AvatarImagePath.Substring("/templates/".Length);
-                        var alternativePath = Path.Combine(_pathManager.GetTemplatesPath(), fileName);
-                        _logger.LogInformation("  尝试备用路径: {AlternativePath}", alternativePath);
-                        
-                        if (File.Exists(alternativePath))
-                        {
-                            fullImagePath = alternativePath;
-                            _logger.LogInformation("  使用备用路径成功");
-                        }
-                    }
+                    _logger.LogError("图片文件不存在: {ImagePath}", fullImagePath);
                 }
                 
-                // 音频路径验证 - 如果是相对路径且文件不存在，尝试其他方式
+                // 音频路径验证
                 if (!File.Exists(fullAudioPath))
                 {
-                    _logger.LogWarning("音频文件不存在，尝试其他路径解析方式...");
-                    
-                    // 尝试直接在temp目录查找
-                    if (request.AudioPath.StartsWith("temp/"))
-                    {
-                        var fileName = request.AudioPath.Substring("temp/".Length);
-                        var alternativePath = Path.Combine(_pathManager.GetTempPath(), fileName);
-                        _logger.LogInformation("  尝试备用路径: {AlternativePath}", alternativePath);
-                        
-                        if (File.Exists(alternativePath))
-                        {
-                            fullAudioPath = alternativePath;
-                            _logger.LogInformation("  使用备用路径成功");
-                        }
-                    }
-                    else if (!Path.IsPathRooted(request.AudioPath))
-                    {
-                        // 尝试作为相对于temp目录的路径
-                        var alternativePath = Path.Combine(_pathManager.GetTempPath(), request.AudioPath);
-                        _logger.LogInformation("  尝试temp相对路径: {AlternativePath}", alternativePath);
-                        
-                        if (File.Exists(alternativePath))
-                        {
-                            fullAudioPath = alternativePath;
-                            _logger.LogInformation("  使用temp相对路径成功");
-                        }
-                    }
+                    _logger.LogError("音频文件不存在: {AudioPath}", fullAudioPath);
                 }
                 
                 // 最终验证
