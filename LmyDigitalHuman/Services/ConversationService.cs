@@ -54,6 +54,90 @@ namespace LmyDigitalHuman.Services
             _realtimeSemaphore = new SemaphoreSlim(maxRealtimeConcurrency, maxRealtimeConcurrency);
         }
 
+        public async Task<ConversationResponse> GenerateWelcomeVideoAsync(WelcomeVideoRequest request)
+        {
+            var stopwatch = Stopwatch.StartNew();
+            
+            try
+            {
+                _logger.LogInformation("开始生成欢迎视频: TemplateId={TemplateId}", request.TemplateId);
+
+                // 获取模板信息
+                var template = await _templateService.GetTemplateByIdAsync(request.TemplateId);
+                if (template == null)
+                {
+                    return new ConversationResponse
+                    {
+                        Success = false,
+                        Message = "模板不存在"
+                    };
+                }
+
+                // 生成欢迎语
+                var welcomeText = $"你好，我是{template.TemplateName}，欢迎咨询！";
+                
+                // 直接生成TTS，不经过LLM
+                var ttsOutputPath = _pathManager.CreateTempAudioPath("wav");
+                var ttsRequest = new TTSRequest
+                {
+                    Text = welcomeText,
+                    Voice = template.DefaultVoiceSettings?.Voice ?? "zh-CN-XiaoxiaoNeural",
+                    Rate = template.DefaultVoiceSettings?.Rate ?? "medium",
+                    Pitch = template.DefaultVoiceSettings?.Pitch ?? "medium",
+                    Emotion = "friendly",
+                    OutputPath = ttsOutputPath
+                };
+                
+                var ttsResult = await _audioPipelineService.ConvertTextToSpeechAsync(ttsRequest);
+                
+                if (!ttsResult.Success)
+                {
+                    return new ConversationResponse
+                    {
+                        Success = false,
+                        Message = "TTS生成失败: " + ttsResult.Error
+                    };
+                }
+
+                // 生成数字人视频
+                var videoResponse = await _museTalkService.GenerateVideoAsync(new DigitalHumanRequest
+                {
+                    AvatarImagePath = template.ImagePath,
+                    AudioPath = ttsResult.AudioPath,
+                    Quality = request.Quality,
+                    EnableEmotion = true,
+                    CacheKey = $"welcome_{request.TemplateId}_{request.Quality}"
+                });
+
+                stopwatch.Stop();
+
+                return new ConversationResponse
+                {
+                    Success = videoResponse.Success,
+                    Message = videoResponse.Message,
+                    InputText = "模板选择",
+                    ResponseText = welcomeText,
+                    VideoUrl = videoResponse.VideoUrl,
+                    AudioUrl = $"/temp/{Path.GetFileName(ttsResult.AudioPath)}",
+                    DetectedEmotion = "friendly",
+                    ProcessingTime = $"{stopwatch.ElapsedMilliseconds}ms",
+                    FromCache = false
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "生成欢迎视频失败");
+                stopwatch.Stop();
+                
+                return new ConversationResponse
+                {
+                    Success = false,
+                    Message = ex.Message,
+                    ProcessingTime = $"{stopwatch.ElapsedMilliseconds}ms"
+                };
+            }
+        }
+
         public async Task<ConversationResponse> ProcessTextConversationAsync(TextConversationRequest request)
         {
             var stopwatch = Stopwatch.StartNew();

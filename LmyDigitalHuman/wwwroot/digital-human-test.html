@@ -838,6 +838,46 @@
             document.getElementById('currentTemplate').textContent = template.templateName;
             
             addLog(`已选择模板: ${template.templateName}`, 'info');
+            
+            // 立即生成欢迎视频
+            generateWelcomeVideo(template);
+        }
+
+        async function generateWelcomeVideo(template) {
+            addLog('正在生成欢迎视频...', 'info');
+            updateProcessingStatus('生成欢迎视频中...');
+            updateProgress(20);
+
+            try {
+                const response = await fetch('/api/conversation/welcome', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        templateId: template.templateId,
+                        quality: 'medium'
+                    })
+                });
+
+                updateProgress(80);
+                const result = await response.json();
+                updateProgress(100);
+
+                if (result.success) {
+                    displayVideo(result.videoUrl);
+                    addLog(`欢迎视频生成成功! 耗时: ${result.processingTime}ms`, 'success');
+                    updateProcessingStatus('欢迎视频已就绪');
+                } else {
+                    addLog(`欢迎视频生成失败: ${result.message}`, 'error');
+                    updateProcessingStatus('欢迎视频生成失败');
+                }
+            } catch (error) {
+                addLog(`生成欢迎视频错误: ${error.message}`, 'error');
+                updateProcessingStatus('欢迎视频生成失败');
+            } finally {
+                setTimeout(() => updateProgress(0), 1000);
+            }
         }
 
         async function sendTextMessage() {

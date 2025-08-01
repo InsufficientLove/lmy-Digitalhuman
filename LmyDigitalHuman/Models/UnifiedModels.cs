@@ -177,6 +177,15 @@ namespace LmyDigitalHuman.Models
     // ==================== 对话相关 ====================
 
     /// <summary>
+    /// 欢迎视频请求
+    /// </summary>
+    public class WelcomeVideoRequest
+    {
+        public string TemplateId { get; set; } = string.Empty;
+        public string Quality { get; set; } = "medium";
+    }
+
+    /// <summary>
     /// 文本对话请求
     /// </summary>
     public class TextConversationRequest

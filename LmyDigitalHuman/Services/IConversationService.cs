@@ -8,6 +8,7 @@ namespace LmyDigitalHuman.Services
     public interface IConversationService
     {
         // 非实时对话
+        Task<ConversationResponse> GenerateWelcomeVideoAsync(WelcomeVideoRequest request);
         Task<ConversationResponse> ProcessTextConversationAsync(TextConversationRequest request);
         Task<ConversationResponse> ProcessAudioConversationAsync(AudioConversationRequest request);
 

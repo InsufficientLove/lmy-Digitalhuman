@@ -31,6 +31,39 @@ namespace LmyDigitalHuman.Controllers
         }
 
         /// <summary>
+        /// 生成欢迎视频 - 选择模板时调用
+        /// </summary>
+        [HttpPost("welcome")]
+        public async Task<IActionResult> GenerateWelcomeVideo([FromBody] WelcomeVideoRequest request)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(request.TemplateId))
+                {
+                    return BadRequest(new { error = "模板ID不能为空" });
+                }
+
+                _logger.LogInformation("生成欢迎视频: TemplateId={TemplateId}", request.TemplateId);
+
+                var response = await _conversationService.GenerateWelcomeVideoAsync(request);
+                
+                if (response.Success)
+                {
+                    return Ok(response);
+                }
+                else
+                {
+                    return BadRequest(new { error = response.Message });
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "生成欢迎视频失败");
+                return StatusCode(500, new { error = "生成欢迎视频失败", details = ex.Message });
+            }
+        }
+
+        /// <summary>
         /// 文本对话 - 非实时
         /// </summary>
         [HttpPost("text")]
@@ -371,6 +404,16 @@ namespace LmyDigitalHuman.Controllers
                 return StatusCode(500, new { error = "预加载模板失败", details = ex.Message });
             }
         }
+    }
+
+    /// <summary>
+    /// 欢迎视频请求
+    /// </summary>
+    public class WelcomeVideoRequest
+    {
+        [Required]
+        public string TemplateId { get; set; } = string.Empty;
+        public string Quality { get; set; } = "medium";
     }
 
     /// <summary>
