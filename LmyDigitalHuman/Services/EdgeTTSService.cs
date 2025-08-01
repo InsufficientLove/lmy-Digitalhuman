@@ -35,12 +35,14 @@ namespace LmyDigitalHuman.Services
         };
 
         private readonly IPathManager _pathManager;
+        private readonly IPythonEnvironmentService _pythonEnvironmentService;
 
-        public EdgeTTSService(ILogger<EdgeTTSService> logger, IConfiguration configuration, IPathManager pathManager)
+        public EdgeTTSService(ILogger<EdgeTTSService> logger, IConfiguration configuration, IPathManager pathManager, IPythonEnvironmentService pythonEnvironmentService)
         {
             _logger = logger;
             _configuration = configuration;
             _pathManager = pathManager;
+            _pythonEnvironmentService = pythonEnvironmentService;
             _outputPath = _configuration["RealtimeDigitalHuman:EdgeTTS:OutputPath"] ?? "temp";
             _defaultVoice = _configuration["RealtimeDigitalHuman:EdgeTTS:DefaultVoice"] ?? "zh-CN-XiaoxiaoNeural";
             
@@ -369,27 +371,22 @@ namespace LmyDigitalHuman.Services
         {
             try
             {
-                // 使用MuseTalk虚拟环境的Python路径
-                var configuredPythonPath = _configuration["DigitalHuman:MuseTalk:PythonPath"] ?? 
-                    _configuration["RealtimeDigitalHuman:SadTalker:PythonPath"] ?? 
-                    _configuration["RealtimeDigitalHuman:Whisper:PythonPath"] ?? 
-                    "python";
+                // 使用Python环境检测服务获取最佳Python路径
+                var pythonPath = await _pythonEnvironmentService.GetRecommendedPythonPathAsync();
                 
-                // 解析Python路径（支持相对路径）
-                var pythonPath = configuredPythonPath;
-                if (!string.IsNullOrEmpty(configuredPythonPath) && 
-                    configuredPythonPath != "python" && 
-                    !Path.IsPathRooted(configuredPythonPath))
+                // 验证Python环境是否支持edge-tts
+                var isValid = await _pythonEnvironmentService.ValidatePythonEnvironmentAsync(pythonPath, "edge_tts");
+                if (!isValid)
                 {
-                    pythonPath = _pathManager.ResolvePath(configuredPythonPath);
-                    _logger.LogInformation("EdgeTTS Python路径解析: {Original} → {Resolved}", configuredPythonPath, pythonPath);
-                }
-                
-                // 验证Python路径
-                if (!File.Exists(pythonPath) && pythonPath != "python")
-                {
-                    _logger.LogWarning("EdgeTTS Python路径不存在: {PythonPath}，回退到系统python", pythonPath);
-                    pythonPath = "python";
+                    _logger.LogWarning("检测到的Python环境不支持edge-tts: {PythonPath}", pythonPath);
+                    
+                    // 尝试安装edge-tts包
+                    var installResult = await TryInstallEdgeTTSAsync(pythonPath);
+                    if (!installResult)
+                    {
+                        _logger.LogError("无法在Python环境中安装edge-tts包: {PythonPath}", pythonPath);
+                        return (false, "", "Python环境不支持edge-tts且无法自动安装");
+                    }
                 }
 
                 var processInfo = new ProcessStartInfo
@@ -444,6 +441,58 @@ namespace LmyDigitalHuman.Services
             {
                 _logger.LogError(ex, "运行edge-tts命令失败");
                 return (false, "", ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// 尝试安装edge-tts包
+        /// </summary>
+        private async Task<bool> TryInstallEdgeTTSAsync(string pythonPath)
+        {
+            try
+            {
+                _logger.LogInformation("尝试安装edge-tts包: {PythonPath}", pythonPath);
+                
+                var processInfo = new ProcessStartInfo
+                {
+                    FileName = pythonPath,
+                    Arguments = "-m pip install edge-tts",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    WorkingDirectory = Directory.GetCurrentDirectory()
+                };
+
+                using var process = Process.Start(processInfo);
+                if (process == null)
+                {
+                    return false;
+                }
+
+                var completed = await process.WaitForExitAsync(TimeSpan.FromMinutes(5));
+                if (!completed)
+                {
+                    try { process.Kill(true); } catch { }
+                    return false;
+                }
+
+                if (process.ExitCode == 0)
+                {
+                    _logger.LogInformation("成功安装edge-tts包");
+                    return true;
+                }
+                else
+                {
+                    var error = await process.StandardError.ReadToEndAsync();
+                    _logger.LogWarning("安装edge-tts包失败: {Error}", error);
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "安装edge-tts包时发生异常");
+                return false;
             }
         }
 

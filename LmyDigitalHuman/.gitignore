@@ -86,8 +86,12 @@ __pycache__/
 venv/
 env/
 .venv/
+venv_musetalk/
 sadtalker_venv/
 sadtalker_env/
+
+# Python 包管理
+requirements_generated.txt
 
 # SadTalker 模型文件
 checkpoints/*

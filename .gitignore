@@ -13,6 +13,16 @@ artifacts/
 venv/
 env/
 .venv/
+venv_musetalk/
+
+# Python 包管理和生成文件
+requirements_generated.txt
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 部署相关
+deploy-python-env.log
 
 # Visual Studio
 .vs/
