@@ -1,0 +1,83 @@
+version: '3.8'
+
+services:
+  # 数字人主服务
+  digitalhuman:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lmy-digitalhuman
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:5000
+      # Ollama服务地址（如果Ollama在另一个容器或主机上）
+      - Ollama__BaseUrl=http://ollama:11434
+    volumes:
+      # 持久化存储用户上传的模板和生成的视频
+      - ./data/templates:/app/wwwroot/templates
+      - ./data/videos:/app/wwwroot/videos
+      - ./data/temp:/app/temp
+      - ./data/logs:/app/logs
+      # 如果有预训练模型，可以挂载到容器中
+      - ./models:/app/models
+    networks:
+      - digitalhuman-network
+    depends_on:
+      - ollama
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/diagnostics/system-info"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Ollama LLM服务
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama-service
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    networks:
+      - digitalhuman-network
+    # 如果服务器支持GPU
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+  # Nginx反向代理（可选）
+  nginx:
+    image: nginx:alpine
+    container_name: digitalhuman-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    networks:
+      - digitalhuman-network
+    depends_on:
+      - digitalhuman
+    profiles:
+      - production  # 只在生产环境启用
+
+networks:
+  digitalhuman-network:
+    driver: bridge
+
+volumes:
+  ollama_data:
+    driver: local
