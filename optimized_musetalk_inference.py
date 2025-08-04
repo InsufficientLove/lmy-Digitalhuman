@@ -445,57 +445,61 @@ class OptimizedMuseTalkInference:
         audio_time = time.time() - audio_start
         print(f"[OK] 音频特征提取完成: {audio_time:.2f}s, 共 {len(whisper_chunks)} 帧")
         
-        # 2. 并行GPU推理
-        print("🎮 开始4GPU并行推理...")
+        # 2. 🚀 优化单GPU高速推理（避免多GPU通信开销）
+        print("🎮 开始优化GPU推理...")
         inference_start = time.time()
         
-        # 将任务分配给4个GPU
-        video_num = len(whisper_chunks)
-        batch_size = self.config.batch_size
+        # 🚀 优化：使用单GPU，增大批处理大小
+        gpu_id = 0
+        model = self.models[gpu_id]
+        device = model['device']
+        
+        # 🚀 优化批处理大小（根据GPU内存动态调整）
+        optimized_batch_size = min(self.config.batch_size * 4, 256)
+        print(f"🎮 GPU {gpu_id} 高速处理，优化批大小: {optimized_batch_size}")
         
         # 创建数据生成器
         gen = datagen(
             whisper_chunks,
             template_data['input_latent_list_cycle'],
-            batch_size
+            optimized_batch_size
         )
         
-        # 使用队列进行GPU间通信
-        task_queue = queue.Queue()
-        result_queue = queue.Queue()
-        
-        # 将所有批次加入任务队列
-        batch_list = list(gen)
-        for i, (whisper_batch, latent_batch) in enumerate(batch_list):
-            task_queue.put((i, whisper_batch, latent_batch))
-        
-        # 启动GPU工作线程
-        gpu_threads = []
-        for gpu_id in range(self.device_count):
-            thread = threading.Thread(
-                target=self._gpu_worker,
-                args=(gpu_id, task_queue, result_queue)
-            )
-            thread.start()
-            gpu_threads.append(thread)
-        
-        # 等待所有任务完成
-        task_queue.join()
-        
-        # 收集结果
-        results = {}
-        for _ in range(len(batch_list)):
-            batch_idx, batch_results = result_queue.get()
-            results[batch_idx] = batch_results
-        
-        # 按顺序组装结果
         res_frame_list = []
-        for i in range(len(batch_list)):
-            if i in results:
-                res_frame_list.extend(results[i])
+        batch_count = 0
+        
+        # 🚀 单GPU批处理推理
+        for whisper_batch, latent_batch in gen:
+            batch_count += 1
+            
+            with torch.no_grad():
+                # 🚀 优化：使用半精度推理加速
+                whisper_batch = whisper_batch.half().to(device)
+                latent_batch = latent_batch.half().to(device)
+                
+                # MuseTalk推理
+                pred_latents = model['unet'].model(
+                    latent_batch,
+                    model['timesteps'],
+                    encoder_hidden_states=whisper_batch
+                ).sample
+                
+                # VAE解码
+                pred_latents = 1 / 0.18215 * pred_latents
+                pred_frames = model['vae'].vae.decode(pred_latents).sample
+                pred_frames = (pred_frames / 2 + 0.5).clamp(0, 1)
+                
+                # 转换为numpy（转回float32避免精度问题）
+                pred_frames = pred_frames.cpu().float().numpy()
+                pred_frames = (pred_frames * 255).astype(np.uint8)
+                
+                # 调整维度 (B, C, H, W) -> (B, H, W, C)
+                pred_frames = np.transpose(pred_frames, (0, 2, 3, 1))
+                
+                res_frame_list.extend(pred_frames)
         
         inference_time = time.time() - inference_start
-        print(f"[OK] 4GPU并行推理完成: {inference_time:.2f}s")
+        print(f"[OK] 优化GPU推理完成: {inference_time:.2f}s, 处理 {batch_count} 批次，共 {len(res_frame_list)} 帧")
         
         # 3. 后处理和视频合成
         print("🎬 开始视频合成...")
@@ -584,39 +588,66 @@ class OptimizedMuseTalkInference:
         temp_dir = f"{output_dir}/temp_{int(time.time())}"
         os.makedirs(temp_dir, exist_ok=True)
         
-        # 合成最终帧
-        print("🖼️ 合成最终帧...")
-        for i, res_frame in enumerate(tqdm(res_frame_list, desc="合成帧")):
-            # 获取对应的原始帧和坐标
-            cycle_idx = i % len(template_data['coord_list_cycle'])
-            bbox = template_data['coord_list_cycle'][cycle_idx]
-            ori_frame = copy.deepcopy(template_data['frame_list_cycle'][cycle_idx])
-            
-            x1, y1, x2, y2 = bbox
-            
-            try:
-                # 调整生成帧大小
-                res_frame = cv2.resize(res_frame.astype(np.uint8), (x2-x1, y2-y1))
-                
-                # 获取mask和坐标
-                mask = template_data['mask_list_cycle'][cycle_idx]
-                mask_crop_box = template_data['mask_coords_list_cycle'][cycle_idx]
-                
-                # 混合图像
-                combine_frame = get_image_blending(ori_frame, res_frame, bbox, mask, mask_crop_box)
-                
-                # 保存帧
-                cv2.imwrite(f"{temp_dir}/{i:08d}.png", combine_frame)
-                
-            except Exception as e:
-                print(f"⚠️ 第 {i} 帧处理失败: {e}")
-                continue
+        # 🚀 优化：直接在内存中合成帧，使用OpenCV VideoWriter
+        print("🖼️ 高速合成最终帧...")
         
-        # 生成视频
-        print("🎬 生成视频文件...")
+        # 获取视频尺寸（使用第一帧）
+        first_frame_idx = 0 % len(template_data['coord_list_cycle'])
+        sample_ori_frame = template_data['frame_list_cycle'][first_frame_idx]
+        height, width = sample_ori_frame.shape[:2]
+        
+        # 初始化VideoWriter - 直接写入最终视频文件
         temp_video = f"{temp_dir}/temp_video.mp4"
-        cmd_img2video = f"ffmpeg -y -v warning -r {fps} -f image2 -i {temp_dir}/%08d.png -vcodec libx264 -vf format=yuv420p -crf 18 {temp_video}"
-        os.system(cmd_img2video)
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        video_writer = cv2.VideoWriter(temp_video, fourcc, fps, (width, height))
+        
+        if not video_writer.isOpened():
+            print("❌ VideoWriter初始化失败，回退到PNG方式")
+            # 回退到原方式
+            for i, res_frame in enumerate(tqdm(res_frame_list, desc="合成帧")):
+                cycle_idx = i % len(template_data['coord_list_cycle'])
+                bbox = template_data['coord_list_cycle'][cycle_idx]
+                ori_frame = copy.deepcopy(template_data['frame_list_cycle'][cycle_idx])
+                
+                x1, y1, x2, y2 = bbox
+                
+                try:
+                    res_frame = cv2.resize(res_frame.astype(np.uint8), (x2-x1, y2-y1))
+                    mask = template_data['mask_list_cycle'][cycle_idx]
+                    mask_crop_box = template_data['mask_coords_list_cycle'][cycle_idx]
+                    combine_frame = get_image_blending(ori_frame, res_frame, bbox, mask, mask_crop_box)
+                    cv2.imwrite(f"{temp_dir}/{i:08d}.png", combine_frame)
+                except Exception as e:
+                    print(f"⚠️ 第 {i} 帧处理失败: {e}")
+                    continue
+            
+            print("🎬 生成视频文件...")
+            cmd_img2video = f"ffmpeg -y -v warning -r {fps} -f image2 -i {temp_dir}/%08d.png -vcodec libx264 -vf format=yuv420p -crf 18 {temp_video}"
+            os.system(cmd_img2video)
+        else:
+            # 🚀 高速模式：直接写入视频
+            for i, res_frame in enumerate(tqdm(res_frame_list, desc="高速合成")):
+                cycle_idx = i % len(template_data['coord_list_cycle'])
+                bbox = template_data['coord_list_cycle'][cycle_idx]
+                ori_frame = copy.deepcopy(template_data['frame_list_cycle'][cycle_idx])
+                
+                x1, y1, x2, y2 = bbox
+                
+                try:
+                    res_frame = cv2.resize(res_frame.astype(np.uint8), (x2-x1, y2-y1))
+                    mask = template_data['mask_list_cycle'][cycle_idx]
+                    mask_crop_box = template_data['mask_coords_list_cycle'][cycle_idx]
+                    combine_frame = get_image_blending(ori_frame, res_frame, bbox, mask, mask_crop_box)
+                    
+                    # 直接写入视频文件，无需保存PNG
+                    video_writer.write(combine_frame)
+                    
+                except Exception as e:
+                    print(f"⚠️ 第 {i} 帧处理失败: {e}")
+                    continue
+            
+            video_writer.release()
+            print("🎬 高速视频合成完成")
         
         # 合并音频
         print("🔊 合并音频...")
