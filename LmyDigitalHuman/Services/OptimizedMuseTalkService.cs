@@ -1465,7 +1465,14 @@ namespace LmyDigitalHuman.Services
                     throw new InvalidOperationException($"模板 {templateId} 正在处理中，请稍后再试");
                 }
                 
-                _activeJobs.TryAdd(activeJobKey, DateTime.Now);
+                var processingJob = new ProcessingJob
+                {
+                    JobId = activeJobKey,
+                    StartTime = DateTime.Now,
+                    Progress = 0,
+                    CurrentStep = "MuseTalk推理"
+                };
+                _activeJobs.TryAdd(activeJobKey, processingJob);
                 
                 _logger.LogInformation("🎮 执行MuseTalk推理命令: {Command}", $"{pythonPath} {arguments}");
                 
