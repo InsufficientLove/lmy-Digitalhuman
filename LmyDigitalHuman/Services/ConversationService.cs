@@ -99,22 +99,39 @@ namespace LmyDigitalHuman.Services
                     };
                 }
 
-                // 生成数字人视频
-                var videoResponse = await _museTalkService.GenerateVideoAsync(new DigitalHumanRequest
+                // 生成数字人视频 - 使用超时机制
+                DigitalHumanResponse videoResponse;
+                try
                 {
-                    AvatarImagePath = template.ImagePath,
-                    AudioPath = ttsResult.AudioPath,
-                    Quality = request.Quality,
-                    EnableEmotion = true,
-                    CacheKey = $"welcome_{request.TemplateId}_{request.Quality}"
-                });
+                    var videoTask = _museTalkService.GenerateVideoAsync(new DigitalHumanRequest
+                    {
+                        AvatarImagePath = template.ImagePath,
+                        AudioPath = ttsResult.AudioPath,
+                        Quality = request.Quality,
+                        EnableEmotion = true,
+                        CacheKey = $"welcome_{request.TemplateId}_{request.Quality}"
+                    });
+                    
+                    // 欢迎视频超时限制为40秒
+                    videoResponse = await videoTask.WaitAsync(TimeSpan.FromSeconds(40));
+                }
+                catch (TimeoutException)
+                {
+                    _logger.LogWarning("欢迎视频生成超时，返回仅音频响应");
+                    videoResponse = new DigitalHumanResponse
+                    {
+                        Success = false,
+                        Message = "视频生成超时，但音频已就绪",
+                        VideoUrl = null
+                    };
+                }
 
                 stopwatch.Stop();
 
                 return new ConversationResponse
                 {
-                    Success = videoResponse.Success,
-                    Message = videoResponse.Message,
+                    Success = true, // 只要TTS成功就返回成功
+                    Message = videoResponse.Success ? "欢迎视频生成成功" : $"音频生成成功，视频生成失败: {videoResponse.Message}",
                     InputText = "模板选择",
                     ResponseText = welcomeText,
                     VideoUrl = videoResponse.VideoUrl,

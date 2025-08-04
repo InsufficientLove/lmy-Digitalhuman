@@ -659,7 +659,11 @@ namespace LmyDigitalHuman.Services
             try
             {
                 var arguments = BuildPythonArguments(request, outputPath);
-                var result = await RunPythonCommandAsync(arguments, TimeSpan.FromMinutes(10));
+                // 欢迎视频使用更短的超时，减少等待时间
+                var timeout = request.CacheKey?.StartsWith("welcome_") == true 
+                    ? TimeSpan.FromSeconds(30) 
+                    : TimeSpan.FromMinutes(5);
+                var result = await RunPythonCommandAsync(arguments, timeout);
                 
                 stopwatch.Stop();
 
@@ -783,15 +787,20 @@ namespace LmyDigitalHuman.Services
                 using var process = Process.Start(processInfo);
                 if (process != null)
                 {
+                    _logger.LogInformation("MuseTalk进程已启动: PID={ProcessId}", process.Id);
+                    
                     var outputTask = process.StandardOutput.ReadToEndAsync();
                     var errorTask = process.StandardError.ReadToEndAsync();
                     
-                    var completed = await Task.WhenAny(
-                        Task.WhenAll(outputTask, errorTask).ContinueWith(_ => process.WaitForExit()),
-                        Task.Delay(timeout)
-                    );
+                    var processTask = Task.Run(async () =>
+                    {
+                        await Task.WhenAll(outputTask, errorTask);
+                        await process.WaitForExitAsync();
+                    });
                     
-                    if (completed != Task.Delay(timeout))
+                    var completed = await Task.WhenAny(processTask, Task.Delay(timeout));
+                    
+                    if (completed == processTask)
                     {
                         var output = await outputTask;
                         var error = await errorTask;
@@ -850,11 +859,25 @@ namespace LmyDigitalHuman.Services
                     }
                     else
                     {
-                        process.Kill();
+                        _logger.LogWarning("MuseTalk进程超时，正在终止进程: PID={ProcessId}, Timeout={Timeout}s", 
+                            process.Id, timeout.TotalSeconds);
+                        try
+                        {
+                            if (!process.HasExited)
+                            {
+                                process.Kill();
+                                _logger.LogInformation("MuseTalk进程已被终止");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "终止MuseTalk进程失败");
+                        }
+                        
                         return new PythonResult
                         {
                             Success = false,
-                            Output = "Python脚本执行超时"
+                            Output = $"MuseTalk脚本执行超时({timeout.TotalSeconds}秒)"
                         };
                     }
                 }

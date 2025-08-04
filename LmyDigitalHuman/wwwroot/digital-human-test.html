@@ -865,9 +865,16 @@
                 updateProgress(100);
 
                 if (result.success) {
-                    displayVideo(result.videoUrl);
-                    addLog(`欢迎视频生成成功! 耗时: ${result.processingTime}ms`, 'success');
-                    updateProcessingStatus('欢迎视频已就绪');
+                    if (result.videoUrl) {
+                        displayVideo(result.videoUrl);
+                        addLog(`欢迎视频生成成功! 耗时: ${result.processingTime}`, 'success');
+                        updateProcessingStatus('欢迎视频已就绪');
+                    } else {
+                        // 只有音频，显示音频播放器
+                        displayAudio(result.audioUrl);
+                        addLog(`欢迎音频生成成功 (视频生成失败)! 耗时: ${result.processingTime}`, 'warning');
+                        updateProcessingStatus('欢迎音频已就绪');
+                    }
                 } else {
                     addLog(`欢迎视频生成失败: ${result.message}`, 'error');
                     updateProcessingStatus('欢迎视频生成失败');
@@ -1187,6 +1194,28 @@
             video.play().catch(e => {
                 addLog('自动播放失败，请手动点击播放', 'warning');
             });
+        }
+
+        function displayAudio(audioUrl) {
+            const video = document.getElementById('digitalHumanVideo');
+            const placeholder = document.getElementById('videoPlaceholder');
+            
+            // 隐藏视频，显示占位符并播放音频
+            video.style.display = 'none';
+            placeholder.style.display = 'flex';
+            placeholder.innerHTML = `
+                <div style="text-align: center;">
+                    <div style="font-size: 4rem; margin-bottom: 10px;">🎵</div>
+                    <div style="font-size: 1.2rem; margin-bottom: 15px;">欢迎音频已就绪</div>
+                    <audio controls autoplay style="width: 300px;">
+                        <source src="${audioUrl}" type="audio/wav">
+                        <source src="${audioUrl}" type="audio/mpeg">
+                        您的浏览器不支持音频播放。
+                    </audio>
+                </div>
+            `;
+            
+            document.getElementById('downloadBtn').style.display = 'none';
         }
 
         function playVideo() {
