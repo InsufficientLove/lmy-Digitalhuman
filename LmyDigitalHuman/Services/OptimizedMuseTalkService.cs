@@ -380,6 +380,112 @@ namespace LmyDigitalHuman.Services
         }
 
         /// <summary>
+        /// 极速实时推理 - 使用预处理的永久化模型（接口实现）
+        /// </summary>
+        public async Task<DigitalHumanResponse> SimulateRealtimeInference(DigitalHumanRequest request)
+        {
+            var stopwatch = Stopwatch.StartNew();
+            
+            try
+            {
+                // 🎯 提取模板ID（优先使用TemplateId，否则从路径提取）
+                var templateId = request.TemplateId ?? ExtractTemplateIdFromPath(request.AvatarImagePath);
+                
+                _logger.LogInformation("⚡ 开始4GPU实时推理: TemplateId={TemplateId}, TotalRequests={TotalRequests}", 
+                    templateId, _activeJobs.Count + 1);
+                
+                // 检查模板是否已预处理
+                if (!_persistentModels.TryGetValue(templateId, out var modelInfo))
+                {
+                    _logger.LogWarning("⚠️ 模板 {TemplateId} 未预处理，开始动态预处理...", templateId);
+                    await PreprocessTemplateAsync(templateId);
+                    
+                    if (!_persistentModels.TryGetValue(templateId, out modelInfo))
+                    {
+                        throw new InvalidOperationException($"模板 {templateId} 预处理失败");
+                    }
+                }
+                
+                _logger.LogInformation("⚡ 模板 {TemplateId} 已预处理完成，使用永久化模型进行极速推理", templateId);
+                
+                // 生成唯一输出路径
+                var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+                var randomSuffix = Guid.NewGuid().ToString("N")[..8];
+                var outputFileName = $"realtime_{templateId}_{timestamp}_{randomSuffix}.mp4";
+                var outputPath = Path.Combine(_pathManager.GetContentRootPath(), "wwwroot", "videos", outputFileName);
+                
+                // 确保输出目录存在
+                Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
+                
+                _logger.LogInformation("⚡ 执行实时推理: {TemplateId} (GPU:{GPU})", templateId, modelInfo.AssignedGPU);
+                
+                // 调用私有方法执行实际推理
+                await ExecuteRealtimeInferenceInternal(templateId, request.AudioPath, outputPath, modelInfo.AssignedGPU);
+                
+                stopwatch.Stop();
+                
+                // 验证输出文件
+                if (!File.Exists(outputPath))
+                {
+                    throw new FileNotFoundException($"推理完成但输出文件不存在: {outputPath}");
+                }
+                
+                var fileInfo = new FileInfo(outputPath);
+                _logger.LogInformation("✅ GPU:{GPU} MuseTalk推理完成: {TemplateId}, 输出: {OutputPath}, 大小: {Size}bytes", 
+                    modelInfo.AssignedGPU, templateId, outputPath, fileInfo.Length);
+                
+                // 更新模型使用时间
+                modelInfo.LastUsed = DateTime.Now;
+                
+                // 计算视频时长
+                var duration = await GetVideoDurationAsync(outputPath);
+                
+                _logger.LogInformation("✅ 4GPU实时推理完成: TemplateId={TemplateId}, 耗时={ElapsedMs}ms, 完成率={CompletionRate:F2} %", 
+                    templateId, stopwatch.ElapsedMilliseconds, 100.0);
+                
+                // 🌐 转换物理路径为前端可访问的URL
+                var videoUrl = ConvertToWebUrl(outputPath);
+                
+                return new DigitalHumanResponse
+                {
+                    Success = true,
+                    VideoPath = outputPath,  // 物理路径（服务器内部使用）
+                    VideoUrl = videoUrl,     // Web URL（前端使用）
+                    Duration = duration,
+                    Message = $"⚡ 4GPU实时推理完成 (模板: {templateId}, 耗时: {stopwatch.ElapsedMilliseconds}ms)"
+                };
+            }
+            catch (Exception ex)
+            {
+                stopwatch.Stop();
+                _logger.LogError(ex, "❌ 4GPU实时推理失败: TemplateId={TemplateId}, 耗时={ElapsedMs}ms", 
+                    request.TemplateId ?? "unknown", stopwatch.ElapsedMilliseconds);
+                
+                return new DigitalHumanResponse
+                {
+                    Success = false,
+                    Message = $"实时推理失败: {ex.Message}",
+                    Duration = 0
+                };
+            }
+        }
+
+        /// <summary>
+        /// 从图片路径提取模板ID
+        /// </summary>
+        private string ExtractTemplateIdFromPath(string imagePath)
+        {
+            try
+            {
+                return Path.GetFileNameWithoutExtension(imagePath);
+            }
+            catch
+            {
+                return "unknown";
+            }
+        }
+
+        /// <summary>
         /// 获取最优设置
         /// </summary>
         public async Task<string> GetOptimalSettingsAsync(string templateId, string quality)
@@ -1364,7 +1470,7 @@ namespace LmyDigitalHuman.Services
 
             // 这里应该通过IPC与持久化进程通信
             // 发送推理请求到指定GPU上的模型
-            await SimulateRealtimeInference(templateId, audioPath, outputPath, modelInfo.AssignedGPU);
+            await ExecuteRealtimeInferenceInternal(templateId, audioPath, outputPath, modelInfo.AssignedGPU);
 
             modelInfo.LastUsed = DateTime.Now;
             modelInfo.UsageCount++;
@@ -1375,7 +1481,7 @@ namespace LmyDigitalHuman.Services
         /// <summary>
         /// 真正的MuseTalk实时推理 - 直接调用Python脚本
         /// </summary>
-        private async Task SimulateRealtimeInference(string templateId, string audioPath, string outputPath, int gpuId)
+        private async Task ExecuteRealtimeInferenceInternal(string templateId, string audioPath, string outputPath, int gpuId)
         {
             _logger.LogInformation("🚀 GPU:{GPU} 开始MuseTalk实时推理: {TemplateId}", gpuId, templateId);
             
