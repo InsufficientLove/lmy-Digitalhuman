@@ -486,6 +486,31 @@ namespace LmyDigitalHuman.Services
         }
 
         /// <summary>
+        /// 获取视频时长（简化实现）
+        /// </summary>
+        private async Task<double> GetVideoDurationAsync(string videoPath)
+        {
+            try
+            {
+                // 简化实现：基于文件大小估算
+                var fileInfo = new FileInfo(videoPath);
+                if (fileInfo.Exists && fileInfo.Length > 0)
+                {
+                    // 粗略估算：MP4文件约每秒100KB（25fps，中等质量）
+                    var estimatedDuration = Math.Max(1.0, (double)fileInfo.Length / 100000);
+                    return estimatedDuration;
+                }
+                
+                return 3.0; // 默认3秒
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "获取视频时长失败，使用默认值: {VideoPath}", videoPath);
+                return 3.0; // 默认3秒
+            }
+        }
+
+        /// <summary>
         /// 获取最优设置
         /// </summary>
         public async Task<string> GetOptimalSettingsAsync(string templateId, string quality)
