@@ -651,11 +651,15 @@ namespace LmyDigitalHuman.Services
                 // 📊 更新模板使用统计
                 _templateUsageCount.AddOrUpdate(templateId, 1, (key, oldValue) => oldValue + 1);
                 
-                // 🎯 检查模板是否已永久化
+                // 🎯 检查模板是否已永久化（避免重复预处理）
                 if (!_persistentModels.ContainsKey(templateId))
                 {
                     _logger.LogWarning("⚠️ 模板 {TemplateId} 未进行永久化预处理，将自动进行预处理", templateId);
                     await PreprocessTemplateAsync(templateId);
+                }
+                else
+                {
+                    _logger.LogInformation("✅ 模板 {TemplateId} 已永久化，直接使用缓存模型", templateId);
                 }
                 
                 // 🚀 执行实时推理（使用永久化模型）
@@ -1346,20 +1350,121 @@ namespace LmyDigitalHuman.Services
         }
 
         /// <summary>
-        /// 模拟实时推理（实际应该是IPC通信）
+        /// 真正的MuseTalk实时推理 - 直接调用Python脚本
         /// </summary>
         private async Task SimulateRealtimeInference(string templateId, string audioPath, string outputPath, int gpuId)
         {
-            _logger.LogInformation("🚀 GPU:{GPU} 开始实时推理: {TemplateId}", gpuId, templateId);
+            _logger.LogInformation("🚀 GPU:{GPU} 开始MuseTalk实时推理: {TemplateId}", gpuId, templateId);
             
-            // 实际实现应该是向持久化进程发送推理请求
-            // 这里模拟快速推理时间（实时级别）
-            await Task.Delay(500); // 模拟500ms的实时推理
-            
-            // 创建一个空的输出文件作为演示
-            await File.WriteAllTextAsync(outputPath, "realtime inference result");
-            
-            _logger.LogInformation("✅ GPU:{GPU} 实时推理完成: {TemplateId}", gpuId, templateId);
+            try
+            {
+                // 构建模板图片路径
+                var imagePath = Path.Combine(_pathManager.GetContentRootPath(), "wwwroot", "templates", $"{templateId}.jpg");
+                
+                if (!File.Exists(imagePath))
+                {
+                    throw new FileNotFoundException($"模板图片不存在: {imagePath}");
+                }
+                
+                if (!File.Exists(audioPath))
+                {
+                    throw new FileNotFoundException($"音频文件不存在: {audioPath}");
+                }
+                
+                // 确保输出目录存在
+                var outputDir = Path.GetDirectoryName(outputPath);
+                Directory.CreateDirectory(outputDir);
+                
+                var museTalkDir = Path.Combine(_pathManager.GetContentRootPath(), "..", "MuseTalk");
+                var pythonPath = await GetCachedPythonPathAsync();
+                var optimizedScriptPath = Path.Combine(museTalkDir, "optimized_musetalk_inference.py");
+                
+                // 构建MuseTalk推理命令
+                var arguments = new StringBuilder();
+                arguments.Append($"\"{optimizedScriptPath}\"");
+                arguments.Append($" --template_id \"{templateId}\"");
+                arguments.Append($" --audio_path \"{audioPath}\"");
+                arguments.Append($" --output_path \"{outputPath}\"");
+                arguments.Append($" --template_dir \"{Path.Combine(_pathManager.GetContentRootPath(), "wwwroot", "templates")}\"");
+                arguments.Append($" --version v1");
+                arguments.Append($" --batch_size 64");
+                arguments.Append($" --fps 25");
+                arguments.Append($" --unet_config \"models/musetalk/musetalk.json\"");
+                arguments.Append($" --unet_model_path \"models/musetalk/pytorch_model.bin\"");
+                arguments.Append($" --whisper_dir \"models/whisper\"");
+                
+                _logger.LogInformation("🎮 执行MuseTalk推理命令: {Command}", $"{pythonPath} {arguments}");
+                
+                var processInfo = new ProcessStartInfo
+                {
+                    FileName = pythonPath,
+                    Arguments = arguments.ToString(),
+                    WorkingDirectory = museTalkDir,
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true
+                };
+                
+                // 配置GPU环境，指定使用特定GPU
+                ConfigureOptimizedGpuEnvironment(processInfo);
+                processInfo.Environment["CUDA_VISIBLE_DEVICES"] = gpuId.ToString();
+                
+                var process = new Process { StartInfo = processInfo };
+                var outputBuilder = new StringBuilder();
+                var errorBuilder = new StringBuilder();
+                
+                process.OutputDataReceived += (sender, e) => {
+                    if (!string.IsNullOrEmpty(e.Data))
+                    {
+                        outputBuilder.AppendLine(e.Data);
+                        _logger.LogInformation("MuseTalk推理: {Output}", e.Data);
+                    }
+                };
+                
+                process.ErrorDataReceived += (sender, e) => {
+                    if (!string.IsNullOrEmpty(e.Data))
+                    {
+                        errorBuilder.AppendLine(e.Data);
+                        _logger.LogWarning("MuseTalk推理警告: {Error}", e.Data);
+                    }
+                };
+                
+                process.Start();
+                process.BeginOutputReadLine();
+                process.BeginErrorReadLine();
+                
+                // 等待推理完成（最多5分钟）
+                var timeoutMs = 300000;
+                var completed = await Task.Run(() => process.WaitForExit(timeoutMs));
+                
+                if (!completed)
+                {
+                    process.Kill();
+                    throw new TimeoutException($"MuseTalk推理超时 ({timeoutMs/1000}秒)");
+                }
+                
+                if (process.ExitCode != 0)
+                {
+                    var error = errorBuilder.ToString();
+                    throw new InvalidOperationException($"MuseTalk推理失败: {error}");
+                }
+                
+                // 检查输出文件
+                if (!File.Exists(outputPath))
+                {
+                    throw new FileNotFoundException($"MuseTalk推理未生成输出文件: {outputPath}");
+                }
+                
+                var fileInfo = new FileInfo(outputPath);
+                _logger.LogInformation("✅ GPU:{GPU} MuseTalk推理完成: {TemplateId}, 输出: {OutputPath}, 大小: {Size}bytes", 
+                    gpuId, templateId, outputPath, fileInfo.Length);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ GPU:{GPU} MuseTalk推理失败: {TemplateId}", gpuId, templateId);
+                throw;
+            }
         }
 
         #endregion

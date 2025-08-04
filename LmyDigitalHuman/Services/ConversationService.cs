@@ -131,7 +131,7 @@ namespace LmyDigitalHuman.Services
                     InputText = "模板选择",
                     ResponseText = welcomeText,
                     VideoUrl = videoResponse.VideoUrl,
-                    AudioUrl = $"/temp/{Path.GetFileName(ttsResult.AudioPath)}", // 提供欢迎语音频
+                    // AudioUrl 已移除 - 不再显示音频
                     DetectedEmotion = "friendly",
                     ProcessingTime = $"{stopwatch.ElapsedMilliseconds}ms",
                     FromCache = false,
