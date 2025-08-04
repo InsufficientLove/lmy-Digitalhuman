@@ -101,21 +101,25 @@ namespace LmyDigitalHuman.Services
                     };
                 }
 
-                // 🎬 使用预处理信息 + 固定欢迎语 实时生成数字人视频
-                _logger.LogInformation("🎬 开始生成数字人欢迎视频: {TemplateId}", request.TemplateId);
+                // 🚀 使用预处理的永久化模型进行极速实时推理
+                _logger.LogInformation("🚀 开始极速实时推理: TemplateId={TemplateId}", request.TemplateId);
                 
-                var videoResponse = await _museTalkService.GenerateVideoAsync(new DigitalHumanRequest
+                // 🎯 从模板的SystemName提取实际的模板标识
+                var templateSystemName = template.SystemName ?? ExtractTemplateIdFromPath(template.ImagePath);
+                
+                var videoResponse = await _museTalkService.SimulateRealtimeInference(new DigitalHumanRequest
                 {
+                    TemplateId = templateSystemName, // 使用SystemName作为模板标识
                     AvatarImagePath = template.ImagePath,
                     AudioPath = ttsResult.AudioPath,
                     Quality = request.Quality,
                     EnableEmotion = true,
-                    CacheKey = $"welcome_{request.TemplateId}_{request.Quality}"
+                    CacheKey = $"realtime_{templateSystemName}_{DateTime.Now:yyyyMMdd_HHmmss}"
                 });
                 
                 if (!videoResponse.Success)
                 {
-                    throw new Exception($"数字人视频生成失败: {videoResponse.Message}");
+                    throw new Exception($"极速实时推理失败: {videoResponse.Message}");
                 }
 
                 stopwatch.Stop();
@@ -123,14 +127,14 @@ namespace LmyDigitalHuman.Services
                 return new ConversationResponse
                 {
                     Success = true,
-                    Message = "数字人视频生成成功",
+                    Message = "⚡ 极速实时推理完成",
                     InputText = "模板选择", 
                     ResponseText = welcomeText,
                     VideoUrl = videoResponse.VideoUrl, // 使用实际生成的视频路径
                     // AudioUrl 已移除 - 不再显示音频
                     DetectedEmotion = "friendly",
                     ProcessingTime = $"{stopwatch.ElapsedMilliseconds}ms",
-                    FromCache = false, // 实时生成，不是缓存
+                    FromCache = false, // 实时推理，不是缓存
                     HasVideo = !string.IsNullOrEmpty(videoResponse.VideoUrl),
                     Duration = videoResponse.Duration // 使用实际视频时长
                 };
@@ -146,6 +150,22 @@ namespace LmyDigitalHuman.Services
                     Message = ex.Message,
                     ProcessingTime = $"{stopwatch.ElapsedMilliseconds}ms"
                 };
+            }
+        }
+
+        /// <summary>
+        /// 从图片路径提取模板标识（用于兼容性）
+        /// </summary>
+        private string ExtractTemplateIdFromPath(string imagePath)
+        {
+            try
+            {
+                var fileName = Path.GetFileNameWithoutExtension(imagePath);
+                return fileName;
+            }
+            catch
+            {
+                return "unknown";
             }
         }
 

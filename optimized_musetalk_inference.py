@@ -228,6 +228,24 @@ class OptimizedMuseTalkInference:
             print(f"[FALLBACK] 使用占位符坐标: {coord_placeholder}")
             print("[INFO] 这将使用MuseTalk的内置错误处理逻辑")
         
+        # 🎯 保存预处理结果到磁盘，实现真正的永久化
+        preprocessing_cache_dir = os.path.join("model_states", template_id)
+        os.makedirs(preprocessing_cache_dir, exist_ok=True)
+        
+        coord_cache_file = os.path.join(preprocessing_cache_dir, "face_coords.pkl")
+        vae_cache_file = os.path.join(preprocessing_cache_dir, "vae_latents.pkl")
+        
+        # 保存面部坐标
+        import pickle
+        with open(coord_cache_file, 'wb') as f:
+            pickle.dump({
+                'coord_list': coord_list,
+                'frame_list': frame_list,
+                'template_id': template_id,
+                'processed_at': time.time()
+            }, f)
+        print(f"✅ 面部坐标已保存: {coord_cache_file}")
+        
         # 预计算VAE编码
         print(f"🧠 预计算VAE编码: {template_id}")
         input_latent_list = []
@@ -307,6 +325,17 @@ class OptimizedMuseTalkInference:
                 mask_coords_list_cycle.append([x1, y1, x2, y2])
                 mask_list_cycle.append(np.ones((256, 256), dtype=np.uint8) * 255)
         
+        # 🎯 保存VAE编码结果，实现真正的永久化
+        with open(vae_cache_file, 'wb') as f:
+            pickle.dump({
+                'input_latent_list_cycle': input_latent_list_cycle,
+                'mask_coords_list_cycle': mask_coords_list_cycle,
+                'mask_list_cycle': mask_list_cycle,
+                'template_id': template_id,
+                'processed_at': time.time()
+            }, f)
+        print(f"✅ VAE编码结果已保存: {vae_cache_file}")
+        
         # 构建模板数据
         template_data = {
             'template_id': template_id,
@@ -319,24 +348,64 @@ class OptimizedMuseTalkInference:
             'preprocessed_at': time.time()
         }
         
-        # 保存缓存
+        # 保存完整缓存（向后兼容）
         with open(cache_file, 'wb') as f:
             pickle.dump(template_data, f)
+        
+        print(f"🎉 模板 {template_id} 预处理完成并永久化保存")
+        print(f"   - 面部坐标: {coord_cache_file}")
+        print(f"   - VAE编码: {vae_cache_file}")
+        print(f"   - 完整缓存: {cache_file}")
         
         return template_data
     
     def inference_parallel(self, template_id, audio_path, output_path, fps=25):
-        """并行推理 - 4GPU协同工作"""
-        # 如果模板未预处理，动态预处理
+        """极速推理 - 使用永久化的预处理结果"""
+        # 🚀 优先加载永久化的预处理结果
         if template_id not in self.templates:
-            print(f"🔄 模板 {template_id} 未预处理，开始动态预处理...")
-            template_path = self._find_template_path(template_id)
-            if not template_path:
-                raise ValueError(f"模板 {template_id} 文件未找到")
+            print(f"🚀 加载模板 {template_id} 的永久化预处理结果...")
             
-            template_data = self._preprocess_single_template(template_id, template_path)
-            self.templates[template_id] = template_data
-            print(f"[OK] 模板 {template_id} 动态预处理完成")
+            # 检查是否有永久化的预处理结果
+            preprocessing_cache_dir = os.path.join("model_states", template_id)
+            coord_cache_file = os.path.join(preprocessing_cache_dir, "face_coords.pkl")
+            vae_cache_file = os.path.join(preprocessing_cache_dir, "vae_latents.pkl")
+            
+            if os.path.exists(coord_cache_file) and os.path.exists(vae_cache_file):
+                print(f"✅ 发现永久化预处理结果，极速加载中...")
+                
+                # 加载面部坐标
+                import pickle
+                with open(coord_cache_file, 'rb') as f:
+                    coord_data = pickle.load(f)
+                
+                # 加载VAE编码
+                with open(vae_cache_file, 'rb') as f:
+                    vae_data = pickle.load(f)
+                
+                # 重建模板数据
+                template_data = {
+                    'template_id': template_id,
+                    'template_path': self._find_template_path(template_id),
+                    'frame_list_cycle': coord_data['frame_list'],
+                    'coord_list_cycle': coord_data['coord_list'],
+                    'input_latent_list_cycle': vae_data['input_latent_list_cycle'],
+                    'mask_coords_list_cycle': vae_data['mask_coords_list_cycle'],
+                    'mask_list_cycle': vae_data['mask_list_cycle'],
+                    'preprocessed_at': coord_data['processed_at']
+                }
+                
+                self.templates[template_id] = template_data
+                print(f"🚀 模板 {template_id} 永久化数据加载完成，跳过重复预处理")
+                
+            else:
+                print(f"🔄 模板 {template_id} 未找到永久化结果，开始首次预处理...")
+                template_path = self._find_template_path(template_id)
+                if not template_path:
+                    raise ValueError(f"模板 {template_id} 文件未找到")
+                
+                template_data = self._preprocess_single_template(template_id, template_path)
+                self.templates[template_id] = template_data
+                print(f"[OK] 模板 {template_id} 首次预处理完成并永久化保存")
         
         template_data = self.templates[template_id]
         
