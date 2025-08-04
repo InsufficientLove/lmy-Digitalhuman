@@ -731,9 +731,11 @@ namespace LmyDigitalHuman.Services
             if (request.BboxShift.HasValue)
                 args.Append($" --bbox_shift {request.BboxShift.Value}");
             
-            // 添加调试参数，让inference脚本输出更多信息
-            args.Append($" --use_float16"); // 使用float16可能更快更稳定
-            args.Append($" --batch_size 1"); // 强制使用最小batch size
+            // 性能优化参数 - 针对4x RTX 4090优化
+            args.Append($" --use_float16"); // 使用float16，节省显存，提高速度
+            args.Append($" --batch_size 8"); // 进一步增加batch size
+            args.Append($" --fps 25"); // 设置合适的FPS
+            args.Append($" --gpu_id 0"); // 指定主GPU（多GPU会自动并行）
                 
             return args.ToString();
         }
@@ -756,8 +758,6 @@ namespace LmyDigitalHuman.Services
                 
                 // 额外的环境信息
                 _logger.LogInformation("CUDA版本检查: {CudaDevices}", Environment.GetEnvironmentVariable("CUDA_VISIBLE_DEVICES"));
-                _logger.LogInformation("输入图片路径: {ImagePath}", request.AvatarImagePath);
-                _logger.LogInformation("输入音频路径: {AudioPath}", request.AudioPath);
                 
                 var processInfo = new ProcessStartInfo
                 {
@@ -1105,10 +1105,13 @@ namespace LmyDigitalHuman.Services
                             _logger.LogInformation("更新PATH，优先使用虚拟环境Scripts: {ScriptsDir}", scriptsDir);
                         }
                         
-                        // 设置4x GPU环境变量
+                        // 优化4x RTX 4090 GPU配置以获得最大性能
                         processInfo.Environment["CUDA_VISIBLE_DEVICES"] = "0,1,2,3";
-                        processInfo.Environment["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:512";
-                        processInfo.Environment["OMP_NUM_THREADS"] = "8";
+                        processInfo.Environment["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:1024,garbage_collection_threshold:0.6";
+                        processInfo.Environment["OMP_NUM_THREADS"] = "16"; // 增加CPU线程数
+                        processInfo.Environment["CUDA_LAUNCH_BLOCKING"] = "0"; // 异步执行
+                        processInfo.Environment["TORCH_CUDNN_V8_API_ENABLED"] = "1"; // 启用cuDNN v8优化
+                        processInfo.Environment["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"; // 优化CUBLAS
                         
                         _logger.LogInformation("虚拟环境配置完成: {VenvDir}", venvDir);
                         _logger.LogInformation("GPU配置: CUDA_VISIBLE_DEVICES=0,1,2,3");
@@ -1134,6 +1137,14 @@ namespace LmyDigitalHuman.Services
                         processInfo.Environment["PYTHONPATH"] = museTalkDir;
                     }
                     _logger.LogInformation("为系统Python设置PYTHONPATH: {MuseTalkDir}", museTalkDir);
+                    
+                    // 为系统Python也设置GPU优化
+                    processInfo.Environment["CUDA_VISIBLE_DEVICES"] = "0,1,2,3";
+                    processInfo.Environment["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:1024,garbage_collection_threshold:0.6";
+                    processInfo.Environment["OMP_NUM_THREADS"] = "16";
+                    processInfo.Environment["CUDA_LAUNCH_BLOCKING"] = "0";
+                    processInfo.Environment["TORCH_CUDNN_V8_API_ENABLED"] = "1";
+                    processInfo.Environment["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8";
                 }
             }
             catch (Exception ex)
