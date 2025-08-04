@@ -800,6 +800,9 @@ namespace LmyDigitalHuman.Services
         // 私有辅助方法
         private void InitializeDefaultTemplates()
         {
+            // 清理旧的示例模板文件
+            CleanupOldSampleTemplates();
+            
             // 加载已存在的模板文件
             LoadExistingTemplates();
             
@@ -1670,6 +1673,40 @@ namespace LmyDigitalHuman.Services
             }
             
             return sanitized;
+        }
+
+        /// <summary>
+        /// 清理旧的示例模板文件
+        /// </summary>
+        private void CleanupOldSampleTemplates()
+        {
+            try
+            {
+                var sampleTemplateIds = new[] { "sample-female-1", "sample-male-1", "sample-female-2" };
+                
+                foreach (var templateId in sampleTemplateIds)
+                {
+                    // 删除JSON配置文件
+                    var jsonPath = Path.Combine(_templatesPath, $"{templateId}.json");
+                    if (File.Exists(jsonPath))
+                    {
+                        File.Delete(jsonPath);
+                        _logger.LogInformation("已删除旧示例模板配置: {JsonPath}", jsonPath);
+                    }
+                    
+                    // 删除图片文件
+                    var imagePath = Path.Combine(_templatesPath, $"{templateId}.jpg");
+                    if (File.Exists(imagePath))
+                    {
+                        File.Delete(imagePath);
+                        _logger.LogInformation("已删除旧示例模板图片: {ImagePath}", imagePath);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "清理旧示例模板时出现错误");
+            }
         }
     }
 }
