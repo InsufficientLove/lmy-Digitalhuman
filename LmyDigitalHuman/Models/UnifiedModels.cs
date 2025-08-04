@@ -128,6 +128,7 @@ namespace LmyDigitalHuman.Models
         public DateTime CompletedAt { get; set; }
         public bool FromCache { get; set; }
         public DigitalHumanMetadata? Metadata { get; set; }
+        public double Duration { get; set; } // 视频时长（秒）
     }
 
     /// <summary>
@@ -242,6 +243,8 @@ namespace LmyDigitalHuman.Models
         public bool FromCache { get; set; }
         public string Message { get; set; } = string.Empty;
         public ServiceMetrics? Metrics { get; set; }
+        public bool HasVideo { get; set; }
+        public double Duration { get; set; } // 视频时长（秒）
     }
 
     /// <summary>

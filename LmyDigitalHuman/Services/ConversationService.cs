@@ -135,7 +135,7 @@ namespace LmyDigitalHuman.Services
                     DetectedEmotion = "friendly",
                     ProcessingTime = $"{stopwatch.ElapsedMilliseconds}ms",
                     FromCache = false,
-                    HasVideo = true,
+                    HasVideo = !string.IsNullOrEmpty(videoResponse.VideoUrl),
                     Duration = videoResponse.Duration
                 };
             }
