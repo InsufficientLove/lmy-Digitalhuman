@@ -166,7 +166,10 @@ class PersistentMuseTalkInference:
             
             try:
                 # 🎯 关键：使用正确的面部解析模式
-                mode = self.config.parsing_mode if self.config.version == "v15" else "raw"
+                if hasattr(self.config, 'version') and self.config.version == "v15":
+                    mode = getattr(self.config, 'parsing_mode', 'jaw')  # 默认使用jaw模式
+                else:
+                    mode = "raw"
                 mask, crop_box = get_image_prepare_material(frame, [x1, y1, x2, y2], fp=self.fp, mode=mode)
                 mask_coords_list_cycle.append(crop_box)
                 mask_list_cycle.append(mask)
