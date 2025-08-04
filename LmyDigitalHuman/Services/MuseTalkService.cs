@@ -832,15 +832,14 @@ namespace LmyDigitalHuman.Services
             args.Append($" --unet_model_path \"models/musetalk/pytorch_model.bin\"");
             args.Append($" --whisper_dir \"models/whisper\"");
             
-            // 单GPU最大性能配置 - 基于官方文档
-            args.Append($" --batch_size 8"); // 单GPU最大批处理大小
+            // 基于官方基准优化 - RTX 4090性能最大化
+            args.Append($" --use_float16"); // 官方推荐的FP16模式
             args.Append($" --fps 25");
-            args.Append($" --use_float16"); // 使用FP16减少显存占用
             args.Append($" --version v1");
             
-            // 根据官方文档，RTX 4090单卡可以支持更大批处理
-            // 官方测试：RTX 3050 Ti (4GB) fp16模式8秒视频5分钟
-            // RTX 4090 (24GB) 应该有6倍性能提升
+            // 官方基准：RTX 3050 Ti (4GB) fp16模式 = 8秒视频5分钟
+            // RTX 4090 (24GB) = 6倍显存 = 理论6倍性能提升
+            // 预期：3秒视频应在15-30秒内完成
             
             // 根据官方文档的bbox_shift参数优化
             // bbox_shift控制面部区域的上下边界，影响嘴部开合程度
