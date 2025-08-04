@@ -729,13 +729,16 @@ namespace LmyDigitalHuman.Services
                         var fileInfo = new FileInfo(actualOutputPath);
                         var videoUrl = $"/videos/{Path.GetFileName(actualOutputPath)}";
                         
-                        // 如果文件不在videos目录，复制过去
-                        if (!actualOutputPath.Contains("wwwroot\\videos"))
+                        // 确保文件在正确的Web可访问目录
+                        var webRootVideosDir = Path.Combine(_pathManager.GetContentRootPath(), "wwwroot", "videos");
+                        var finalVideoPath = Path.Combine(webRootVideosDir, Path.GetFileName(actualOutputPath));
+                        
+                        if (!actualOutputPath.Equals(finalVideoPath, StringComparison.OrdinalIgnoreCase))
                         {
-                            var targetPath = Path.Combine(resultDir, Path.GetFileName(actualOutputPath));
-                            File.Copy(actualOutputPath, targetPath, true);
-                            actualOutputPath = targetPath;
-                            _logger.LogInformation("视频文件已复制到: {TargetPath}", targetPath);
+                            Directory.CreateDirectory(webRootVideosDir);
+                            File.Copy(actualOutputPath, finalVideoPath, true);
+                            _logger.LogInformation("视频文件已复制到Web目录: {SourcePath} → {TargetPath}", actualOutputPath, finalVideoPath);
+                            actualOutputPath = finalVideoPath;
                         }
                         
                         return new DigitalHumanResponse
@@ -822,11 +825,16 @@ namespace LmyDigitalHuman.Services
             args.Append($" --whisper_dir \"models/whisper\"");
             args.Append($" --vae_type \"sd-vae\""); // 明确指定VAE类型
             
-            // 性能和质量参数
-            args.Append($" --batch_size 1"); // 从源码看这个参数是支持的
+            // 性能和质量参数 - 提升视频质量
+            args.Append($" --batch_size 1");
             args.Append($" --fps 25");
-            args.Append($" --use_float16"); // 从源码看这个参数也是支持的
-            args.Append($" --version v1"); // 使用v1版本
+            args.Append($" --use_float16");
+            args.Append($" --version v1");
+            
+            // 质量提升参数
+            args.Append($" --extra_margin 20"); // 增加面部边距，改善只有嘴巴动的问题
+            args.Append($" --audio_padding_length_left 3"); // 音频左侧填充
+            args.Append($" --audio_padding_length_right 3"); // 音频右侧填充
             
             if (request.BboxShift.HasValue)
                 args.Append($" --bbox_shift {request.BboxShift.Value}");
@@ -970,9 +978,17 @@ namespace LmyDigitalHuman.Services
                                     var elapsed = DateTime.UtcNow - processStartTime;
                                     var workingSet = process.WorkingSet64 / (1024 * 1024); // MB
                                     var cpuTime = process.TotalProcessorTime.TotalSeconds;
+                                    var peakWorkingSet = process.PeakWorkingSet64 / (1024 * 1024); // MB
+                                    var threads = process.Threads.Count;
                                     
-                                    _logger.LogInformation("MuseTalk运行状态: PID={ProcessId}, 已运行={Elapsed:mm\\:ss}, 内存={Memory}MB, CPU时间={CpuTime:F1}s",
-                                        process.Id, elapsed, workingSet, cpuTime);
+                                    _logger.LogInformation("MuseTalk运行状态: PID={ProcessId}, 已运行={Elapsed:mm\\:ss}, 内存={Memory}MB, 峰值内存={PeakMemory}MB, CPU时间={CpuTime:F1}s, 线程数={Threads}",
+                                        process.Id, elapsed, workingSet, peakWorkingSet, cpuTime, threads);
+                                        
+                                    // 如果进程长时间无活动，可能卡住了
+                                    if (elapsed.TotalSeconds > 30 && workingSet < 10 && cpuTime < 0.1)
+                                    {
+                                        _logger.LogWarning("⚠️ 进程可能卡住: 长时间低内存低CPU使用");
+                                    }
                                         
                                     lastCheck = DateTime.UtcNow;
                                 }
