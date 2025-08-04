@@ -717,13 +717,13 @@ namespace LmyDigitalHuman.Services
             // 直接使用官方MuseTalk的inference脚本
             args.Append($"-m scripts.inference");
             
-            // 使用官方MuseTalk的配置文件路径
-            args.Append($" --inference_config \"MuseTalk/configs/inference/test.yaml\"");
+            // 使用相对于MuseTalk工作目录的路径（因为WorkingDirectory已经是MuseTalk目录）
+            args.Append($" --inference_config \"configs/inference/test.yaml\"");
             args.Append($" --result_dir \"{Path.GetDirectoryName(outputPath)}\"");
             
-            // 模型路径 - 使用官方MuseTalk的模型位置
-            args.Append($" --unet_model_path \"MuseTalk/models/musetalk/pytorch_model.bin\"");
-            args.Append($" --unet_config \"MuseTalk/models/musetalk/musetalk.json\"");
+            // 模型路径 - 相对于MuseTalk目录
+            args.Append($" --unet_model_path \"models/musetalk/pytorch_model.bin\"");
+            args.Append($" --unet_config \"models/musetalk/musetalk.json\"");
             
             // 版本和其他参数
             args.Append($" --version v1");
