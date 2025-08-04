@@ -800,6 +800,9 @@ namespace LmyDigitalHuman.Services
                 if (!Directory.Exists(_templatesPath))
                 {
                     Directory.CreateDirectory(_templatesPath);
+                    _logger.LogInformation("Templates目录不存在，已创建: {Path}", _templatesPath);
+                    // 创建示例模板
+                    CreateSampleTemplates();
                     return;
                 }
 
@@ -869,8 +872,8 @@ namespace LmyDigitalHuman.Services
                         AgeRange = "25-35",
                         Style = "professional",
                         EnableEmotion = true,
-                        ImagePath = "/images/default-avatar.svg",
-                        ImageUrl = "/images/default-avatar.svg",
+                        ImagePath = "/templates/sample-female-1.jpg",
+                        ImageUrl = "/templates/sample-female-1.jpg",
                         DefaultVoiceSettings = new VoiceSettings
                         {
                             Voice = "zh-CN-XiaoxiaoNeural",
@@ -897,8 +900,8 @@ namespace LmyDigitalHuman.Services
                         AgeRange = "25-35",
                         Style = "friendly",
                         EnableEmotion = true,
-                        ImagePath = "/images/default-avatar.svg",
-                        ImageUrl = "/images/default-avatar.svg",
+                        ImagePath = "/templates/sample-male-1.jpg",
+                        ImageUrl = "/templates/sample-male-1.jpg",
                         DefaultVoiceSettings = new VoiceSettings
                         {
                             Voice = "zh-CN-YunxiNeural",
@@ -925,8 +928,8 @@ namespace LmyDigitalHuman.Services
                         AgeRange = "20-30",
                         Style = "casual",
                         EnableEmotion = true,
-                        ImagePath = "/images/default-avatar.svg",
-                        ImageUrl = "/images/default-avatar.svg",
+                        ImagePath = "/templates/sample-female-2.jpg",
+                        ImageUrl = "/templates/sample-female-2.jpg",
                         DefaultVoiceSettings = new VoiceSettings
                         {
                             Voice = "zh-CN-XiaohanNeural",

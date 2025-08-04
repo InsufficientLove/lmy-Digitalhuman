@@ -406,15 +406,7 @@ namespace LmyDigitalHuman.Controllers
         }
     }
 
-    /// <summary>
-    /// 欢迎视频请求
-    /// </summary>
-    public class WelcomeVideoRequest
-    {
-        [Required]
-        public string TemplateId { get; set; } = string.Empty;
-        public string Quality { get; set; } = "medium";
-    }
+
 
     /// <summary>
     /// 音频对话表单请求（用于文件上传）
