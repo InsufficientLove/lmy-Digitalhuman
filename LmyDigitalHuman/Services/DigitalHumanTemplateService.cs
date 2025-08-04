@@ -124,7 +124,8 @@ namespace LmyDigitalHuman.Services
                         _logger.LogInformation("🔧 开始MuseTalk模板预处理: {TemplateName}", template.TemplateName);
                         
                         // 🎯 第一步：进行MuseTalk预处理（永久化模型）
-                        await _museTalkService.PreprocessTemplateAsync(templateId);
+                        // 使用模板名称而不是GUID，因为图片文件名是基于模板名称的
+                        await _museTalkService.PreprocessTemplateAsync(template.TemplateName);
                         _logger.LogInformation("✅ MuseTalk预处理完成: {TemplateName}", template.TemplateName);
                         
                         // 🎬 第二步：生成预览视频

@@ -1448,6 +1448,10 @@ namespace LmyDigitalHuman.Services
                 _logger.LogInformation("   音频文件: {AudioPath}", audioPath);
                 _logger.LogInformation("   输出路径: {OutputPath}", outputPath);
                 
+                // 🔧 首先测试中文路径图片读取
+                _logger.LogInformation("🧪 测试中文路径图片读取...");
+                await TestChineseImageRead(pythonPath, imagePath);
+                
                 _logger.LogInformation("🎮 执行MuseTalk推理命令: {Command}", $"{pythonPath} {arguments}");
                 
                 var processInfo = new ProcessStartInfo
