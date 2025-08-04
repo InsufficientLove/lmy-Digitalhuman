@@ -730,6 +730,10 @@ namespace LmyDigitalHuman.Services
             
             if (request.BboxShift.HasValue)
                 args.Append($" --bbox_shift {request.BboxShift.Value}");
+            
+            // 添加调试参数，让inference脚本输出更多信息
+            args.Append($" --use_float16"); // 使用float16可能更快更稳定
+            args.Append($" --batch_size 1"); // 强制使用最小batch size
                 
             return args.ToString();
         }
@@ -749,6 +753,11 @@ namespace LmyDigitalHuman.Services
                 _logger.LogInformation("ContentRoot: {ContentRoot}", _pathManager.GetContentRootPath());
                 _logger.LogInformation("工作目录: {WorkingDirectory}", workingDir);
                 _logger.LogInformation("工作目录存在: {Exists}", Directory.Exists(workingDir));
+                
+                // 额外的环境信息
+                _logger.LogInformation("CUDA版本检查: {CudaDevices}", Environment.GetEnvironmentVariable("CUDA_VISIBLE_DEVICES"));
+                _logger.LogInformation("输入图片路径: {ImagePath}", request.AvatarImagePath);
+                _logger.LogInformation("输入音频路径: {AudioPath}", request.AudioPath);
                 
                 var processInfo = new ProcessStartInfo
                 {
