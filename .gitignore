@@ -13,7 +13,7 @@ artifacts/
 venv/
 env/
 .venv/
-venv_musetalk/
+# venv_musetalk/ - 注释掉，允许提交本地MuseTalk虚拟环境
 
 # Python 包管理和生成文件
 requirements_generated.txt
