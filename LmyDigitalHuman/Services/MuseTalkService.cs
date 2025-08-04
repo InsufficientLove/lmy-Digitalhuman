@@ -670,27 +670,65 @@ namespace LmyDigitalHuman.Services
                 
                 stopwatch.Stop();
 
-                if (result.Success && File.Exists(outputPath))
+                if (result.Success)
                 {
-                    var fileInfo = new FileInfo(outputPath);
-                    var videoUrl = $"/videos/{Path.GetFileName(outputPath)}";
+                    // MuseTalk在result_dir下创建版本子目录，寻找实际生成的文件
+                    var resultDir = Path.GetDirectoryName(outputPath);
+                    var fileName = Path.GetFileName(outputPath);
                     
-                    return new DigitalHumanResponse
+                    // 检查可能的输出路径
+                    var possiblePaths = new[]
                     {
-                        Success = true,
-                        VideoUrl = videoUrl,
-                        VideoPath = outputPath,
-                        ProcessingTime = stopwatch.ElapsedMilliseconds,
-                        Message = "数字人视频生成成功",
-                        CompletedAt = DateTime.UtcNow,
-                        Metadata = new DigitalHumanMetadata
-                        {
-                            Resolution = GetVideoResolution(request.Quality),
-                            Fps = request.Fps ?? 25,
-                            FileSize = fileInfo.Length,
-                            Quality = request.Quality
-                        }
+                        outputPath, // 原始路径
+                        Path.Combine(resultDir, "v1", fileName), // v1子目录
+                        Path.Combine(resultDir, "v15", fileName) // v15子目录
                     };
+                    
+                    string actualOutputPath = null;
+                    foreach (var path in possiblePaths)
+                    {
+                        if (File.Exists(path))
+                        {
+                            actualOutputPath = path;
+                            break;
+                        }
+                    }
+                    
+                    if (actualOutputPath != null)
+                    {
+                        var fileInfo = new FileInfo(actualOutputPath);
+                        var videoUrl = $"/videos/{Path.GetFileName(actualOutputPath)}";
+                        
+                        // 如果文件不在videos目录，复制过去
+                        if (!actualOutputPath.Contains("wwwroot\\videos"))
+                        {
+                            var targetPath = Path.Combine(resultDir, Path.GetFileName(actualOutputPath));
+                            File.Copy(actualOutputPath, targetPath, true);
+                            actualOutputPath = targetPath;
+                            _logger.LogInformation("视频文件已复制到: {TargetPath}", targetPath);
+                        }
+                        
+                        return new DigitalHumanResponse
+                        {
+                            Success = true,
+                            VideoUrl = videoUrl,
+                            VideoPath = actualOutputPath,
+                            ProcessingTime = stopwatch.ElapsedMilliseconds,
+                            Message = "数字人视频生成成功",
+                            CompletedAt = DateTime.UtcNow,
+                            Metadata = new DigitalHumanMetadata
+                            {
+                                Resolution = GetVideoResolution(request.Quality),
+                                Fps = request.Fps ?? 25,
+                                FileSize = fileInfo.Length,
+                                Quality = request.Quality
+                            }
+                        };
+                    }
+                    else
+                    {
+                        _logger.LogWarning("视频生成完成但未找到输出文件，检查路径: {Paths}", string.Join(", ", possiblePaths));
+                    }
                 }
                 else
                 {
