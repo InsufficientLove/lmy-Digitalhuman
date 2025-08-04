@@ -428,26 +428,42 @@
 
         .modal-content {
             background-color: white;
-            margin: 5% auto;
-            padding: 30px;
+            margin: 2% auto;
+            padding: 0;
             border-radius: 15px;
             width: 90%;
             max-width: 600px;
+            max-height: 90vh;
             box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
         }
 
         .modal-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 20px;
-            padding-bottom: 15px;
+            padding: 20px 30px;
             border-bottom: 2px solid #e9ecef;
+            flex-shrink: 0;
         }
 
         .modal-header h3 {
             margin: 0;
             color: #495057;
+        }
+
+        .modal-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px 30px;
+        }
+
+        .modal-footer {
+            padding: 20px 30px;
+            border-top: 1px solid #e9ecef;
+            flex-shrink: 0;
         }
 
         .close {
@@ -658,75 +674,79 @@
             </div>
             
             <form id="createTemplateForm" onsubmit="createTemplate(event)">
-                <div class="form-row">
-                    <div class="input-group">
-                        <label for="templateName">显示名称 *</label>
-                        <input type="text" id="templateName" class="form-control" required placeholder="请输入中文显示名称，如：小哈">
+                <div class="modal-body">
+                    <div class="form-row">
+                        <div class="input-group">
+                            <label for="templateName">显示名称 *</label>
+                            <input type="text" id="templateName" class="form-control" required placeholder="请输入中文显示名称，如：小哈">
+                        </div>
+                        <div class="input-group">
+                            <label for="systemName">英文标识 *</label>
+                            <input type="text" id="systemName" class="form-control" required 
+                                   placeholder="请输入英文标识，如：xiaoha" 
+                                   pattern="[a-zA-Z0-9_-]+" 
+                                   title="只能包含英文字母、数字、下划线和连字符"
+                                   oninput="validateSystemName(this)">
+                            <small style="color: #666; font-size: 0.8em;">用于文件存储，只能包含英文、数字、下划线和连字符</small>
+                        </div>
                     </div>
-                    <div class="input-group">
-                        <label for="systemName">英文标识 *</label>
-                        <input type="text" id="systemName" class="form-control" required 
-                               placeholder="请输入英文标识，如：xiaoha" 
-                               pattern="[a-zA-Z0-9_-]+" 
-                               title="只能包含英文字母、数字、下划线和连字符"
-                               oninput="validateSystemName(this)">
-                        <small style="color: #666; font-size: 0.8em;">用于文件存储，只能包含英文、数字、下划线和连字符</small>
+                    
+                    <div class="form-row">
+                        <div class="input-group">
+                            <label for="templateDescription">模板描述</label>
+                            <input type="text" id="templateDescription" class="form-control" placeholder="简短描述这个模板">
+                        </div>
+                        <div class="input-group">
+                            <!-- 占位，保持布局平衡 -->
+                        </div>
                     </div>
-                </div>
-                
-                <div class="form-row">
-                    <div class="input-group">
-                        <label for="templateDescription">模板描述</label>
-                        <input type="text" id="templateDescription" class="form-control" placeholder="简短描述这个模板">
+
+                    <div class="form-row">
+                        <div class="input-group">
+                            <label for="templateGender">性别</label>
+                            <select id="templateGender" class="form-control">
+                                <option value="female">女性</option>
+                                <option value="male">男性</option>
+                                <option value="other">其他</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label for="templateStyle">风格</label>
+                            <select id="templateStyle" class="form-control">
+                                <option value="professional">专业</option>
+                                <option value="casual">休闲</option>
+                                <option value="elegant">优雅</option>
+                                <option value="modern">现代</option>
+                                <option value="classic">经典</option>
+                            </select>
+                        </div>
                     </div>
+
                     <div class="input-group">
-                        <!-- 占位，保持布局平衡 -->
+                        <label for="templateImage">上传头像图片 *</label>
+                        <div class="file-upload">
+                            <input type="file" id="templateImage" accept="image/*" required onchange="previewTemplateImage(event)">
+                            <label for="templateImage" class="file-upload-label">
+                                📷 选择图片文件 (支持 JPG, PNG, WebP)
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="preview-container" id="imagePreviewContainer" style="display: none;">
+                        <img id="imagePreview" class="preview-image" alt="预览图片">
+                    </div>
+
+                    <div class="input-group">
+                        <label for="voiceSettings">语音设置</label>
+                        <textarea id="voiceSettings" class="form-control" placeholder="语音设置 (JSON格式，可选)">{"voice": "zh-CN-XiaoxiaoNeural", "rate": "medium", "pitch": "medium"}</textarea>
                     </div>
                 </div>
 
-                <div class="form-row">
-                    <div class="input-group">
-                        <label for="templateGender">性别</label>
-                        <select id="templateGender" class="form-control">
-                            <option value="female">女性</option>
-                            <option value="male">男性</option>
-                            <option value="other">其他</option>
-                        </select>
+                <div class="modal-footer">
+                    <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                        <button type="button" class="btn btn-secondary" onclick="hideCreateTemplateModal()">取消</button>
+                        <button type="submit" class="btn btn-primary" id="createTemplateBtn">🎭 创建模板</button>
                     </div>
-                    <div class="input-group">
-                        <label for="templateStyle">风格</label>
-                        <select id="templateStyle" class="form-control">
-                            <option value="professional">专业</option>
-                            <option value="casual">休闲</option>
-                            <option value="elegant">优雅</option>
-                            <option value="modern">现代</option>
-                            <option value="classic">经典</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="input-group">
-                    <label for="templateImage">上传头像图片 *</label>
-                    <div class="file-upload">
-                        <input type="file" id="templateImage" accept="image/*" required onchange="previewTemplateImage(event)">
-                        <label for="templateImage" class="file-upload-label">
-                            📷 选择图片文件 (支持 JPG, PNG, WebP)
-                        </label>
-                    </div>
-                </div>
-
-                <div class="preview-container" id="imagePreviewContainer" style="display: none;">
-                    <img id="imagePreview" class="preview-image" alt="预览图片">
-                </div>
-
-                <div class="input-group">
-                    <label for="voiceSettings">语音设置</label>
-                    <textarea id="voiceSettings" class="form-control" placeholder="语音设置 (JSON格式，可选)">{"voice": "zh-CN-XiaoxiaoNeural", "rate": "medium", "pitch": "medium"}</textarea>
-                </div>
-
-                <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
-                    <button type="button" class="btn btn-secondary" onclick="hideCreateTemplateModal()">取消</button>
-                    <button type="submit" class="btn btn-primary" id="createTemplateBtn">🎭 创建模板</button>
                 </div>
             </form>
         </div>
