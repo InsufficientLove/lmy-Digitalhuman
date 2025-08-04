@@ -62,10 +62,16 @@ namespace LmyDigitalHuman.Services
                 // 生成模板ID
                 var templateId = Guid.NewGuid().ToString("N");
                 
-                // 使用模板名称作为文件名，确保文件名安全
+                // 🎯 直接使用模板名称作为文件名，支持中英文
                 var safeName = SanitizeFileName(request.TemplateName);
-                var imageFileName = $"{safeName}_{templateId}.jpg";
+                var imageFileName = $"{safeName}.jpg";
                 var imagePath = Path.Combine(_templatesPath, imageFileName);
+                
+                // 检查文件是否已存在（防止重名覆盖）
+                if (File.Exists(imagePath))
+                {
+                    _logger.LogWarning("模板文件已存在，将覆盖: {FileName}", imageFileName);
+                }
                 
                 using (var stream = new FileStream(imagePath, FileMode.Create))
                 {

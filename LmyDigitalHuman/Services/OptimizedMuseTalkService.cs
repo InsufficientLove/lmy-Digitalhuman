@@ -32,6 +32,10 @@ namespace LmyDigitalHuman.Services
         private long _completedRequests = 0;
         private readonly ConcurrentDictionary<string, long> _templateUsageCount = new();
         
+        // 🚀 性能优化缓存
+        private string? _cachedPythonPath = null;
+        private readonly object _pythonPathLock = new object();
+        
         public OptimizedMuseTalkService(
             ILogger<OptimizedMuseTalkService> logger,
             IConfiguration configuration,
@@ -182,7 +186,7 @@ namespace LmyDigitalHuman.Services
             {
                 var templatesDir = Path.Combine(_pathManager.GetContentRootPath(), "wwwroot", "templates");
                 var museTalkDir = Path.Combine(_pathManager.GetContentRootPath(), "..", "MuseTalk");
-                var pythonPath = _pythonEnvironmentService.GetRecommendedPythonPathAsync().Result;
+                var pythonPath = await GetCachedPythonPathAsync();
                 
                                  // 构建初始化命令 - 仅初始化模型，不预处理模板（支持动态预处理）
                 var arguments = new StringBuilder();
@@ -197,7 +201,7 @@ namespace LmyDigitalHuman.Services
                 arguments.Append($"unet_model_path='{museTalkDir.Replace("\\", "/")}/models/musetalk/pytorch_model.bin', ");
                 arguments.Append($"whisper_dir='{museTalkDir.Replace("\\", "/")}/models/whisper', ");
                 arguments.Append($"vae_type='sd-vae', ");
-                arguments.Append($"batch_size=32, ");
+                arguments.Append($"batch_size=64, ");
                 arguments.Append($"bbox_shift=0, ");
                 arguments.Append($"extra_margin=10, ");
                 arguments.Append($"audio_padding_length_left=2, ");
@@ -287,7 +291,7 @@ namespace LmyDigitalHuman.Services
             var outputPath = Path.Combine(_pathManager.GetContentRootPath(), "wwwroot", "videos", outputFileName);
             
             var museTalkDir = Path.Combine(_pathManager.GetContentRootPath(), "..", "MuseTalk");
-            var pythonPath = await _pythonEnvironmentService.GetRecommendedPythonPathAsync();
+            var pythonPath = await GetCachedPythonPathAsync();
             var optimizedScriptPath = Path.Combine(museTalkDir, "optimized_musetalk_inference.py");
             
             // 构建优化推理命令
@@ -298,7 +302,7 @@ namespace LmyDigitalHuman.Services
             arguments.Append($" --output_path \"{outputPath}\"");
             arguments.Append($" --template_dir \"{Path.Combine(_pathManager.GetContentRootPath(), "wwwroot", "templates")}\"");
             arguments.Append($" --version v1");
-            arguments.Append($" --batch_size 32"); // 4GPU优化批处理大小
+            arguments.Append($" --batch_size 64"); // 4x RTX 4090极致优化批处理大小
             arguments.Append($" --fps 25");
             arguments.Append($" --unet_config \"models/musetalk/musetalk.json\"");
             arguments.Append($" --unet_model_path \"models/musetalk/pytorch_model.bin\"");
@@ -344,8 +348,8 @@ namespace LmyDigitalHuman.Services
             process.BeginOutputReadLine();
             process.BeginErrorReadLine();
             
-            // 优化推理超时设置（2分钟）
-            var timeoutMs = 120000;
+            // 🚀 4GPU并行推理超时设置（5分钟，确保有足够时间完成）
+            var timeoutMs = 300000;
             var completed = await Task.Run(() => process.WaitForExit(timeoutMs));
             
             if (!completed)
@@ -374,10 +378,10 @@ namespace LmyDigitalHuman.Services
         /// </summary>
         private void ConfigureOptimizedGpuEnvironment(ProcessStartInfo processInfo)
         {
-            // 🚀 4x RTX 4090极致性能配置
+            // 🚀 4x RTX 4090极致性能配置 - 基于官方基准优化
             processInfo.Environment["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"; // 使用所有GPU
-            processInfo.Environment["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:8192,expandable_segments:True"; // 大内存配置
-            processInfo.Environment["OMP_NUM_THREADS"] = "32"; // 最大化CPU并行
+            processInfo.Environment["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:12288,expandable_segments:True,roundup_power2_divisions:32"; // RTX 4090 24GB极致配置
+            processInfo.Environment["OMP_NUM_THREADS"] = "64"; // 最大化CPU并行，支持batch_size=64
             processInfo.Environment["CUDA_LAUNCH_BLOCKING"] = "0"; // 异步CUDA
             processInfo.Environment["TORCH_CUDNN_V8_API_ENABLED"] = "1";
             processInfo.Environment["TORCH_BACKENDS_CUDNN_BENCHMARK"] = "1"; // cuDNN自动调优
@@ -417,12 +421,28 @@ namespace LmyDigitalHuman.Services
         }
         
         /// <summary>
-        /// 获取音频时长
+        /// 获取音频时长 - 快速估算，避免性能开销
         /// </summary>
         private double GetAudioDuration(string audioPath)
         {
-            // TODO: 使用FFmpeg获取真实时长
-            return 3.0;
+            try
+            {
+                // 快速文件大小估算（避免FFmpeg调用的性能开销）
+                var fileInfo = new FileInfo(audioPath);
+                if (fileInfo.Exists)
+                {
+                    // 粗略估算：WAV文件约每秒175KB，MP3约每秒32KB
+                    var extension = Path.GetExtension(audioPath).ToLower();
+                    var bytesPerSecond = extension == ".wav" ? 175000 : 32000;
+                    return Math.Max(1.0, (double)fileInfo.Length / bytesPerSecond);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "获取音频时长失败，使用默认值: {AudioPath}", audioPath);
+            }
+            
+            return 3.0; // 默认3秒
         }
         
         /// <summary>
@@ -443,6 +463,31 @@ namespace LmyDigitalHuman.Services
             }
             
             return stats.ToString();
+        }
+        
+        /// <summary>
+        /// 获取缓存的Python路径，避免重复检测
+        /// </summary>
+        private async Task<string> GetCachedPythonPathAsync()
+        {
+            if (_cachedPythonPath != null)
+            {
+                return _cachedPythonPath;
+            }
+            
+            lock (_pythonPathLock)
+            {
+                if (_cachedPythonPath != null)
+                {
+                    return _cachedPythonPath;
+                }
+                
+                _logger.LogInformation("🔍 首次检测Python路径...");
+                _cachedPythonPath = _pythonEnvironmentService.GetRecommendedPythonPathAsync().Result;
+                _logger.LogInformation("✅ Python路径已缓存: {PythonPath}", _cachedPythonPath);
+                
+                return _cachedPythonPath;
+            }
         }
         
         public void Dispose()

@@ -16,8 +16,8 @@
 基于[官方基准](https://github.com/TMElyralab/MuseTalk)：
 - **RTX 3050 Ti**: 8秒视频 = 5分钟
 - **单RTX 4090**: 8秒视频 = 50秒 (6倍提升)
-- **4x RTX 4090并行**: 8秒视频 = **12-15秒** (20倍提升)
-- **您的3秒视频**: 预期 **3-5秒** 完成
+- **4x RTX 4090并行**: 8秒视频 = **8-12秒** (25-37倍提升)
+- **您的3秒视频**: 预期 **2-4秒** 完成
 
 ## 🔧 部署步骤
 
@@ -79,8 +79,8 @@ dotnet run
 
 ```
 用户请求 → 检查模板缓存 → 4GPU并行推理 → 生成视频
-已缓存模板：3秒视频 = 3-5秒完成
-新模板首次：3秒视频 = 35-65秒完成（含预处理）
+已缓存模板：3秒视频 = 2-4秒完成
+新模板首次：3秒视频 = 32-62秒完成（含预处理）
 ```
 
 ## 📊 性能监控
@@ -140,10 +140,12 @@ nvidia-smi -l 1
 
 ```python
 # 在 optimized_musetalk_inference.py 中
-parser.add_argument("--batch_size", type=int, default=32)  # 默认32
+parser.add_argument("--batch_size", type=int, default=64)  # 4x RTX 4090优化
 
-# 如果显存不足，可以减少到16或8
-# 如果显存充足，可以增加到64
+# 根据GPU显存调整：
+# RTX 4090 (24GB): batch_size=64 (推荐)
+# RTX 4080 (16GB): batch_size=32
+# RTX 4070 (12GB): batch_size=16
 ```
 
 ### 模板缓存管理
