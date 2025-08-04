@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
-🚀 MuseTalk极致性能优化版本
+MuseTalk极致性能优化版本
 基于官方realtime_inference.py源码，针对固定模板场景的极致优化
 
 特性:
@@ -35,7 +36,7 @@ from musetalk.utils.blending import get_image_prepare_material, get_image_blendi
 from musetalk.utils.audio_processor import AudioProcessor
 
 class OptimizedMuseTalkInference:
-    """🚀 MuseTalk极致性能优化推理器"""
+    """MuseTalk极致性能优化推理器"""
     
     def __init__(self, config):
         self.config = config
@@ -45,7 +46,7 @@ class OptimizedMuseTalkInference:
         self.audio_processor = None
         self.fp = None
         
-        print(f"🚀 初始化MuseTalk优化推理器 - 检测到 {self.device_count} 个GPU")
+        print(f"[START] 初始化MuseTalk优化推理器 - 检测到 {self.device_count} 个GPU")
         
         # 初始化每个GPU的模型
         self._initialize_models()
@@ -53,11 +54,11 @@ class OptimizedMuseTalkInference:
         # 预处理所有模板
         self._preprocess_templates()
         
-        print("✅ MuseTalk优化推理器初始化完成")
+        print("[OK] MuseTalk优化推理器初始化完成")
     
     def _initialize_models(self):
         """初始化每个GPU的模型实例"""
-        print("🔧 初始化GPU模型...")
+        print("[CONFIG] 初始化GPU模型...")
         
         for gpu_id in range(self.device_count):
             device = torch.device(f"cuda:{gpu_id}")
@@ -94,7 +95,7 @@ class OptimizedMuseTalkInference:
                 'device': device
             }
             
-            print(f"✅ GPU {gpu_id} 模型初始化完成")
+            print(f"[OK] GPU {gpu_id} 模型初始化完成")
         
         # 初始化音频处理器（共享）
         self.audio_processor = AudioProcessor(feature_extractor_path=self.config.whisper_dir)
@@ -134,9 +135,9 @@ class OptimizedMuseTalkInference:
             try:
                 template_data = self._preprocess_single_template(template_id, template_file)
                 self.templates[template_id] = template_data
-                print(f"✅ 模板 {template_id} 预处理完成")
+                print(f"[OK] 模板 {template_id} 预处理完成")
             except Exception as e:
-                print(f"❌ 模板 {template_id} 预处理失败: {e}")
+                print(f"[ERROR] 模板 {template_id} 预处理失败: {e}")
         
         print(f"🎉 所有模板预处理完成，共 {len(self.templates)} 个模板")
     
@@ -240,11 +241,11 @@ class OptimizedMuseTalkInference:
             
             template_data = self._preprocess_single_template(template_id, template_path)
             self.templates[template_id] = template_data
-            print(f"✅ 模板 {template_id} 动态预处理完成")
+            print(f"[OK] 模板 {template_id} 动态预处理完成")
         
         template_data = self.templates[template_id]
         
-        print(f"🚀 开始并行推理: 模板={template_id}, 音频={audio_path}")
+        print(f"[START] 开始并行推理: 模板={template_id}, 音频={audio_path}")
         start_time = time.time()
         
         # 1. 音频特征提取（使用GPU 0）
@@ -271,7 +272,7 @@ class OptimizedMuseTalkInference:
         )
         
         audio_time = time.time() - audio_start
-        print(f"✅ 音频特征提取完成: {audio_time:.2f}s, 共 {len(whisper_chunks)} 帧")
+        print(f"[OK] 音频特征提取完成: {audio_time:.2f}s, 共 {len(whisper_chunks)} 帧")
         
         # 2. 并行GPU推理
         print("🎮 开始4GPU并行推理...")
@@ -323,7 +324,7 @@ class OptimizedMuseTalkInference:
                 res_frame_list.extend(results[i])
         
         inference_time = time.time() - inference_start
-        print(f"✅ 4GPU并行推理完成: {inference_time:.2f}s")
+        print(f"[OK] 4GPU并行推理完成: {inference_time:.2f}s")
         
         # 3. 后处理和视频合成
         print("🎬 开始视频合成...")
@@ -337,7 +338,7 @@ class OptimizedMuseTalkInference:
         total_time = time.time() - start_time
         
         print(f"🎉 推理完成!")
-        print(f"📊 性能统计:")
+        print(f"[STATS] 性能统计:")
         print(f"   音频处理: {audio_time:.2f}s")
         print(f"   GPU推理: {inference_time:.2f}s")
         print(f"   后处理: {postprocess_time:.2f}s")
@@ -384,7 +385,7 @@ class OptimizedMuseTalkInference:
                 # 队列为空，退出线程
                 break
             except Exception as e:
-                print(f"❌ GPU {gpu_id} 处理错误: {e}")
+                print(f"[ERROR] GPU {gpu_id} 处理错误: {e}")
                 task_queue.task_done()
         
         print(f"🛑 GPU {gpu_id} 工作线程结束")
@@ -455,7 +456,7 @@ class OptimizedMuseTalkInference:
         import shutil
         shutil.rmtree(temp_dir)
         
-        print(f"✅ 视频保存完成: {output_path}")
+        print(f"[OK] 视频保存完成: {output_path}")
 
 def main():
     parser = argparse.ArgumentParser(description="MuseTalk极致性能优化推理")
@@ -483,8 +484,8 @@ def main():
     
     args = parser.parse_args()
     
-    print("🚀 启动MuseTalk极致性能优化推理器")
-    print(f"📊 配置参数:")
+    print("启动MuseTalk极致性能优化推理器")
+    print(f"配置参数:")
     print(f"   模板ID: {args.template_id}")
     print(f"   音频文件: {args.audio_path}")
     print(f"   输出路径: {args.output_path}")

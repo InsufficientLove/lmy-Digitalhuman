@@ -1375,9 +1375,25 @@ namespace LmyDigitalHuman.Services
                 var outputDir = Path.GetDirectoryName(outputPath);
                 Directory.CreateDirectory(outputDir);
                 
-                var museTalkDir = Path.Combine(_pathManager.GetContentRootPath(), "..", "MuseTalk");
+                // 🔧 使用正确的MuseTalk脚本路径
+                var contentRoot = _pathManager.GetContentRootPath();
+                var museTalkDir = Path.Combine(contentRoot, "..", "MuseTalk");
                 var pythonPath = await GetCachedPythonPathAsync();
+                
+                // 检查脚本路径
                 var optimizedScriptPath = Path.Combine(museTalkDir, "optimized_musetalk_inference.py");
+                if (!File.Exists(optimizedScriptPath))
+                {
+                    // 尝试在工作目录中查找
+                    optimizedScriptPath = Path.Combine(contentRoot, "optimized_musetalk_inference.py");
+                    if (!File.Exists(optimizedScriptPath))
+                    {
+                        throw new FileNotFoundException($"找不到MuseTalk推理脚本: {optimizedScriptPath}");
+                    }
+                    museTalkDir = contentRoot; // 更新工作目录
+                }
+                
+                _logger.LogInformation("📄 使用MuseTalk脚本: {ScriptPath}", optimizedScriptPath);
                 
                 // 构建MuseTalk推理命令
                 var arguments = new StringBuilder();
@@ -1409,6 +1425,13 @@ namespace LmyDigitalHuman.Services
                 // 配置GPU环境，指定使用特定GPU
                 ConfigureOptimizedGpuEnvironment(processInfo);
                 processInfo.Environment["CUDA_VISIBLE_DEVICES"] = gpuId.ToString();
+                
+                // 🔧 修复Unicode编码问题 - 强制UTF-8
+                processInfo.Environment["PYTHONIOENCODING"] = "utf-8";
+                processInfo.Environment["PYTHONUNBUFFERED"] = "1";
+                processInfo.Environment["PYTHONUTF8"] = "1";
+                processInfo.Environment["LANG"] = "en_US.UTF-8";
+                processInfo.Environment["LC_ALL"] = "en_US.UTF-8";
                 
                 var process = new Process { StartInfo = processInfo };
                 var outputBuilder = new StringBuilder();
