@@ -63,8 +63,7 @@ namespace LmyDigitalHuman.Services
                 var templateId = Guid.NewGuid().ToString("N");
                 
                 // 🎯 直接使用模板名称作为文件名，支持中英文
-                var safeName = SanitizeFileName(request.TemplateName);
-                var imageFileName = $"{safeName}.jpg";
+                var imageFileName = $"{request.TemplateName}.jpg";
                 
                 // 确保使用完整的绝对路径
                 var fullTemplatesPath = Path.IsPathRooted(_templatesPath) 
@@ -869,120 +868,12 @@ namespace LmyDigitalHuman.Services
             }
         }
 
-        private void CreateSampleTemplates()
-        {
-            try
-            {
-                _logger.LogInformation("创建示例模板...");
-
-                var sampleTemplates = new[]
-                {
-                    new DigitalHumanTemplate
-                    {
-                        TemplateId = "sample-female-1",
-                        TemplateName = "小雅",
-                        Description = "专业女性主播，适合商务场景",
-                        TemplateType = "standard",
-                        Gender = "female",
-                        AgeRange = "25-35",
-                        Style = "professional",
-                        EnableEmotion = true,
-                        ImagePath = "/templates/sample-female-1.jpg",
-                        ImageUrl = "/templates/sample-female-1.jpg",
-                        DefaultVoiceSettings = new VoiceSettings
-                        {
-                            Voice = "zh-CN-XiaoxiaoNeural",
-                            VoiceId = "zh-CN-XiaoxiaoNeural",
-                            Rate = "medium",
-                            Pitch = "medium",
-                            Speed = 1.0f,
-                            Volume = 1.0f
-                        },
-                        CustomParameters = new Dictionary<string, object>(),
-                        CreatedAt = DateTime.Now,
-                        UpdatedAt = DateTime.Now,
-                        IsActive = true,
-                        Status = "active",
-                        UsageCount = 0
-                    },
-                    new DigitalHumanTemplate
-                    {
-                        TemplateId = "sample-male-1",
-                        TemplateName = "小明",
-                        Description = "友好男性助手，适合客服场景",
-                        TemplateType = "standard",
-                        Gender = "male",
-                        AgeRange = "25-35",
-                        Style = "friendly",
-                        EnableEmotion = true,
-                        ImagePath = "/templates/sample-male-1.jpg",
-                        ImageUrl = "/templates/sample-male-1.jpg",
-                        DefaultVoiceSettings = new VoiceSettings
-                        {
-                            Voice = "zh-CN-YunxiNeural",
-                            VoiceId = "zh-CN-YunxiNeural",
-                            Rate = "medium",
-                            Pitch = "medium",
-                            Speed = 1.0f,
-                            Volume = 1.0f
-                        },
-                        CustomParameters = new Dictionary<string, object>(),
-                        CreatedAt = DateTime.Now,
-                        UpdatedAt = DateTime.Now,
-                        IsActive = true,
-                        Status = "active",
-                        UsageCount = 0
-                    },
-                    new DigitalHumanTemplate
-                    {
-                        TemplateId = "sample-female-2",
-                        TemplateName = "小慧",
-                        Description = "活泼女性主播，适合娱乐场景",
-                        TemplateType = "standard",
-                        Gender = "female",
-                        AgeRange = "20-30",
-                        Style = "casual",
-                        EnableEmotion = true,
-                        ImagePath = "/templates/sample-female-2.jpg",
-                        ImageUrl = "/templates/sample-female-2.jpg",
-                        DefaultVoiceSettings = new VoiceSettings
-                        {
-                            Voice = "zh-CN-XiaohanNeural",
-                            VoiceId = "zh-CN-XiaohanNeural",
-                            Rate = "medium",
-                            Pitch = "medium",
-                            Speed = 1.0f,
-                            Volume = 1.0f
-                        },
-                        CustomParameters = new Dictionary<string, object>(),
-                        CreatedAt = DateTime.Now,
-                        UpdatedAt = DateTime.Now,
-                        IsActive = true,
-                        Status = "active",
-                        UsageCount = 0
-                    }
-                };
-
-                foreach (var template in sampleTemplates)
-                {
-                    _templates[template.TemplateId] = template;
-                    // 保存到文件
-                    _ = Task.Run(async () => await SaveTemplateToFileAsync(template));
-                }
-
-                _logger.LogInformation("成功创建 {Count} 个示例模板", sampleTemplates.Length);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "创建示例模板失败");
-            }
-        }
+        // CreateSampleTemplates方法已完全移除 - 业务从用户创建模板开始
 
         private async Task SaveTemplateToFileAsync(DigitalHumanTemplate template)
         {
-            // 使用安全的模板名称作为JSON文件名
-            var safeName = SanitizeFileName(template.TemplateName);
-            var filePath = Path.Combine(_templatesPath, $"{safeName}_{template.TemplateId}.json");
+            // 直接使用模板名称作为JSON文件名，支持中文
+            var filePath = Path.Combine(_templatesPath, $"{template.TemplateName}.json");
             var json = JsonSerializer.Serialize(template, new JsonSerializerOptions { 
                 WriteIndented = true,
                 Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping 

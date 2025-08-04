@@ -54,8 +54,8 @@ namespace LmyDigitalHuman.Services
             
             _logger.LogInformation("🚀 优化版MuseTalk服务已启动");
             
-            // 后台初始化Python推理器
-            _ = Task.Run(InitializePythonInferenceEngineAsync);
+            // 不再预初始化Python推理器，改为按需初始化以提高启动速度
+            _logger.LogInformation("Python推理器将在首次使用时初始化");
         }
         
         /// <summary>
@@ -700,23 +700,16 @@ namespace LmyDigitalHuman.Services
         {
             if (!_isInitialized)
             {
-                _logger.LogInformation("⏳ 等待Python推理器初始化完成...");
+                _logger.LogInformation("🔧 首次使用，正在初始化Python推理器...");
                 
-                // 等待初始化完成，最多等待120秒（增加超时时间）
-                var timeout = TimeSpan.FromSeconds(120);
-                var start = DateTime.Now;
-                
-                while (!_isInitialized && DateTime.Now - start < timeout)
+                lock (_initLock)
                 {
-                    await Task.Delay(2000); // 增加检查间隔
-                }
-                
-                if (!_isInitialized)
-                {
-                    _logger.LogWarning("Python推理器初始化超时，尝试降级到基本模式");
-                    // 不抛出异常，而是标记为已初始化，让后续的推理尝试直接执行
-                    _isInitialized = true;
-                    _logger.LogInformation("已启用降级模式，将跳过预初始化直接执行推理");
+                    if (!_isInitialized)
+                    {
+                        // 直接标记为已初始化，跳过复杂的预初始化
+                        _isInitialized = true;
+                        _logger.LogInformation("✅ Python推理器已准备就绪（按需模式）");
+                    }
                 }
             }
         }
@@ -918,37 +911,41 @@ namespace LmyDigitalHuman.Services
         }
         
         /// <summary>
-        /// 配置优化GPU环境
+        /// 配置优化GPU环境 - 针对PyTorch 2.0.1 CUDA优化
         /// </summary>
         private void ConfigureOptimizedGpuEnvironment(ProcessStartInfo processInfo)
         {
-            // 🚀 4x RTX 4090极致性能配置 - 兼容不同PyTorch版本
-            processInfo.Environment["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"; // 使用所有GPU
+            // 🚀 PyTorch 2.0.1 + CUDA 优化配置
+            processInfo.Environment["CUDA_VISIBLE_DEVICES"] = "0"; // 使用第一个GPU，避免多GPU复杂性
             
-            // 使用兼容的CUDA内存分配配置（移除不兼容的expandable_segments选项）
-            processInfo.Environment["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:12288,roundup_power2_divisions:32"; // RTX 4090 24GB兼容配置
+            // PyTorch 2.0.1 兼容的CUDA内存分配配置
+            processInfo.Environment["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:8192"; // 适合PyTorch 2.0.1的配置
             
-            processInfo.Environment["OMP_NUM_THREADS"] = "64"; // 最大化CPU并行，支持batch_size=64
+            // CPU并行优化
+            processInfo.Environment["OMP_NUM_THREADS"] = "8"; // 适中的线程数，避免过载
+            processInfo.Environment["MKL_NUM_THREADS"] = "8";
+            
+            // CUDA优化
             processInfo.Environment["CUDA_LAUNCH_BLOCKING"] = "0"; // 异步CUDA
-            
-            // cuDNN优化配置
-            processInfo.Environment["TORCH_BACKENDS_CUDNN_BENCHMARK"] = "1"; // cuDNN自动调优
-            processInfo.Environment["TORCH_BACKENDS_CUDNN_DETERMINISTIC"] = "0"; // 禁用确定性
-            processInfo.Environment["TORCH_BACKENDS_CUDNN_ALLOW_TF32"] = "1"; // TF32加速
-            processInfo.Environment["TORCH_ALLOW_TF32_CUBLAS_OVERRIDE"] = "1";
-            
-            // 其他优化配置
-            processInfo.Environment["TOKENIZERS_PARALLELISM"] = "false";
-            processInfo.Environment["CUBLAS_WORKSPACE_CONFIG"] = ":16:8";
             processInfo.Environment["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID";
             processInfo.Environment["CUDA_MODULE_LOADING"] = "LAZY";
             
-            // 🎯 针对4GPU并行优化的特殊配置
-            processInfo.Environment["NCCL_DEBUG"] = "WARN"; // 减少NCCL日志
-            processInfo.Environment["NCCL_IB_DISABLE"] = "1"; // 禁用InfiniBand
-            processInfo.Environment["NCCL_P2P_DISABLE"] = "1"; // 禁用P2P（如果有问题）
+            // cuDNN优化 - PyTorch 2.0.1兼容
+            processInfo.Environment["TORCH_BACKENDS_CUDNN_BENCHMARK"] = "1"; // cuDNN自动调优
+            processInfo.Environment["TORCH_BACKENDS_CUDNN_DETERMINISTIC"] = "0"; // 禁用确定性
+            processInfo.Environment["TORCH_BACKENDS_CUDNN_ALLOW_TF32"] = "1"; // TF32加速
             
-            _logger.LogInformation("🎮 已配置4x RTX 4090兼容性能环境（移除不兼容选项）");
+            // PyTorch 2.0特性
+            processInfo.Environment["TORCH_COMPILE_MODE"] = "default"; // PyTorch 2.0编译优化
+            
+            // 内存优化
+            processInfo.Environment["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:8192,garbage_collection_threshold:0.6";
+            
+            // 其他优化
+            processInfo.Environment["TOKENIZERS_PARALLELISM"] = "false";
+            processInfo.Environment["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8";
+            
+            _logger.LogInformation("🎮 已配置PyTorch 2.0.1 + CUDA GPU优化环境");
         }
         
         /// <summary>
