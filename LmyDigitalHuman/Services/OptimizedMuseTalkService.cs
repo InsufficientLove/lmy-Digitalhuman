@@ -794,7 +794,7 @@ namespace LmyDigitalHuman.Services
                 arguments.Append($"unet_config='{museTalkDir.Replace("\\", "/")}/models/musetalk/musetalk.json', ");
                 arguments.Append($"unet_model_path='{museTalkDir.Replace("\\", "/")}/models/musetalk/pytorch_model.bin', ");
                 arguments.Append($"whisper_dir='{museTalkDir.Replace("\\", "/")}/models/whisper', ");
-                arguments.Append($"vae_type='sd-vae-ft-mse', ");
+                arguments.Append($"vae_type='sd-vae', ");
                 arguments.Append($"batch_size=64, ");
                 arguments.Append($"bbox_shift=0, ");
                 arguments.Append($"extra_margin=10, ");
@@ -1449,7 +1449,7 @@ namespace LmyDigitalHuman.Services
                 arguments.Append($" --unet_config \"models/musetalk/musetalk.json\"");
                 arguments.Append($" --unet_model_path \"models/musetalk/pytorch_model.bin\"");
                 arguments.Append($" --whisper_dir \"models/whisper\"");
-                arguments.Append($" --vae_type \"sd-vae-ft-mse\"");
+                arguments.Append($" --vae_type \"sd-vae\"");
                 
                 _logger.LogInformation("🔧 推理参数:");
                 _logger.LogInformation("   模板ID: {TemplateId}", templateId);

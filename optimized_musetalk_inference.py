@@ -517,7 +517,7 @@ def main():
     parser.add_argument("--unet_config", type=str, default="./models/musetalk/musetalk.json")
     parser.add_argument("--unet_model_path", type=str, default="./models/musetalk/pytorch_model.bin")
     parser.add_argument("--whisper_dir", type=str, default="./models/whisper")
-    parser.add_argument("--vae_type", type=str, default="sd-vae-ft-mse")
+    parser.add_argument("--vae_type", type=str, default="sd-vae")
     parser.add_argument("--batch_size", type=int, default=64, help="批处理大小 - 4x RTX 4090优化")
     parser.add_argument("--bbox_shift", type=int, default=0)
     parser.add_argument("--extra_margin", type=int, default=10)
