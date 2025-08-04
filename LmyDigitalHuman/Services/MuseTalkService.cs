@@ -676,15 +676,38 @@ namespace LmyDigitalHuman.Services
                     var resultDir = Path.GetDirectoryName(outputPath);
                     var fileName = Path.GetFileName(outputPath);
                     
-                    // 检查可能的输出路径
+                    // 检查可能的输出路径 - 基于MuseTalk官方行为
                     var possiblePaths = new[]
                     {
                         outputPath, // 原始路径
-                        Path.Combine(resultDir, "v1", fileName), // v1子目录
+                        Path.Combine(resultDir, "v1", fileName), // v1子目录（最常见）
                         Path.Combine(resultDir, "v15", fileName) // v15子目录
                     };
                     
+                    // 额外检查：搜索所有可能的视频文件
+                    var searchPatterns = new[] { "*.mp4", "*.avi", "*.mov" };
+                    var foundFiles = new List<string>();
+                    
+                    foreach (var pattern in searchPatterns)
+                    {
+                        try
+                        {
+                            foundFiles.AddRange(Directory.GetFiles(resultDir, pattern, SearchOption.AllDirectories));
+                        }
+                        catch { /* 忽略搜索错误 */ }
+                    }
+                    
+                    // 按修改时间排序，获取最新生成的文件
+                    var recentFiles = foundFiles
+                        .Where(f => File.GetLastWriteTime(f) > DateTime.Now.AddMinutes(-5)) // 最近5分钟内的文件
+                        .OrderByDescending(f => File.GetLastWriteTime(f))
+                        .ToList();
+                    
+                    _logger.LogInformation("找到最近生成的视频文件: {Files}", string.Join(", ", recentFiles));
+                    
                     string actualOutputPath = null;
+                    
+                    // 首先尝试标准路径
                     foreach (var path in possiblePaths)
                     {
                         if (File.Exists(path))
@@ -692,6 +715,13 @@ namespace LmyDigitalHuman.Services
                             actualOutputPath = path;
                             break;
                         }
+                    }
+                    
+                    // 如果标准路径没找到，使用最近生成的文件
+                    if (actualOutputPath == null && recentFiles.Count > 0)
+                    {
+                        actualOutputPath = recentFiles[0]; // 使用索引代替First()
+                        _logger.LogInformation("使用最近生成的视频文件: {FilePath}", actualOutputPath);
                     }
                     
                     if (actualOutputPath != null)
@@ -728,6 +758,12 @@ namespace LmyDigitalHuman.Services
                     else
                     {
                         _logger.LogWarning("视频生成完成但未找到输出文件，检查路径: {Paths}", string.Join(", ", possiblePaths));
+                        return new DigitalHumanResponse
+                        {
+                            Success = false,
+                            Error = $"视频生成完成但未找到输出文件。检查路径: {string.Join(", ", possiblePaths)}",
+                            ProcessingTime = stopwatch.ElapsedMilliseconds
+                        };
                     }
                 }
                 else
