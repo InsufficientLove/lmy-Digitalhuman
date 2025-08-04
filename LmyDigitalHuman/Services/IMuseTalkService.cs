@@ -45,6 +45,9 @@ namespace LmyDigitalHuman.Services
         Task<string> StartStreamingGenerationAsync(StreamingGenerationRequest request);
         Task<StreamingGenerationChunk?> GetGenerationChunkAsync(string sessionId);
         Task<bool> EndStreamingGenerationAsync(string sessionId);
+        
+        // 极速实时推理（使用预处理结果）
+        Task<DigitalHumanResponse> SimulateRealtimeInference(DigitalHumanRequest request);
     }
 
     // DTO模型已移至UnifiedModels.cs中统一管理

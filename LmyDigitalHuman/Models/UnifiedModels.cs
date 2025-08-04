@@ -115,6 +115,8 @@ namespace LmyDigitalHuman.Models
     /// </summary>
     public class DigitalHumanRequest
     {
+        public string? TemplateId { get; set; } // 模板标识，用于极速实时推理
+        
         [Required]
         public string AvatarImagePath { get; set; } = string.Empty;
         
