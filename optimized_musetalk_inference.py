@@ -129,61 +129,94 @@ class OptimizedMuseTalkInference:
     def _detect_face_with_opencv(self, img, template_id):
         """使用OpenCV检测面部区域"""
         if self.face_cascade is None:
+            print(f"[WARN] 面部检测器未初始化: {template_id}")
             return [], []
             
         try:
             # 转换为灰度图
             gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            print(f"[OK] 灰度图转换成功: {gray.shape}")
             
-            # 检测面部
-            faces = self.face_cascade.detectMultiScale(
-                gray,
-                scaleFactor=1.1,
-                minNeighbors=5,
-                minSize=(50, 50),  # 最小面部尺寸
-                flags=cv2.CASCADE_SCALE_IMAGE
-            )
+            # 🔍 多种参数组合检测面部，提高检测成功率
+            detection_params = [
+                {"scaleFactor": 1.05, "minNeighbors": 3, "minSize": (20, 20)},  # 更宽松的参数
+                {"scaleFactor": 1.1, "minNeighbors": 5, "minSize": (30, 30)},   # 标准参数
+                {"scaleFactor": 1.2, "minNeighbors": 7, "minSize": (50, 50)},   # 更严格的参数
+                {"scaleFactor": 1.3, "minNeighbors": 4, "minSize": (40, 40)},   # 备选参数
+            ]
             
-            if len(faces) == 0:
-                print(f"[WARN] 未检测到面部: {template_id}")
-                return [], []
+            for i, params in enumerate(detection_params):
+                print(f"[CONFIG] 尝试参数组合 {i+1}: scaleFactor={params['scaleFactor']}, minNeighbors={params['minNeighbors']}")
+                
+                faces = self.face_cascade.detectMultiScale(gray, **params)
+                print(f"[CONFIG] 检测到 {len(faces)} 个面部区域")
+                
+                if len(faces) > 0:
+                    print(f"[OK] 面部检测成功！使用参数组合 {i+1}")
+                    
+                    # 打印所有检测到的面部
+                    for j, (x, y, w, h) in enumerate(faces):
+                        area = w * h
+                        print(f"  面部 {j+1}: x={x}, y={y}, w={w}, h={h}, 面积={area}")
+                    
+                    # 选择最大的面部（通常是主要人物）
+                    largest_face = max(faces, key=lambda rect: rect[2] * rect[3])
+                    x, y, w, h = largest_face
+                    print(f"[OK] 选择最大面部: x={x}, y={y}, w={w}, h={h}")
+                    
+                    # 🎯 智能扩展面部区域
+                    img_h, img_w = img.shape[:2]
+                    
+                    # 根据面部大小动态调整扩展比例
+                    face_area_ratio = (w * h) / (img_w * img_h)
+                    if face_area_ratio > 0.3:  # 大面部，少扩展
+                        expand_ratio = 0.2
+                    elif face_area_ratio > 0.1:  # 中等面部，标准扩展
+                        expand_ratio = 0.3
+                    else:  # 小面部，多扩展
+                        expand_ratio = 0.5
+                    
+                    expand_w = int(w * expand_ratio)
+                    expand_h = int(h * expand_ratio)
+                    
+                    x1 = max(0, x - expand_w)
+                    y1 = max(0, y - expand_h)
+                    x2 = min(img_w, x + w + expand_w)
+                    y2 = min(img_h, y + h + expand_h)
+                    
+                    print(f"[CONFIG] 扩展后区域: ({x1}, {y1}, {x2}, {y2}), 扩展比例: {expand_ratio}")
+                    
+                    # 🔧 确保是正方形（MuseTalk要求）
+                    center_x = (x1 + x2) // 2
+                    center_y = (y1 + y2) // 2
+                    size = max(x2 - x1, y2 - y1)
+                    half_size = size // 2
+                    
+                    x1_final = max(0, center_x - half_size)
+                    y1_final = max(0, center_y - half_size)
+                    x2_final = min(img_w, center_x + half_size)
+                    y2_final = min(img_h, center_y + half_size)
+                    
+                    # 最终调整确保是正方形
+                    actual_size = min(x2_final - x1_final, y2_final - y1_final)
+                    x2_final = x1_final + actual_size
+                    y2_final = y1_final + actual_size
+                    
+                    print(f"[OK] 最终正方形区域: ({x1_final}, {y1_final}, {x2_final}, {y2_final}), 尺寸: {actual_size}x{actual_size}")
+                    
+                    # 验证区域有效性
+                    if actual_size > 50:  # 确保面部区域足够大
+                        return [(x1_final, y1_final, x2_final, y2_final)], [img]
+                    else:
+                        print(f"[WARN] 面部区域太小({actual_size}x{actual_size})，继续尝试其他参数")
             
-            # 选择最大的面部（通常是主要人物）
-            largest_face = max(faces, key=lambda rect: rect[2] * rect[3])
-            x, y, w, h = largest_face
-            
-            # 扩展面部区域以包含更多上下文（MuseTalk需要）
-            expand_ratio = 0.3  # 扩展30%
-            expand_w = int(w * expand_ratio)
-            expand_h = int(h * expand_ratio)
-            
-            x1 = max(0, x - expand_w)
-            y1 = max(0, y - expand_h)
-            x2 = min(img.shape[1], x + w + expand_w)
-            y2 = min(img.shape[0], y + h + expand_h)
-            
-            # 确保是正方形（MuseTalk要求）
-            center_x = (x1 + x2) // 2
-            center_y = (y1 + y2) // 2
-            size = max(x2 - x1, y2 - y1)
-            half_size = size // 2
-            
-            x1 = max(0, center_x - half_size)
-            y1 = max(0, center_y - half_size)
-            x2 = min(img.shape[1], center_x + half_size)
-            y2 = min(img.shape[0], center_y + half_size)
-            
-            # 最终调整确保是正方形
-            actual_size = min(x2 - x1, y2 - y1)
-            x2 = x1 + actual_size
-            y2 = y1 + actual_size
-            
-            print(f"[OK] OpenCV检测到面部: {template_id}, 原始({x}, {y}, {w}, {h}) -> 调整后({x1}, {y1}, {x2}, {y2}), 尺寸: {actual_size}x{actual_size}")
-            
-            return [(x1, y1, x2, y2)], [img]
+            print(f"[WARN] 所有参数组合都未检测到有效面部: {template_id}")
+            return [], []
             
         except Exception as e:
             print(f"[ERROR] OpenCV面部检测异常: {e}")
+            import traceback
+            traceback.print_exc()
             return [], []
     
     def _preprocess_templates(self):
@@ -288,21 +321,47 @@ class OptimizedMuseTalkInference:
             coord_list, frame_list = self._detect_face_with_opencv(img, template_id)
             
             if not coord_list:
-                print(f"[WARN] OpenCV面部检测失败，使用备用方案")
-                # 备用方案：使用图片中心区域
+                print(f"[WARN] OpenCV面部检测失败，使用改进的备用方案")
+                # 🎯 改进的备用方案：假设面部在图片的上半部分中央
                 h, w = img.shape[:2]
-                face_size = min(w, h) // 2
-                center_x, center_y = w // 2, h // 2
+                print(f"[CONFIG] 图片尺寸: {w}x{h}")
+                
+                # 🔧 智能面部区域估算
+                # 面部通常占图片的40-70%，位于上半部分
+                face_ratio = 0.6  # 面部占图片的比例
+                face_size = int(min(w, h) * face_ratio)
+                
+                # 面部中心通常在图片的水平中央，垂直方向约40%处
+                center_x = w // 2
+                center_y = int(h * 0.4)  # 面部中心在图片40%高度处（适合头像照片）
+                
                 half_size = face_size // 2
                 x1 = max(0, center_x - half_size)
                 y1 = max(0, center_y - half_size)
                 x2 = min(w, center_x + half_size)
                 y2 = min(h, center_y + half_size)
+                
+                # 确保是正方形
                 size = min(x2 - x1, y2 - y1)
-                x2, y2 = x1 + size, y1 + size
+                x2 = x1 + size
+                y2 = y1 + size
+                
+                # 再次检查边界
+                if x2 > w:
+                    x2 = w
+                    x1 = w - size
+                if y2 > h:
+                    y2 = h
+                    y1 = h - size
+                
+                # 确保坐标非负
+                x1 = max(0, x1)
+                y1 = max(0, y1)
+                
                 coord_list = [(x1, y1, x2, y2)]
                 frame_list = [img]
-                print(f"[FALLBACK] 使用中心区域作为面部坐标: ({x1}, {y1}, {x2}, {y2})")
+                print(f"[FALLBACK] 智能估算面部区域: ({x1}, {y1}, {x2}, {y2}), 尺寸: {size}x{size}")
+                print(f"[FALLBACK] 面部中心: ({center_x}, {center_y}), 面部比例: {face_ratio}")
         
         # 预计算VAE编码
         print(f"🧠 预计算VAE编码: {template_id}")
