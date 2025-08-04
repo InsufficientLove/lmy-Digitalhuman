@@ -34,6 +34,10 @@ namespace LmyDigitalHuman.Services
         private static bool _globalModelsInitialized = false;
         private static Process? _persistentMuseTalkProcess = null;
         
+        // 兼容性字段 - 保持原有功能
+        private static readonly object _initLock = new object();
+        private static bool _isInitialized = false;
+        
         // 📈 性能统计
         private long _totalRequests = 0;
         private long _completedRequests = 0;
@@ -55,6 +59,9 @@ namespace LmyDigitalHuman.Services
             _pythonEnvironmentService = pythonEnvironmentService;
             
             _logger.LogInformation("🚀 优化版MuseTalk服务已启动");
+            
+            // 加载已有的模板信息
+            LoadTemplateInfoFromFileSystem();
             
             // 不再预初始化Python推理器，改为按需初始化以提高启动速度
             _logger.LogInformation("Python推理器将在首次使用时初始化");
@@ -257,7 +264,8 @@ namespace LmyDigitalHuman.Services
                 }
             }
 
-            _templateCache.TryRemove(templateId, out _);
+            // 清理永久化模型缓存
+            _persistentModels.TryRemove(templateId, out _);
             return true;
         }
 
@@ -500,7 +508,7 @@ namespace LmyDigitalHuman.Services
                     ["total_requests"] = _totalRequests,
                     ["completed_requests"] = _completedRequests,
                     ["completion_rate"] = (double)_completedRequests / Math.Max(_totalRequests, 1),
-                    ["template_cache_size"] = _templateCache.Count,
+                    ["persistent_models_count"] = _persistentModels.Count,
                     ["video_cache_size"] = _videoCache.Count
                 },
                 PerformanceWarnings = GetPerformanceWarnings()
@@ -1365,15 +1373,142 @@ namespace LmyDigitalHuman.Services
         {
             _logger.LogInformation("🛑 优化版MuseTalk服务正在关闭");
             
-            // 清理持久化进程
             try
             {
-                _persistentMuseTalkProcess?.Kill();
-                _persistentMuseTalkProcess?.Dispose();
+                // 1. 保存模板信息到wwwroot/templates
+                SaveTemplateInfoToFileSystem();
+                
+                // 2. 清理持久化进程
+                if (_persistentMuseTalkProcess != null && !_persistentMuseTalkProcess.HasExited)
+                {
+                    _logger.LogInformation("🔄 正在终止持久化MuseTalk进程...");
+                    _persistentMuseTalkProcess.Kill();
+                    _persistentMuseTalkProcess.WaitForExit(5000); // 等待5秒
+                    _persistentMuseTalkProcess.Dispose();
+                    _logger.LogInformation("✅ 持久化进程已清理");
+                }
+                
+                // 3. 清理内存缓存
+                _persistentModels.Clear();
+                _jobQueue.Clear();
+                _videoCache.Clear();
+                _activeJobs.Clear();
+                _templateUsageCount.Clear();
+                
+                // 4. 重置状态
+                _globalModelsInitialized = false;
+                _isInitialized = false;
+                _cachedPythonPath = null;
+                
+                _logger.LogInformation("🧹 内存已清理，模板信息已保存");
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "清理持久化进程时出现错误");
+                _logger.LogError(ex, "❌ 服务清理过程中出现错误");
+            }
+        }
+        
+        /// <summary>
+        /// 保存模板信息到文件系统 - 确保前端可以读取
+        /// </summary>
+        private void SaveTemplateInfoToFileSystem()
+        {
+            try
+            {
+                var templatesDir = Path.Combine(_pathManager.GetContentRootPath(), "wwwroot", "templates");
+                if (!Directory.Exists(templatesDir))
+                    return;
+                
+                var templateInfoFile = Path.Combine(templatesDir, "template_info.json");
+                var templateInfos = new List<object>();
+                
+                // 收集所有模板信息
+                foreach (var model in _persistentModels.Values)
+                {
+                    var templateInfo = new
+                    {
+                        templateId = model.TemplateId,
+                        templatePath = model.TemplatePath,
+                        isModelLoaded = model.IsModelLoaded,
+                        loadedAt = model.LoadedAt,
+                        lastUsed = model.LastUsed,
+                        usageCount = model.UsageCount,
+                        assignedGPU = model.AssignedGPU,
+                        modelStatePath = model.ModelStatePath
+                    };
+                    templateInfos.Add(templateInfo);
+                }
+                
+                // 保存到JSON文件
+                var json = System.Text.Json.JsonSerializer.Serialize(templateInfos, new System.Text.Json.JsonSerializerOptions 
+                { 
+                    WriteIndented = true,
+                    Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+                });
+                
+                File.WriteAllText(templateInfoFile, json, System.Text.Encoding.UTF8);
+                _logger.LogInformation("💾 模板信息已保存到: {TemplateInfoFile}", templateInfoFile);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "保存模板信息失败");
+            }
+        }
+        
+        /// <summary>
+        /// 从文件系统加载模板信息 - 启动时恢复状态
+        /// </summary>
+        private void LoadTemplateInfoFromFileSystem()
+        {
+            try
+            {
+                var templatesDir = Path.Combine(_pathManager.GetContentRootPath(), "wwwroot", "templates");
+                var templateInfoFile = Path.Combine(templatesDir, "template_info.json");
+                
+                if (!File.Exists(templateInfoFile))
+                {
+                    _logger.LogInformation("🔍 未找到模板信息文件，将从头开始");
+                    return;
+                }
+                
+                var json = File.ReadAllText(templateInfoFile, System.Text.Encoding.UTF8);
+                var templateInfos = System.Text.Json.JsonSerializer.Deserialize<List<System.Text.Json.JsonElement>>(json);
+                
+                if (templateInfos != null)
+                {
+                    foreach (var info in templateInfos)
+                    {
+                        try
+                        {
+                            var templateId = info.GetProperty("templateId").GetString();
+                            if (string.IsNullOrEmpty(templateId)) continue;
+                            
+                            var modelInfo = new PersistentModelInfo
+                            {
+                                TemplateId = templateId,
+                                TemplatePath = info.GetProperty("templatePath").GetString() ?? "",
+                                ModelStatePath = info.GetProperty("modelStatePath").GetString() ?? "",
+                                IsModelLoaded = false, // 重启后需要重新加载
+                                LoadedAt = info.GetProperty("loadedAt").GetDateTime(),
+                                LastUsed = info.GetProperty("lastUsed").GetDateTime(),
+                                UsageCount = info.GetProperty("usageCount").GetInt64(),
+                                AssignedGPU = info.GetProperty("assignedGPU").GetInt32()
+                            };
+                            
+                            _persistentModels.TryAdd(templateId, modelInfo);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "跳过无效的模板信息项");
+                        }
+                    }
+                    
+                    _logger.LogInformation("📂 已加载 {Count} 个模板信息", _persistentModels.Count);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "加载模板信息失败");
             }
         }
     }
