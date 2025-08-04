@@ -292,8 +292,13 @@ namespace LmyDigitalHuman.Services
                 {
                     Success = true,
                     TemplateId = templateId,
-                    ProcessingTime = TimeSpan.Zero,
-                    Message = "模板已预处理完成"
+                    PreprocessingTime = 0,
+                    OptimizedSettings = new Dictionary<string, object>
+                    {
+                        ["Status"] = "AlreadyProcessed",
+                        ["Message"] = "模板已预处理完成",
+                        ["SkippedDuplicateProcessing"] = true
+                    }
                 };
             }
             
