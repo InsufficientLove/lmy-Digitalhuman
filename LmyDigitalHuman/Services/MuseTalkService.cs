@@ -39,50 +39,7 @@ namespace LmyDigitalHuman.Services
         private long _totalProcessingTime = 0;
         private readonly ConcurrentDictionary<string, CacheStatistics> _cacheStats = new();
 
-        /// <summary>
-        /// 预生成视频库管理 - 实现真正实时响应
-        /// </summary>
-        private readonly Dictionary<string, List<string>> _preGeneratedVideos = new();
-        
-        /// <summary>
-        /// 检查是否存在预生成的视频，如果有则直接使用
-        /// </summary>
-        private async Task<string> TryGetPreGeneratedVideoAsync(string avatarPath, string audioPath)
-        {
-            try
-            {
-                var avatarKey = Path.GetFileNameWithoutExtension(avatarPath);
-                var audioKey = Path.GetFileNameWithoutExtension(audioPath);
-                
-                // 检查是否有匹配的预生成视频
-                var preGenDir = Path.Combine(_pathManager.GetContentRootPath(), "wwwroot", "videos", "pregenerated", avatarKey);
-                if (Directory.Exists(preGenDir))
-                {
-                    var availableVideos = Directory.GetFiles(preGenDir, "*.mp4");
-                    if (availableVideos.Length > 0)
-                    {
-                        // 简单策略：使用第一个可用视频
-                        // TODO: 未来可以基于音频特征或情感分析选择最匹配的视频
-                        var selectedVideo = availableVideos[0];
-                        
-                        // 复制到标准输出目录
-                        var outputFileName = $"{avatarKey}_{audioKey}_{DateTime.Now:yyyyMMdd_HHmmss}.mp4";
-                        var outputPath = Path.Combine(_pathManager.GetContentRootPath(), "wwwroot", "videos", outputFileName);
-                        File.Copy(selectedVideo, outputPath, true);
-                        
-                        _logger.LogInformation("🚀 使用预生成视频实现实时响应: {VideoPath}", selectedVideo);
-                        return outputPath;
-                    }
-                }
-                
-                return null;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning("预生成视频检查失败: {Error}", ex.Message);
-                return null;
-            }
-        }
+
 
         public MuseTalkService(
             ILogger<MuseTalkService> logger,
@@ -712,22 +669,8 @@ namespace LmyDigitalHuman.Services
             
             try
             {
-                // 🚀 优先检查预生成视频库 - 实现真正实时响应
-                var preGeneratedVideo = await TryGetPreGeneratedVideoAsync(request.AvatarImagePath, request.AudioPath);
-                if (!string.IsNullOrEmpty(preGeneratedVideo))
-                {
-                    var duration = GetAudioDuration(request.AudioPath);
-                    return new DigitalHumanResponse
-                    {
-                        Success = true,
-                        VideoPath = preGeneratedVideo,
-                        Duration = duration,
-                        Message = $"🚀 实时响应: 使用预生成视频 (耗时: {stopwatch.ElapsedMilliseconds}ms)"
-                    };
-                }
-                
-                // 如果没有预生成视频，则使用标准MuseTalk流程
-                _logger.LogInformation("未找到预生成视频，使用MuseTalk生成 (预计15-30秒)");
+                // 🚀 直接使用MuseTalk生成，通过多GPU并行实现性能提升
+                _logger.LogInformation("开始MuseTalk生成 (单GPU模式，已优化)");
                 
                 var (arguments, dynamicConfigPath) = BuildPythonArguments(request, outputPath);
                 configPath = dynamicConfigPath;

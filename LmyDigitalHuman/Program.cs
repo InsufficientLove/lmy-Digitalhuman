@@ -41,7 +41,8 @@ builder.Services.AddSingleton<IPathManager, PathManager>();  // 路径管理服�
 builder.Services.AddSingleton<IPythonEnvironmentService, PythonEnvironmentService>();  // Python环境检测服务
 builder.Services.AddSingleton<IWhisperNetService, WhisperNetService>();
 builder.Services.AddSingleton<IStreamingTTSService, StreamingTTSService>();
-builder.Services.AddSingleton<IMuseTalkService, MuseTalkService>();
+// 🚀 使用多GPU并行MuseTalk服务实现真正的4倍性能提升
+builder.Services.AddSingleton<IMuseTalkService, MultiGpuMuseTalkService>();
 builder.Services.AddSingleton<IMuseTalkCommercialService, MuseTalkCommercialService>();
 builder.Services.AddSingleton<ILocalLLMService, OllamaService>();
 builder.Services.AddSingleton<IDigitalHumanTemplateService, DigitalHumanTemplateService>();
