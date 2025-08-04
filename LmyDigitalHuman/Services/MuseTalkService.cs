@@ -741,8 +741,13 @@ namespace LmyDigitalHuman.Services
                 // 使用Python环境服务获取最佳Python路径
                 var bestPythonPath = await _pythonEnvironmentService.GetRecommendedPythonPathAsync();
                 
+                // MuseTalk工作目录应该是MuseTalk目录的父目录，因为Python命令中使用的是"MuseTalk/..."相对路径
+                var workingDir = Directory.GetParent(_pathManager.GetContentRootPath())?.FullName ?? _pathManager.GetContentRootPath();
+                
                 _logger.LogInformation("执行Python命令: {PythonPath} {Arguments}", bestPythonPath, arguments);
-                _logger.LogInformation("工作目录: {WorkingDirectory}", _pathManager.GetContentRootPath());
+                _logger.LogInformation("ContentRoot: {ContentRoot}", _pathManager.GetContentRootPath());
+                _logger.LogInformation("工作目录: {WorkingDirectory}", workingDir);
+                _logger.LogInformation("工作目录存在: {Exists}", Directory.Exists(workingDir));
                 
                 var processInfo = new ProcessStartInfo
                 {
@@ -752,13 +757,27 @@ namespace LmyDigitalHuman.Services
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                     CreateNoWindow = true,
-                    WorkingDirectory = Path.Combine(_pathManager.GetContentRootPath(), "MuseTalk")
+                    WorkingDirectory = workingDir
                 };
                 
                 // 设置环境变量解决中文乱码问题
                 processInfo.Environment["PYTHONIOENCODING"] = "utf-8";
                 processInfo.Environment["PYTHONUNBUFFERED"] = "1";
                 processInfo.Environment["PYTHONUTF8"] = "1";
+                
+                // 检查MuseTalk目录是否存在
+                var museTalkDir = Path.Combine(workingDir, "MuseTalk");
+                if (!Directory.Exists(museTalkDir))
+                {
+                    _logger.LogError("MuseTalk目录不存在: {MuseTalkDir}", museTalkDir);
+                    _logger.LogError("工作目录: {WorkingDir}", workingDir);
+                    _logger.LogError("请确保MuseTalk目录位于项目父目录下");
+                    return new PythonResult
+                    {
+                        Success = false,
+                        Output = $"MuseTalk目录不存在: {museTalkDir}"
+                    };
+                }
                 
                 // 配置虚拟环境
                 ConfigureVirtualEnvironment(processInfo, bestPythonPath);
