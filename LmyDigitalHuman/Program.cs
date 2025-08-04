@@ -41,8 +41,8 @@ builder.Services.AddSingleton<IPathManager, PathManager>();  // 路径管理服�
 builder.Services.AddSingleton<IPythonEnvironmentService, PythonEnvironmentService>();  // Python环境检测服务
 builder.Services.AddSingleton<IWhisperNetService, WhisperNetService>();
 builder.Services.AddSingleton<IStreamingTTSService, StreamingTTSService>();
-// 🌐 使用Web级MuseTalk服务 - 支持大规模并发用户 (50-200人)
-builder.Services.AddSingleton<IMuseTalkService, WebScaleMuseTalkService>();
+// 🚀 使用极致优化MuseTalk服务 - 专门针对固定模板的4x RTX 4090优化
+builder.Services.AddSingleton<IMuseTalkService, OptimizedMuseTalkService>();
 builder.Services.AddSingleton<IMuseTalkCommercialService, MuseTalkCommercialService>();
 builder.Services.AddSingleton<ILocalLLMService, OllamaService>();
 builder.Services.AddSingleton<IDigitalHumanTemplateService, DigitalHumanTemplateService>();
