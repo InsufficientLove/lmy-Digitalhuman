@@ -43,7 +43,7 @@ namespace LmyDigitalHuman.Controllers
                     return BadRequest(new { error = "模板ID不能为空" });
                 }
 
-                _logger.LogInformation("生成欢迎视频: TemplateId={TemplateId} (跳过TTS音频生成)", request.TemplateId);
+                _logger.LogInformation("生成欢迎视频: TemplateId={TemplateId}", request.TemplateId);
 
                 var response = await _conversationService.GenerateWelcomeVideoAsync(request);
                 

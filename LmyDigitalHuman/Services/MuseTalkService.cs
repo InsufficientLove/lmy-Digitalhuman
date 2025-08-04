@@ -821,8 +821,39 @@ namespace LmyDigitalHuman.Services
                 {
                     _logger.LogInformation("MuseTalk进程已启动: PID={ProcessId}", process.Id);
                     
+                    var processStartTime = DateTime.UtcNow;
                     var outputTask = process.StandardOutput.ReadToEndAsync();
                     var errorTask = process.StandardError.ReadToEndAsync();
+                    
+                    // 启动进程监控任务
+                    var monitoringTask = Task.Run(async () =>
+                    {
+                        var lastCheck = DateTime.UtcNow;
+                        while (!process.HasExited)
+                        {
+                            await Task.Delay(15000); // 每15秒检查一次
+                            
+                            if (!process.HasExited && DateTime.UtcNow - lastCheck > TimeSpan.FromSeconds(15))
+                            {
+                                try
+                                {
+                                    var elapsed = DateTime.UtcNow - processStartTime;
+                                    var workingSet = process.WorkingSet64 / (1024 * 1024); // MB
+                                    var cpuTime = process.TotalProcessorTime.TotalSeconds;
+                                    
+                                    _logger.LogInformation("MuseTalk运行状态: PID={ProcessId}, 已运行={Elapsed:mm\\:ss}, 内存={Memory}MB, CPU时间={CpuTime:F1}s",
+                                        process.Id, elapsed, workingSet, cpuTime);
+                                        
+                                    lastCheck = DateTime.UtcNow;
+                                }
+                                catch
+                                {
+                                    // 进程可能已退出，忽略异常
+                                    break;
+                                }
+                            }
+                        }
+                    });
                     
                     var processTask = Task.Run(async () =>
                     {

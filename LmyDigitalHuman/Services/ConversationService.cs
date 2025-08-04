@@ -76,53 +76,30 @@ namespace LmyDigitalHuman.Services
                 // 生成欢迎语
                 var welcomeText = $"你好，我是{template.TemplateName}，欢迎咨询！";
                 
-                // 直接生成TTS，不经过LLM
-                var ttsOutputPath = _pathManager.CreateTempAudioPath("wav");
-                var ttsRequest = new TTSRequest
+                // 跳过TTS生成，直接使用预设音频或无音频生成视频
+                _logger.LogInformation("跳过TTS生成，直接生成欢迎视频");
+                
+                // 创建一个短暂的静音音频文件用于视频生成
+                var silentAudioPath = await CreateSilentAudioFile();
+
+                // 生成数字人视频 - 移除音频回退机制，只等待视频
+                _logger.LogInformation("开始生成欢迎视频，等待完成...");
+                
+                var videoResponse = await _museTalkService.GenerateVideoAsync(new DigitalHumanRequest
                 {
-                    Text = welcomeText,
-                    Voice = template.DefaultVoiceSettings?.Voice ?? "zh-CN-XiaoxiaoNeural",
-                    Rate = template.DefaultVoiceSettings?.Rate ?? "medium",
-                    Pitch = template.DefaultVoiceSettings?.Pitch ?? "medium",
-                    Emotion = "friendly",
-                    OutputPath = ttsOutputPath
-                };
+                    AvatarImagePath = template.ImagePath,
+                    AudioPath = silentAudioPath,
+                    Quality = request.Quality,
+                    EnableEmotion = true,
+                    CacheKey = $"welcome_{request.TemplateId}_{request.Quality}"
+                });
                 
-                var ttsResult = await _audioPipelineService.ConvertTextToSpeechAsync(ttsRequest);
-                
-                if (!ttsResult.Success)
+                if (!videoResponse.Success)
                 {
                     return new ConversationResponse
                     {
                         Success = false,
-                        Message = "TTS生成失败: " + ttsResult.Error
-                    };
-                }
-
-                // 生成数字人视频 - 使用超时机制
-                DigitalHumanResponse videoResponse;
-                try
-                {
-                    var videoTask = _museTalkService.GenerateVideoAsync(new DigitalHumanRequest
-                    {
-                        AvatarImagePath = template.ImagePath,
-                        AudioPath = ttsResult.AudioPath,
-                        Quality = request.Quality,
-                        EnableEmotion = true,
-                        CacheKey = $"welcome_{request.TemplateId}_{request.Quality}"
-                    });
-                    
-                    // 欢迎视频超时限制为40秒
-                    videoResponse = await videoTask.WaitAsync(TimeSpan.FromSeconds(40));
-                }
-                catch (TimeoutException)
-                {
-                    _logger.LogWarning("欢迎视频生成超时，返回仅音频响应");
-                    videoResponse = new DigitalHumanResponse
-                    {
-                        Success = false,
-                        Message = "视频生成超时，但音频已就绪",
-                        VideoUrl = null
+                        Message = $"欢迎视频生成失败: {videoResponse.Message}"
                     };
                 }
 
@@ -130,15 +107,17 @@ namespace LmyDigitalHuman.Services
 
                 return new ConversationResponse
                 {
-                    Success = true, // 只要TTS成功就返回成功
-                    Message = videoResponse.Success ? "欢迎视频生成成功" : $"音频生成成功，视频生成失败: {videoResponse.Message}",
+                    Success = true,
+                    Message = "欢迎视频生成成功",
                     InputText = "模板选择",
                     ResponseText = welcomeText,
                     VideoUrl = videoResponse.VideoUrl,
-                    AudioUrl = $"/temp/{Path.GetFileName(ttsResult.AudioPath)}",
+                    AudioUrl = null, // 不提供音频，只有视频
                     DetectedEmotion = "friendly",
                     ProcessingTime = $"{stopwatch.ElapsedMilliseconds}ms",
-                    FromCache = false
+                    FromCache = false,
+                    HasVideo = true,
+                    Duration = videoResponse.Duration
                 };
             }
             catch (Exception ex)
@@ -714,6 +693,82 @@ namespace LmyDigitalHuman.Services
         {
             var content = $"{type}:{templateId}:{text}:{emotion}";
             return Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(content));
+        }
+
+        private async Task<string> CreateSilentAudioFile()
+        {
+            // 创建2秒的静音WAV文件用于视频生成
+            var silentAudioPath = _pathManager.CreateTempAudioPath("wav");
+            
+            try
+            {
+                // 使用FFmpeg创建静音音频文件
+                var ffmpegArgs = $"-f lavfi -i anullsrc=channel_layout=stereo:sample_rate=16000 -t 2 -acodec pcm_s16le \"{silentAudioPath}\"";
+                
+                var processInfo = new ProcessStartInfo
+                {
+                    FileName = "ffmpeg",
+                    Arguments = ffmpegArgs,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                };
+
+                using var process = Process.Start(processInfo);
+                if (process != null)
+                {
+                    await process.WaitForExitAsync(TimeSpan.FromSeconds(10));
+                    
+                    if (process.ExitCode == 0 && File.Exists(silentAudioPath))
+                    {
+                        _logger.LogInformation("创建静音音频文件成功: {AudioPath}", silentAudioPath);
+                        return silentAudioPath;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "创建静音音频文件失败，使用备用方案");
+            }
+
+            // 备用方案：创建最小的WAV文件
+            await CreateMinimalWavFile(silentAudioPath);
+            return silentAudioPath;
+        }
+
+        private async Task CreateMinimalWavFile(string filePath)
+        {
+            // 创建最小的WAV文件头 + 2秒16KHz立体声静音数据
+            var sampleRate = 16000;
+            var channels = 2;
+            var duration = 2; // 秒
+            var totalSamples = sampleRate * channels * duration;
+            var dataSize = totalSamples * 2; // 16位 = 2字节
+
+            using var fileStream = new FileStream(filePath, FileMode.Create);
+            using var writer = new BinaryWriter(fileStream);
+
+            // WAV文件头
+            writer.Write("RIFF".ToCharArray());
+            writer.Write(36 + dataSize); // 文件大小
+            writer.Write("WAVE".ToCharArray());
+            writer.Write("fmt ".ToCharArray());
+            writer.Write(16); // fmt块大小
+            writer.Write((short)1); // PCM格式
+            writer.Write((short)channels); // 声道数
+            writer.Write(sampleRate); // 采样率
+            writer.Write(sampleRate * channels * 2); // 字节率
+            writer.Write((short)(channels * 2)); // 块对齐
+            writer.Write((short)16); // 位深度
+            writer.Write("data".ToCharArray());
+            writer.Write(dataSize); // 数据大小
+
+            // 写入静音数据（全0）
+            var silentData = new byte[dataSize];
+            await writer.BaseStream.WriteAsync(silentData);
+            
+            _logger.LogInformation("创建备用静音音频文件: {AudioPath}", filePath);
         }
     }
 }
