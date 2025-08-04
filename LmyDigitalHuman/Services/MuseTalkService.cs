@@ -832,16 +832,16 @@ namespace LmyDigitalHuman.Services
             args.Append($" --unet_model_path \"models/musetalk/pytorch_model.bin\"");
             args.Append($" --whisper_dir \"models/whisper\"");
             
-            // 急速性能优化参数 - 基于官方文档
-            args.Append($" --batch_size 8"); // 进一步增加批处理大小
+            // GPU强制启用配置 - 确保使用GPU而非CPU
+            args.Append($" --device cuda"); // 强制指定CUDA设备
+            args.Append($" --batch_size 4"); // 保守批处理大小确保GPU可用
             args.Append($" --fps 25");
             args.Append($" --use_float16"); // 使用FP16减少显存占用
             args.Append($" --version v1");
             
-            // 启用实时优化模式 - 基于官方realtime配置
-            args.Append($" --skip_save_images"); // 跳过保存中间图片，节省I/O时间
-            args.Append($" --low_latency"); // 低延迟模式
-            args.Append($" --optimize_memory"); // 内存优化
+            // GPU内存管理优化 - 避免OOM导致回退到CPU
+            args.Append($" --gpu_memory_fraction 0.8"); // 限制GPU内存使用
+            args.Append($" --allow_growth"); // 允许动态内存增长
             
             // 根据官方文档的bbox_shift参数优化
             // bbox_shift控制面部区域的上下边界，影响嘴部开合程度
@@ -1253,21 +1253,23 @@ namespace LmyDigitalHuman.Services
                             _logger.LogInformation("更新PATH，优先使用虚拟环境Scripts: {ScriptsDir}", scriptsDir);
                         }
                         
-                        // 急速GPU配置 - 针对RTX 4090x4优化
-                        processInfo.Environment["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"; // 启用所有GPU
-                        processInfo.Environment["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:2048,expandable_segments:True"; // 大幅增加内存分配
-                        processInfo.Environment["OMP_NUM_THREADS"] = "32"; // 最大化CPU线程
-                        processInfo.Environment["CUDA_LAUNCH_BLOCKING"] = "0"; // 异步执行
+                        // GPU稳定配置 - 确保GPU可用性优先于性能
+                        processInfo.Environment["CUDA_VISIBLE_DEVICES"] = "0"; // 先使用单GPU确保稳定
+                        processInfo.Environment["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:512"; // 保守内存分配
+                        processInfo.Environment["OMP_NUM_THREADS"] = "8"; // 保守CPU线程数
+                        processInfo.Environment["CUDA_LAUNCH_BLOCKING"] = "1"; // 同步执行便于调试
                         processInfo.Environment["TORCH_CUDNN_V8_API_ENABLED"] = "1"; // cuDNN v8
                         processInfo.Environment["TORCH_BACKENDS_CUDNN_BENCHMARK"] = "1"; // cuDNN自动调优
-                        processInfo.Environment["TORCH_BACKENDS_CUDNN_DETERMINISTIC"] = "0"; // 禁用确定性以提升速度
                         processInfo.Environment["TOKENIZERS_PARALLELISM"] = "false"; // 避免警告
-                        processInfo.Environment["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"; // 最大CUBLAS工作空间
-                        processInfo.Environment["TORCH_COMPILE"] = "1"; // 启用torch.compile优化
-                        processInfo.Environment["TORCH_CUDNN_SDPA_ENABLED"] = "1"; // 启用优化的注意力机制
+                        processInfo.Environment["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"; // CUBLAS工作空间
+                        
+                        // 强制GPU使用相关环境变量
+                        processInfo.Environment["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"; // 确保设备顺序
+                        processInfo.Environment["TORCH_CUDA_ARCH_LIST"] = "8.9"; // RTX 4090架构
+                        processInfo.Environment["FORCE_CUDA"] = "1"; // 强制使用CUDA
                         
                         _logger.LogInformation("虚拟环境配置完成: {VenvDir}", venvDir);
-                        _logger.LogInformation("GPU配置: CUDA_VISIBLE_DEVICES=0,1,2,3 (多GPU高性能模式)");
+                        _logger.LogInformation("GPU配置: CUDA_VISIBLE_DEVICES=0 (单GPU稳定模式，确保GPU加速)");
                     }
                     else
                     {
@@ -1291,11 +1293,13 @@ namespace LmyDigitalHuman.Services
                     }
                     _logger.LogInformation("为系统Python设置PYTHONPATH: {MuseTalkDir}", museTalkDir);
                     
-                    // 为系统Python也设置GPU优化（多GPU高性能模式）
-                    processInfo.Environment["CUDA_VISIBLE_DEVICES"] = "0,1,2,3";
-                    processInfo.Environment["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:1024";
-                    processInfo.Environment["OMP_NUM_THREADS"] = "16";
+                    // 为系统Python也设置GPU优化（单GPU稳定模式）
+                    processInfo.Environment["CUDA_VISIBLE_DEVICES"] = "0";
+                    processInfo.Environment["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:512";
+                    processInfo.Environment["OMP_NUM_THREADS"] = "8";
                     processInfo.Environment["TORCH_BACKENDS_CUDNN_BENCHMARK"] = "1";
+                    processInfo.Environment["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID";
+                    processInfo.Environment["FORCE_CUDA"] = "1";
                     processInfo.Environment["OMP_NUM_THREADS"] = "8";
                     processInfo.Environment["CUDA_LAUNCH_BLOCKING"] = "1";
                     processInfo.Environment["TORCH_CUDNN_V8_API_ENABLED"] = "1";
