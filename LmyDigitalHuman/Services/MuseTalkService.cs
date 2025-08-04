@@ -746,6 +746,7 @@ namespace LmyDigitalHuman.Services
             args.Append($" --unet_config \"models/musetalk/musetalk.json\"");
             args.Append($" --unet_model_path \"models/musetalk/pytorch_model.bin\"");
             args.Append($" --whisper_dir \"models/whisper\"");
+            args.Append($" --vae_type \"sd-vae\""); // 明确指定VAE类型
             
             // 性能和质量参数
             args.Append($" --batch_size 1"); // 从源码看这个参数是支持的
@@ -924,7 +925,7 @@ namespace LmyDigitalHuman.Services
                         _logger.LogInformation("Python标准输出: {Output}", 
                             string.IsNullOrEmpty(output) ? "[空]" : (output.Length > 500 ? output.Substring(0, 500) + "..." : output));
                         _logger.LogInformation("Python错误输出: {Error}", 
-                            string.IsNullOrEmpty(error) ? "[空]" : (error.Length > 500 ? error.Substring(0, 500) + "..." : error));
+                            string.IsNullOrEmpty(error) ? "[空]" : (error.Length > 2000 ? error.Substring(0, 2000) + "..." : error));
                         
                         var isSuccess = process.ExitCode == 0;
                         var resultOutput = string.IsNullOrEmpty(error) ? output : error;
