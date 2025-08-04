@@ -184,18 +184,18 @@ namespace LmyDigitalHuman.Services
                 var museTalkDir = Path.Combine(_pathManager.GetContentRootPath(), "..", "MuseTalk");
                 var pythonPath = _pythonEnvironmentService.GetRecommendedPythonPathAsync().Result;
                 
-                // 构建初始化命令 - 仅预处理，不实际推理
+                                 // 构建初始化命令 - 仅初始化模型，不预处理模板（支持动态预处理）
                 var arguments = new StringBuilder();
                 arguments.Append($"-c \"");
-                arguments.Append($"import sys; sys.path.append('{museTalkDir}'); ");
+                arguments.Append($"import sys; sys.path.append('{museTalkDir.Replace("\\", "/")}'); ");
                 arguments.Append($"from optimized_musetalk_inference import OptimizedMuseTalkInference; ");
                 arguments.Append($"import argparse; ");
                 arguments.Append($"args = argparse.Namespace(");
-                arguments.Append($"template_dir='{templatesDir}', ");
+                arguments.Append($"template_dir='{templatesDir.Replace("\\", "/")}', ");
                 arguments.Append($"version='v1', ");
-                arguments.Append($"unet_config='{museTalkDir}/models/musetalk/musetalk.json', ");
-                arguments.Append($"unet_model_path='{museTalkDir}/models/musetalk/pytorch_model.bin', ");
-                arguments.Append($"whisper_dir='{museTalkDir}/models/whisper', ");
+                arguments.Append($"unet_config='{museTalkDir.Replace("\\", "/")}/models/musetalk/musetalk.json', ");
+                arguments.Append($"unet_model_path='{museTalkDir.Replace("\\", "/")}/models/musetalk/pytorch_model.bin', ");
+                arguments.Append($"whisper_dir='{museTalkDir.Replace("\\", "/")}/models/whisper', ");
                 arguments.Append($"vae_type='sd-vae', ");
                 arguments.Append($"batch_size=32, ");
                 arguments.Append($"bbox_shift=0, ");
@@ -207,7 +207,7 @@ namespace LmyDigitalHuman.Services
                 arguments.Append($"right_cheek_width=90");
                 arguments.Append($"); ");
                 arguments.Append($"engine = OptimizedMuseTalkInference(args); ");
-                arguments.Append($"print('Python推理器初始化完成')");
+                arguments.Append($"print('🚀 Python推理器初始化完成，支持动态模板预处理')");
                 arguments.Append($"\"");
                 
                 var processInfo = new ProcessStartInfo
@@ -401,10 +401,17 @@ namespace LmyDigitalHuman.Services
         }
         
         /// <summary>
-        /// 获取模板ID
+        /// 获取模板ID - 从前端传入的路径中提取
         /// </summary>
         private string GetTemplateId(string avatarPath)
         {
+            // 处理前端传入的路径格式，如: /templates/Template_20250730_14_b2cbd859fb654911a9e14c50f025ecb7.jpg
+            if (avatarPath.StartsWith("/"))
+            {
+                return Path.GetFileNameWithoutExtension(avatarPath);
+            }
+            
+            // 处理绝对路径格式
             return Path.GetFileNameWithoutExtension(avatarPath);
         }
         

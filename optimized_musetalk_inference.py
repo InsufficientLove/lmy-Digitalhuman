@@ -112,14 +112,20 @@ class OptimizedMuseTalkInference:
         """预处理所有模板"""
         print("🔄 开始预处理模板...")
         
-        # 从配置文件或目录读取模板列表
+        # 从wwwroot/templates目录读取模板列表
         template_dir = getattr(self.config, 'template_dir', './templates')
         if os.path.exists(template_dir):
             template_files = []
-            for ext in ['*.jpg', '*.jpeg', '*.png']:
+            # 支持常见图片格式
+            for ext in ['*.jpg', '*.jpeg', '*.png', '*.bmp', '*.webp']:
                 template_files.extend(glob.glob(os.path.join(template_dir, ext)))
         else:
+            print(f"⚠️ 模板目录不存在: {template_dir}")
             template_files = []
+        
+        if not template_files:
+            print("⚠️ 未找到任何模板文件，将在运行时动态预处理")
+            return
         
         for template_file in template_files:
             template_id = Path(template_file).stem
@@ -223,8 +229,16 @@ class OptimizedMuseTalkInference:
     
     def inference_parallel(self, template_id, audio_path, output_path, fps=25):
         """并行推理 - 4GPU协同工作"""
+        # 如果模板未预处理，动态预处理
         if template_id not in self.templates:
-            raise ValueError(f"模板 {template_id} 未找到，请先预处理")
+            print(f"🔄 模板 {template_id} 未预处理，开始动态预处理...")
+            template_path = self._find_template_path(template_id)
+            if not template_path:
+                raise ValueError(f"模板 {template_id} 文件未找到")
+            
+            template_data = self._preprocess_single_template(template_id, template_path)
+            self.templates[template_id] = template_data
+            print(f"✅ 模板 {template_id} 动态预处理完成")
         
         template_data = self.templates[template_id]
         
@@ -372,6 +386,20 @@ class OptimizedMuseTalkInference:
                 task_queue.task_done()
         
         print(f"🛑 GPU {gpu_id} 工作线程结束")
+    
+    def _find_template_path(self, template_id):
+        """查找模板文件路径"""
+        template_dir = getattr(self.config, 'template_dir', './templates')
+        
+        # 支持的图片格式
+        extensions = ['.jpg', '.jpeg', '.png', '.bmp', '.webp']
+        
+        for ext in extensions:
+            template_path = os.path.join(template_dir, f"{template_id}{ext}")
+            if os.path.exists(template_path):
+                return template_path
+        
+        return None
     
     def _postprocess_and_save(self, template_data, res_frame_list, audio_path, output_path, fps):
         """后处理和保存视频"""
