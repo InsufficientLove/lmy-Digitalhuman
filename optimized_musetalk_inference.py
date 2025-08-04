@@ -160,6 +160,8 @@ class OptimizedMuseTalkInference:
         # 读取模板图片
         if os.path.isfile(template_path):
             frame_list = [cv2.imread(template_path)]
+            if frame_list[0] is None:
+                raise ValueError(f"无法读取模板图片: {template_path}")
         else:
             raise ValueError(f"模板文件不存在: {template_path}")
         

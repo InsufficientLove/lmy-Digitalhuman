@@ -401,11 +401,12 @@ namespace LmyDigitalHuman.Services
         }
         
         /// <summary>
-        /// 获取模板ID - 从前端传入的路径中提取
+        /// 获取模板ID - 从前端传入的路径中提取模板名称
+        /// 支持用户自定义的可读模板名称，而不是GUID
         /// </summary>
         private string GetTemplateId(string avatarPath)
         {
-            // 处理前端传入的路径格式，如: /templates/Template_20250730_14_b2cbd859fb654911a9e14c50f025ecb7.jpg
+            // 处理前端传入的路径格式，如: /templates/美女主播.jpg 或 /templates/商务男士.jpg
             if (avatarPath.StartsWith("/"))
             {
                 return Path.GetFileNameWithoutExtension(avatarPath);
