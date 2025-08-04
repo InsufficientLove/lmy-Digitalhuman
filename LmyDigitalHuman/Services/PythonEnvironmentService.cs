@@ -12,7 +12,7 @@ namespace LmyDigitalHuman.Services
         Task<bool> ValidatePythonEnvironmentAsync(string pythonPath, params string[] requiredPackages);
         Task<string> GetRecommendedPythonPathAsync();
         Task<List<PythonEnvironmentInfo>> GetAllAvailablePythonEnvironmentsAsync();
-        void ClearCache();
+
     }
 
     public class PythonEnvironmentInfo
@@ -94,67 +94,35 @@ namespace LmyDigitalHuman.Services
             return bestEnv;
         }
 
-        private static string? _cachedPythonPath;
-        private static DateTime _cacheTime = DateTime.MinValue;
-        private static readonly TimeSpan CacheExpiry = TimeSpan.FromMinutes(5);
-
         public async Task<string> GetRecommendedPythonPathAsync()
         {
-            // 使用缓存避免重复检测
-            if (_cachedPythonPath != null && DateTime.Now - _cacheTime < CacheExpiry)
+            // 直接使用已知的工作路径，避免耗时检测
+            var knownPaths = new[]
             {
-                _logger.LogDebug("使用缓存的Python路径: {PythonPath}", _cachedPythonPath);
-                return _cachedPythonPath;
-            }
-
-            // 优先使用MuseTalk专用配置，因为这通常是最优的
-            var museTalkPath = _configuration["DigitalHuman:MuseTalk:PythonPath"];
-            if (!string.IsNullOrEmpty(museTalkPath))
-            {
-                var resolvedPath = _pathManager.ResolvePath(museTalkPath);
-                if (File.Exists(resolvedPath))
-                {
-                    _logger.LogInformation("使用MuseTalk配置的Python路径: {PythonPath}", resolvedPath);
-                    _cachedPythonPath = resolvedPath;
-                    _cacheTime = DateTime.Now;
-                    return resolvedPath;
-                }
-            }
-
-            // 快速检查常见的虚拟环境路径
-            var quickPaths = new[]
-            {
+                // 基于日志中的实际路径：C:\Users\Administrator\Desktop\digitalhuman\lmy-Digitalhuman\LmyDigitalHuman\../venv_musetalk/Scripts/python.exe
                 "../venv_musetalk/Scripts/python.exe",
+                // 备用路径
                 "venv_musetalk/Scripts/python.exe",
                 "../venv_musetalk/bin/python"
             };
 
-            foreach (var quickPath in quickPaths)
+            foreach (var knownPath in knownPaths)
             {
-                var resolvedPath = _pathManager.ResolvePath(quickPath);
+                var resolvedPath = _pathManager.ResolvePath(knownPath);
                 if (File.Exists(resolvedPath))
                 {
-                    _logger.LogInformation("使用快速检测的Python路径: {PythonPath}", resolvedPath);
-                    _cachedPythonPath = resolvedPath;
-                    _cacheTime = DateTime.Now;
+                    _logger.LogInformation("使用已知Python路径: {PythonPath}", resolvedPath);
                     return resolvedPath;
                 }
             }
 
-            // 最后才进行完整检测（较慢）
-            _logger.LogWarning("快速检测失败，进行完整Python环境检测...");
-            var bestEnv = await DetectBestPythonEnvironmentAsync();
-            _cachedPythonPath = bestEnv.PythonPath;
-            _cacheTime = DateTime.Now;
-            return bestEnv.PythonPath;
+            // 如果已知路径都不存在，给出明确的错误提示
+            var expectedPath = _pathManager.ResolvePath("../venv_musetalk/Scripts/python.exe");
+            _logger.LogError("Python环境未找到，请确保虚拟环境存在于: {ExpectedPath}", expectedPath);
+            throw new FileNotFoundException($"Python环境未找到，请确保虚拟环境存在于: {expectedPath}");
         }
 
-        public void ClearCache()
-        {
-            _cachedPythonPath = null;
-            _cacheTime = DateTime.MinValue;
-            _logger.LogInformation("Python路径缓存已清除");
-        }
+
 
         public async Task<List<PythonEnvironmentInfo>> GetAllAvailablePythonEnvironmentsAsync()
         {

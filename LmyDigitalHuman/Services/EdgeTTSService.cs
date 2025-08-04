@@ -371,23 +371,8 @@ namespace LmyDigitalHuman.Services
         {
             try
             {
-                // 使用Python环境检测服务获取最佳Python路径
+                // 直接使用已知的Python路径，不再进行耗时验证
                 var pythonPath = await _pythonEnvironmentService.GetRecommendedPythonPathAsync();
-                
-                // 验证Python环境是否支持edge-tts
-                var isValid = await _pythonEnvironmentService.ValidatePythonEnvironmentAsync(pythonPath, "edge_tts");
-                if (!isValid)
-                {
-                    _logger.LogWarning("检测到的Python环境不支持edge-tts: {PythonPath}", pythonPath);
-                    
-                    // 尝试安装edge-tts包
-                    var installResult = await TryInstallEdgeTTSAsync(pythonPath);
-                    if (!installResult)
-                    {
-                        _logger.LogError("无法在Python环境中安装edge-tts包: {PythonPath}", pythonPath);
-                        return (false, "", "Python环境不支持edge-tts且无法自动安装");
-                    }
-                }
 
                 var processInfo = new ProcessStartInfo
                 {
