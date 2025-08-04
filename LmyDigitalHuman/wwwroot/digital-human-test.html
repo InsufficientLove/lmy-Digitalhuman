@@ -65,19 +65,23 @@
         .video-container {
             position: relative;
             background: #f8f9fa;
-            border-radius: 10px;
+            border-radius: 12px;
             overflow: hidden;
             margin-bottom: 20px;
-            min-height: 300px;
+            min-height: 400px;
             display: flex;
             align-items: center;
             justify-content: center;
+            padding: 20px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
         }
 
         #digitalHumanVideo {
             max-width: 100%;
             max-height: 100%;
             border-radius: 10px;
+            border: 2px solid #007bff;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
         }
 
         .placeholder {
@@ -1183,17 +1187,25 @@
             const video = document.getElementById('digitalHumanVideo');
             const placeholder = document.getElementById('videoPlaceholder');
             
-            video.src = videoUrl;
-            video.style.display = 'block';
-            placeholder.style.display = 'none';
+            // 使用改进的视频设置函数（如果可用）
+            if (window.setVideoSource) {
+                placeholder.style.display = 'none';
+                video.style.display = 'block'; 
+                window.setVideoSource(videoUrl);
+            } else {
+                // 回退到原始方法
+                video.src = videoUrl;
+                video.style.display = 'block';
+                placeholder.style.display = 'none';
+                
+                // 自动播放
+                video.play().catch(e => {
+                    addLog('自动播放失败，请手动点击播放', 'warning');
+                });
+            }
             
             document.getElementById('downloadBtn').style.display = 'inline-block';
             document.getElementById('downloadBtn').onclick = () => downloadVideo(videoUrl);
-            
-            // 自动播放
-            video.play().catch(e => {
-                addLog('自动播放失败，请手动点击播放', 'warning');
-            });
         }
 
         function displayAudio(audioUrl) {
@@ -1433,5 +1445,8 @@
 
     <!-- WebRTC实时通信脚本 -->
     <script src="js/webrtc-realtime.js"></script>
+    
+    <!-- 视频播放器增强脚本 -->
+    <script src="js/improve_video_player.js"></script>
 </body>
 </html>

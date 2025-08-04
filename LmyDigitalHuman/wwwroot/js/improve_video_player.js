@@ -4,16 +4,14 @@
 function improveVideoPlayer() {
     console.log('🎬 改进视频播放器...');
     
-    // 1. 放大视频播放区域
-    const videoElement = document.querySelector('video');
+    // 1. 优化视频播放区域 - 与现有样式协调
+    const videoElement = document.querySelector('#digitalHumanVideo');
     if (videoElement) {
-        // 设置更大的视频尺寸
-        videoElement.style.width = '640px';
-        videoElement.style.height = '480px';
-        videoElement.style.maxWidth = '100%';
-        videoElement.style.border = '2px solid #007bff';
-        videoElement.style.borderRadius = '8px';
-        videoElement.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
+        // 应用增强样式（与CSS协调）
+        videoElement.style.width = '100%';
+        videoElement.style.height = 'auto';
+        videoElement.style.maxWidth = '640px';
+        videoElement.style.maxHeight = '480px';
         
         // 添加视频加载事件监听
         videoElement.addEventListener('loadstart', function() {
@@ -46,18 +44,13 @@ function improveVideoPlayer() {
         });
     }
     
-    // 2. 创建视频容器改进
-    const videoContainer = document.querySelector('.video-container') || 
-                          document.querySelector('#videoContainer') ||
-                          videoElement?.parentElement;
+    // 2. 获取视频容器（已有样式，无需重复设置）
+    const videoContainer = document.querySelector('.video-container');
     
+    // 容器已在CSS中设置了样式，这里只做必要的增强
     if (videoContainer) {
-        videoContainer.style.textAlign = 'center';
-        videoContainer.style.padding = '20px';
-        videoContainer.style.backgroundColor = '#f8f9fa';
-        videoContainer.style.borderRadius = '12px';
-        videoContainer.style.margin = '20px auto';
-        videoContainer.style.maxWidth = '800px';
+        // 确保容器有正确的标识
+        videoContainer.setAttribute('data-enhanced', 'true');
     }
     
     // 3. 添加加载状态指示器
@@ -113,12 +106,16 @@ function improveVideoPlayer() {
             });
     };
     
-    // 6. 改进的视频设置函数
+    // 6. 改进的视频设置函数 - 集成现有日志系统
     window.setVideoSource = function(videoUrl) {
         console.log('🎬 设置视频源:', videoUrl);
         
         if (!videoElement) {
             console.error('❌ 未找到视频元素');
+            // 使用现有的日志系统
+            if (window.addLog) {
+                window.addLog('❌ 未找到视频元素', 'error');
+            }
             return;
         }
         
@@ -131,15 +128,28 @@ function improveVideoPlayer() {
                 videoElement.load();
                 hideLoadingIndicator();
                 
+                // 使用现有日志系统
+                if (window.addLog) {
+                    window.addLog(`✅ 视频加载成功: ${videoUrl}`, 'success');
+                }
+                
                 // 尝试自动播放
                 setTimeout(() => {
                     videoElement.play().catch(e => {
                         console.log('自动播放失败，需要用户交互:', e);
+                        if (window.addLog) {
+                            window.addLog('自动播放失败，请手动点击播放', 'warning');
+                        }
                     });
                 }, 500);
             } else {
                 hideLoadingIndicator();
                 console.error('❌ 视频文件不存在:', videoUrl);
+                
+                // 使用现有日志系统
+                if (window.addLog) {
+                    window.addLog(`❌ 视频文件不存在: ${videoUrl}`, 'error');
+                }
                 
                 // 显示文件不存在的错误
                 const errorDiv = document.createElement('div');
