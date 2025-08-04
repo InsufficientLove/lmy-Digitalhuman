@@ -9,50 +9,75 @@ C:\Users\Administrator\Desktop\digitalhuman\lmy-Digitalhuman\venv_musetalk\Scrip
 
 ## 根本原因
 
-项目尝试使用官方MuseTalk的 `scripts.inference` 模块，但是缺少MuseTalk源代码仓库。从代码分析可以看出：
+项目尝试使用官方MuseTalk的 `scripts.inference` 模块，但您现有的MuseTalk目录可能缺少必要的文件。从代码分析可以看出：
 
 1. `LmyDigitalHuman/Services/MuseTalkService.cs` 第718行使用 `-m scripts.inference` 参数
 2. 工作目录设置为项目父目录：`C:\Users\Administrator\Desktop\digitalhuman\lmy-Digitalhuman`
 3. 代码期望MuseTalk目录位于：`C:\Users\Administrator\Desktop\digitalhuman\lmy-Digitalhuman\MuseTalk`
 
+**您的目录结构是正确的，问题在于MuseTalk目录可能缺少关键文件！**
+
 ## 解决方案
 
-### 步骤1：克隆官方MuseTalk仓库
+### 方案A：快速修复（推荐）
 
-在项目根目录 `C:\Users\Administrator\Desktop\digitalhuman\lmy-Digitalhuman` 执行：
+运行提供的检查和修复工具：
+
+1. **检查MuseTalk目录结构**：
+   ```cmd
+   # 双击运行
+   check_musetalk.bat
+   ```
+
+2. **自动修复缺失文件**：
+   ```cmd
+   # 双击运行
+   fix_musetalk.bat
+   ```
+
+### 方案B：手动检查和修复
+
+1. **检查关键文件是否存在**：
+   ```
+   C:\Users\Administrator\Desktop\digitalhuman\lmy-Digitalhuman\MuseTalk\
+   ├── scripts/
+   │   ├── __init__.py          # 必需
+   │   ├── inference.py         # 关键文件
+   │   ├── preprocess.py        # 可选
+   │   └── realtime_inference.py # 可选
+   ├── configs/
+   │   └── inference/
+   │       └── test.yaml        # 必需
+   ├── models/                  # 必需目录
+   └── requirements.txt         # 推荐
+   ```
+
+2. **手动创建缺失文件**：
+   
+   如果 `scripts/__init__.py` 不存在：
+   ```python
+   # 创建 MuseTalk/scripts/__init__.py
+   """
+   MuseTalk Scripts Package
+   """
+   ```
+   
+   如果 `scripts/inference.py` 不存在，运行 `fix_musetalk.bat` 会自动创建兼容版本。
+
+### 方案C：完整替换（终极方案）
+
+如果以上方案都不能解决问题，建议完整替换MuseTalk目录：
 
 ```bash
+# 备份当前MuseTalk目录
+cd C:\Users\Administrator\Desktop\digitalhuman\lmy-Digitalhuman
+ren MuseTalk MuseTalk_backup
+
+# 下载官方MuseTalk仓库
 git clone https://github.com/TMElyralab/MuseTalk.git
-```
 
-### 步骤2：验证目录结构
-
-克隆后应该有以下结构：
-```
-C:\Users\Administrator\Desktop\digitalhuman\lmy-Digitalhuman\
-├── LmyDigitalHuman/           # 主应用程序
-├── MuseTalk/                  # 官方MuseTalk仓库
-│   ├── scripts/
-│   │   ├── __init__.py
-│   │   ├── inference.py       # 关键文件
-│   │   ├── preprocess.py
-│   │   └── realtime_inference.py
-│   ├── configs/
-│   ├── models/
-│   └── requirements.txt
-└── venv_musetalk/             # Python虚拟环境
-```
-
-### 步骤3：安装MuseTalk依赖（可选）
-
-如果虚拟环境 `venv_musetalk` 缺少MuseTalk依赖，可以安装：
-
-```bash
-# 激活虚拟环境
-C:\Users\Administrator\Desktop\digitalhuman\lmy-Digitalhuman\venv_musetalk\Scripts\activate
-
-# 安装MuseTalk依赖
-pip install -r MuseTalk/requirements.txt
+# 安装依赖
+venv_musetalk\Scripts\pip install -r MuseTalk/requirements.txt
 ```
 
 ## 验证修复
