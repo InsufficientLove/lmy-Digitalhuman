@@ -655,10 +655,13 @@ namespace LmyDigitalHuman.Services
         private async Task<DigitalHumanResponse> ExecuteMuseTalkPythonAsync(DigitalHumanRequest request, string outputPath)
         {
             var stopwatch = Stopwatch.StartNew();
+            string configPath = null;
             
             try
             {
-                var arguments = BuildPythonArguments(request, outputPath);
+                var (arguments, dynamicConfigPath) = BuildPythonArguments(request, outputPath);
+                configPath = dynamicConfigPath;
+                
                 // 根据视频类型设置合适的超时时间
                 var timeout = request.CacheKey?.StartsWith("welcome_") == true 
                     ? TimeSpan.FromMinutes(3)  // 欢迎视频3分钟超时
@@ -708,28 +711,76 @@ namespace LmyDigitalHuman.Services
                     ProcessingTime = stopwatch.ElapsedMilliseconds
                 };
             }
+            finally
+            {
+                // 清理动态配置文件
+                if (!string.IsNullOrEmpty(configPath) && File.Exists(configPath))
+                {
+                    try
+                    {
+                        File.Delete(configPath);
+                        _logger.LogInformation("已清理动态配置文件: {ConfigPath}", configPath);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "清理动态配置文件失败: {ConfigPath}", configPath);
+                    }
+                }
+            }
         }
 
-        private string BuildPythonArguments(DigitalHumanRequest request, string outputPath)
+        private (string arguments, string configPath) BuildPythonArguments(DigitalHumanRequest request, string outputPath)
         {
             var args = new StringBuilder();
             
             // 直接使用官方MuseTalk的inference脚本
             args.Append($"-m scripts.inference");
             
-            // 基于日志中的帮助信息，尝试最简参数组合
-            args.Append($" --inference_config \"configs/inference/test.yaml\"");
+            // 动态生成配置文件
+            var configPath = CreateDynamicInferenceConfig(request, outputPath);
+            args.Append($" --inference_config \"{configPath}\"");
             args.Append($" --result_dir \"{Path.GetDirectoryName(outputPath)}\"");
             args.Append($" --gpu_id 0");
             
-            // 模型路径
+            // 模型路径 - 基于源码的默认值
             args.Append($" --unet_config \"models/musetalk/musetalk.json\"");
             args.Append($" --unet_model_path \"models/musetalk/pytorch_model.bin\"");
+            args.Append($" --whisper_dir \"models/whisper\"");
             
-            // 尝试不同的参数名 - 基于常见的MuseTalk参数
-            // 先测试最基本的配置，看是否能启动
+            // 性能和质量参数
+            args.Append($" --batch_size 1"); // 从源码看这个参数是支持的
+            args.Append($" --fps 25");
+            args.Append($" --use_float16"); // 从源码看这个参数也是支持的
+            args.Append($" --version v1"); // 使用v1版本
             
-            return args.ToString();
+            if (request.BboxShift.HasValue)
+                args.Append($" --bbox_shift {request.BboxShift.Value}");
+            
+            return (args.ToString(), configPath);
+        }
+
+        private string CreateDynamicInferenceConfig(DigitalHumanRequest request, string outputPath)
+        {
+            // 创建动态配置文件
+            var configDir = Path.Combine(Directory.GetParent(_pathManager.GetContentRootPath())?.FullName ?? _pathManager.GetContentRootPath(), "MuseTalk", "configs", "inference");
+            Directory.CreateDirectory(configDir);
+            
+            var configPath = Path.Combine(configDir, $"dynamic_{Guid.NewGuid():N}.yaml");
+            var taskId = "task_001";
+            
+            // 生成YAML配置内容
+            var yamlContent = $@"{taskId}:
+  video_path: ""{request.AvatarImagePath}""
+  audio_path: ""{request.AudioPath}""
+  bbox_shift: {request.BboxShift ?? 0}
+  result_name: ""{Path.GetFileName(outputPath)}""
+";
+
+            File.WriteAllText(configPath, yamlContent);
+            _logger.LogInformation("创建动态配置文件: {ConfigPath}", configPath);
+            _logger.LogInformation("配置内容:\n{Content}", yamlContent);
+            
+            return configPath;
         }
 
         private async Task<PythonResult> RunPythonCommandAsync(string arguments, TimeSpan timeout)
