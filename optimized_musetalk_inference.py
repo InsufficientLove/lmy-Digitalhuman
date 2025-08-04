@@ -236,7 +236,6 @@ class OptimizedMuseTalkInference:
         vae_cache_file = os.path.join(preprocessing_cache_dir, "vae_latents.pkl")
         
         # 保存面部坐标
-        import pickle
         with open(coord_cache_file, 'wb') as f:
             pickle.dump({
                 'coord_list': coord_list,
@@ -374,7 +373,6 @@ class OptimizedMuseTalkInference:
                 print(f"✅ 发现永久化预处理结果，极速加载中...")
                 
                 # 加载面部坐标
-                import pickle
                 with open(coord_cache_file, 'rb') as f:
                     coord_data = pickle.load(f)
                 

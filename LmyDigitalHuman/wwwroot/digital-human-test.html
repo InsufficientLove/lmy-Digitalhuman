@@ -561,6 +561,7 @@
                     <div style="display: flex; gap: 10px; margin-bottom: 15px;">
                         <button class="btn btn-primary" onclick="loadTemplates()">🔄 刷新模板列表</button>
                         <button class="btn btn-success" onclick="showCreateTemplateModal()">➕ 创建新模板</button>
+                        <button class="btn btn-success" onclick="generateWelcomeVideoManual()" id="generateWelcomeBtn" style="display: none;">🎬 生成欢迎视频</button>
                     </div>
                     <div id="templatesContainer" class="templates-grid">
                         <!-- 动态加载模板 -->
@@ -880,10 +881,14 @@
             currentTemplateId = template.templateId;
             document.getElementById('currentTemplate').textContent = template.templateName;
             
-            addLog(`已选择模板: ${template.templateName}`, 'info');
+            addLog(`已选择模板: ${template.templateName}，请手动点击生成视频`, 'info');
+            updateProcessingStatus('模板已选择，等待用户操作');
             
-            // 立即生成欢迎视频
-            generateWelcomeVideo(template);
+            // 显示生成欢迎视频按钮
+            document.getElementById('generateWelcomeBtn').style.display = 'inline-block';
+            
+            // 🎯 不再自动生成欢迎视频，需要用户手动触发
+            // generateWelcomeVideo(template); // 已移除自动触发
         }
 
         async function generateWelcomeVideo(template) {
@@ -928,6 +933,30 @@
             } finally {
                 setTimeout(() => updateProgress(0), 1000);
             }
+        }
+
+        async function generateWelcomeVideoManual() {
+            if (!currentTemplateId) {
+                alert('请先选择一个数字人模板');
+                return;
+            }
+            
+            // 找到当前选中的模板
+            const selectedCard = document.querySelector('.template-card.selected');
+            if (!selectedCard) {
+                alert('请先选择一个数字人模板');
+                return;
+            }
+            
+            // 从模板列表中找到对应的模板对象
+            const templateName = selectedCard.querySelector('.template-name').textContent;
+            const template = {
+                templateId: currentTemplateId,
+                templateName: templateName
+            };
+            
+            // 生成欢迎视频
+            await generateWelcomeVideo(template);
         }
 
         async function sendTextMessage() {
