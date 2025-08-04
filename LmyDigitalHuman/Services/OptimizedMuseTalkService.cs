@@ -1407,19 +1407,31 @@ namespace LmyDigitalHuman.Services
                 var outputDir = Path.GetDirectoryName(outputPath);
                 Directory.CreateDirectory(outputDir);
                 
-                // 🔧 使用本地MuseTalk文件夹中的脚本
+                // 🔧 使用工作区的脚本，但设置MuseTalk为工作目录
                 var contentRoot = _pathManager.GetContentRootPath();
                 var pythonPath = await GetCachedPythonPathAsync();
                 
-                // 脚本应该在本地MuseTalk文件夹中
-                var museTalkDir = Path.Combine(contentRoot, "..", "MuseTalk");
-                var optimizedScriptPath = Path.Combine(museTalkDir, "optimized_musetalk_inference.py");
+                // 脚本在工作区根目录，但工作目录设置为本地MuseTalk
+                var projectRoot = Path.Combine(contentRoot, "..");
+                var optimizedScriptPath = Path.Combine(projectRoot, "MuseTalk", "optimized_musetalk_inference.py");
+                var museTalkDir = Path.Combine(projectRoot, "MuseTalk");
+                
+                // 检查本地MuseTalk目录是否存在
+                if (!Directory.Exists(museTalkDir))
+                {
+                    _logger.LogError("❌ 本地MuseTalk目录不存在: {MuseTalkDir}", museTalkDir);
+                    throw new DirectoryNotFoundException($"本地MuseTalk目录不存在: {museTalkDir}");
+                }
                 
                 if (!File.Exists(optimizedScriptPath))
                 {
-                    _logger.LogError("❌ MuseTalk推理脚本不存在: {ScriptPath}", optimizedScriptPath);
-                    _logger.LogInformation("💡 请将 optimized_musetalk_inference.py 复制到: {MuseTalkDir}", museTalkDir);
-                    throw new FileNotFoundException($"找不到MuseTalk推理脚本: {optimizedScriptPath}");
+                    _logger.LogWarning("⚠️ MuseTalk目录中没有优化脚本，尝试使用工作区脚本");
+                    // 回退到工作区脚本
+                    optimizedScriptPath = Path.Combine(projectRoot, "optimized_musetalk_inference.py");
+                    if (!File.Exists(optimizedScriptPath))
+                    {
+                        throw new FileNotFoundException($"找不到MuseTalk推理脚本: {optimizedScriptPath}");
+                    }
                 }
                 
                 _logger.LogInformation("📄 使用MuseTalk脚本: {ScriptPath}", optimizedScriptPath);

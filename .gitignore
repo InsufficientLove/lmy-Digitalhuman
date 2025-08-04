@@ -13,7 +13,10 @@ artifacts/
 venv/
 env/
 .venv/
-# venv_musetalk/ - 注释掉，允许提交本地MuseTalk虚拟环境
+venv_musetalk/
+
+# 本地MuseTalk目录中的优化脚本（避免冲突）
+MuseTalk/optimized_musetalk_inference.py
 
 # Python 包管理和生成文件
 requirements_generated.txt
