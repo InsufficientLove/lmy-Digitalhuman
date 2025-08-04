@@ -1013,8 +1013,11 @@ namespace LmyDigitalHuman.Services
                         var sitePackages = Path.Combine(venvDir, "Lib", "site-packages");
                         if (Directory.Exists(sitePackages))
                         {
-                            processInfo.Environment["PYTHONPATH"] = sitePackages;
-                            _logger.LogInformation("设置PYTHONPATH: {SitePackages}", sitePackages);
+                            // 获取MuseTalk目录路径
+                            var museTalkDir = Path.Combine(processInfo.WorkingDirectory, "MuseTalk");
+                            // 将MuseTalk目录和site-packages都添加到PYTHONPATH
+                            processInfo.Environment["PYTHONPATH"] = museTalkDir + ";" + sitePackages;
+                            _logger.LogInformation("设置PYTHONPATH: {MuseTalkDir};{SitePackages}", museTalkDir, sitePackages);
                         }
                         
                         // 修改PATH环境变量，优先使用虚拟环境的Scripts目录，同时保持系统FFmpeg可用
@@ -1043,6 +1046,22 @@ namespace LmyDigitalHuman.Services
                 else
                 {
                     _logger.LogInformation("使用系统Python: {PythonPath}", pythonPath);
+                    
+                    // 为系统Python也设置MuseTalk目录到PYTHONPATH
+                    var museTalkDir = Path.Combine(processInfo.WorkingDirectory, "MuseTalk");
+                    if (Directory.Exists(museTalkDir))
+                    {
+                        var currentPythonPath = Environment.GetEnvironmentVariable("PYTHONPATH") ?? "";
+                        if (!string.IsNullOrEmpty(currentPythonPath))
+                        {
+                            processInfo.Environment["PYTHONPATH"] = museTalkDir + ";" + currentPythonPath;
+                        }
+                        else
+                        {
+                            processInfo.Environment["PYTHONPATH"] = museTalkDir;
+                        }
+                        _logger.LogInformation("为系统Python设置PYTHONPATH: {MuseTalkDir}", museTalkDir);
+                    }
                 }
             }
             catch (Exception ex)
