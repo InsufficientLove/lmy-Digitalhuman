@@ -621,7 +621,10 @@
                         </div>
                     </div>
                     
-                    <button class="btn btn-primary" onclick="sendAudioMessage()" id="sendAudioBtn">🎵 处理语音对话</button>
+                    <div style="display: flex; gap: 10px; margin-top: 10px;">
+                        <button class="btn btn-primary" onclick="sendAudioMessage()" id="sendAudioBtn">🎵 处理语音对话</button>
+                        <button class="btn btn-secondary" onclick="testSpeechRecognition()" id="testSpeechBtn">🔍 测试语音识别</button>
+                    </div>
                 </div>
 
                 <!-- 实时对话 -->
@@ -1167,6 +1170,58 @@
             }
         }
 
+        async function testSpeechRecognition() {
+            const audioFile = document.getElementById('audioFile').files[0];
+            
+            if (!audioFile) {
+                alert('请先选择音频文件');
+                return;
+            }
+
+            const testBtn = document.getElementById('testSpeechBtn');
+            testBtn.disabled = true;
+            testBtn.textContent = '🔍 识别中...';
+            
+            addLog('开始测试语音识别...', 'info');
+            updateProgress(10);
+
+            try {
+                const formData = new FormData();
+                formData.append('audioFile', audioFile);
+
+                const response = await fetch('/api/audio/speech-recognition', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                updateProgress(80);
+                const result = await response.json();
+                updateProgress(100);
+
+                if (result.success) {
+                    addLog(`✅ 语音识别成功!`, 'success');
+                    addLog(`🎯 识别文本: "${result.recognizedText}"`, 'success');
+                    addLog(`⏱️ 处理时长: ${result.processingTime}ms`, 'info');
+                    addLog(`🎵 音频时长: ${result.audioDuration}s`, 'info');
+                    
+                    // 将识别结果填入文本框
+                    if (result.recognizedText) {
+                        document.getElementById('textInput').value = result.recognizedText;
+                        addLog('识别结果已自动填入文本对话框', 'info');
+                    }
+                } else {
+                    addLog(`❌ 语音识别失败: ${result.message}`, 'error');
+                }
+            } catch (error) {
+                addLog(`🚫 语音识别错误: ${error.message}`, 'error');
+            } finally {
+                testBtn.disabled = false;
+                testBtn.textContent = '🔍 测试语音识别';
+                updateProgress(100);
+                setTimeout(() => updateProgress(0), 1000);
+            }
+        }
+
         async function startRealtimeConversation() {
             if (!currentTemplateId) {
                 alert('请先选择一个数字人模板');
@@ -1265,6 +1320,16 @@
                 video.src = videoUrl;
                 video.style.display = 'block';
                 placeholder.style.display = 'none';
+                
+                // 🔄 设置循环播放：2秒后自动循环
+                video.loop = false; // 先不循环，等待首次播放完成
+                video.onended = function() {
+                    setTimeout(() => {
+                        video.loop = true; // 2秒后开始循环播放
+                        video.play();
+                        addLog('视频开始循环播放', 'info');
+                    }, 2000);
+                };
                 
                 // 自动播放
                 video.play().catch(e => {
