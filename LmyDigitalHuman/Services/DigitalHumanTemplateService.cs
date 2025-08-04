@@ -65,13 +65,24 @@ namespace LmyDigitalHuman.Services
                 // 🎯 直接使用模板名称作为文件名，支持中英文
                 var safeName = SanitizeFileName(request.TemplateName);
                 var imageFileName = $"{safeName}.jpg";
-                var imagePath = Path.Combine(_templatesPath, imageFileName);
+                
+                // 确保使用完整的绝对路径
+                var fullTemplatesPath = Path.IsPathRooted(_templatesPath) 
+                    ? _templatesPath 
+                    : Path.Combine(Directory.GetCurrentDirectory(), _templatesPath);
+                
+                var imagePath = Path.Combine(fullTemplatesPath, imageFileName);
+                
+                // 确保目录存在
+                Directory.CreateDirectory(fullTemplatesPath);
                 
                 // 检查文件是否已存在（防止重名覆盖）
                 if (File.Exists(imagePath))
                 {
                     _logger.LogWarning("模板文件已存在，将覆盖: {FileName}", imageFileName);
                 }
+                
+                _logger.LogInformation("保存模板图片到: {ImagePath}", imagePath);
                 
                 using (var stream = new FileStream(imagePath, FileMode.Create))
                 {
@@ -792,11 +803,8 @@ namespace LmyDigitalHuman.Services
             // 加载已存在的模板文件
             LoadExistingTemplates();
             
-            // 如果没有任何模板，创建一些示例模板
-            if (_templates.Count == 0)
-            {
-                CreateSampleTemplates();
-            }
+            // 不再自动创建示例模板，由用户手动创建
+            _logger.LogInformation("模板服务初始化完成，当前模板数量: {Count}", _templates.Count);
         }
 
         private void LoadExistingTemplates()
@@ -807,8 +815,6 @@ namespace LmyDigitalHuman.Services
                 {
                     Directory.CreateDirectory(_templatesPath);
                     _logger.LogInformation("Templates目录不存在，已创建: {Path}", _templatesPath);
-                    // 创建示例模板
-                    CreateSampleTemplates();
                     return;
                 }
 
@@ -1090,16 +1096,22 @@ namespace LmyDigitalHuman.Services
                     // 如果是web路径格式 (/templates/xxx)，需要转换为实际文件路径
                     if (relativePath.StartsWith("templates/") || relativePath.StartsWith("templates\\"))
                     {
-                        fullImagePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", relativePath);
+                        // 确保使用正确的wwwroot路径
+                        var wwwrootPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+                        fullImagePath = Path.Combine(wwwrootPath, relativePath);
                     }
                     else
                     {
-                        fullImagePath = Path.Combine(Directory.GetCurrentDirectory(), relativePath);
+                        // 可能是直接的文件名，尝试在templates目录中查找
+                        var templatesPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "templates");
+                        fullImagePath = Path.Combine(templatesPath, relativePath);
                     }
                 }
                 
                 // 规范化路径以处理中文字符
                 fullImagePath = Path.GetFullPath(fullImagePath);
+                
+                _logger.LogInformation("解析图片路径: {OriginalPath} -> {FullPath}", imagePath, fullImagePath);
                 
                 // 如果音频路径是相对路径，转换为绝对路径
                 var fullAudioPath = Path.IsPathRooted(audioPath) ? audioPath : Path.GetFullPath(audioPath);

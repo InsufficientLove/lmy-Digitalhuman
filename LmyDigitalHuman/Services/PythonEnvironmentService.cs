@@ -96,29 +96,76 @@ namespace LmyDigitalHuman.Services
 
         public async Task<string> GetRecommendedPythonPathAsync()
         {
-            // 直接使用已知的工作路径，避免耗时检测
+            // 基于实际部署路径进行检测
+            var contentRoot = _pathManager.GetContentRootPath();
+            _logger.LogInformation("当前内容根路径: {ContentRoot}", contentRoot);
+            
             var knownPaths = new[]
             {
-                // 基于日志中的实际路径：C:\Users\Administrator\Desktop\digitalhuman\lmy-Digitalhuman\LmyDigitalHuman\../venv_musetalk/Scripts/python.exe
-                "../venv_musetalk/Scripts/python.exe",
-                // 备用路径
-                "venv_musetalk/Scripts/python.exe",
-                "../venv_musetalk/bin/python"
+                // 基于日志中的实际路径结构
+                Path.Combine(contentRoot, "..", "venv_musetalk", "Scripts", "python.exe"),
+                Path.Combine(contentRoot, "venv_musetalk", "Scripts", "python.exe"),
+                Path.Combine(contentRoot, "..", "..", "venv_musetalk", "Scripts", "python.exe"),
+                // Linux/macOS 路径
+                Path.Combine(contentRoot, "..", "venv_musetalk", "bin", "python"),
+                Path.Combine(contentRoot, "venv_musetalk", "bin", "python"),
+                // 系统Python作为备用
+                "python.exe",
+                "python3.exe",
+                "python",
+                "python3"
             };
 
             foreach (var knownPath in knownPaths)
             {
-                var resolvedPath = _pathManager.ResolvePath(knownPath);
+                var resolvedPath = Path.GetFullPath(knownPath);
+                _logger.LogDebug("检查Python路径: {Path}", resolvedPath);
+                
                 if (File.Exists(resolvedPath))
                 {
-                    _logger.LogInformation("使用已知Python路径: {PythonPath}", resolvedPath);
+                    _logger.LogInformation("找到可用的Python路径: {PythonPath}", resolvedPath);
                     return resolvedPath;
                 }
             }
 
-            // 如果已知路径都不存在，给出明确的错误提示
-            var expectedPath = _pathManager.ResolvePath("../venv_musetalk/Scripts/python.exe");
-            _logger.LogError("Python环境未找到，请确保虚拟环境存在于: {ExpectedPath}", expectedPath);
+            // 如果所有路径都不存在，尝试使用环境变量中的python
+            try
+            {
+                var process = new Process
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = "python",
+                        Arguments = "--version",
+                        UseShellExecute = false,
+                        RedirectStandardOutput = true,
+                        CreateNoWindow = true
+                    }
+                };
+                
+                process.Start();
+                await process.WaitForExitAsync();
+                
+                if (process.ExitCode == 0)
+                {
+                    _logger.LogInformation("使用系统Python: python");
+                    return "python";
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug("系统Python检测失败: {Error}", ex.Message);
+            }
+
+            // 最后的错误处理
+            var expectedPath = Path.Combine(contentRoot, "..", "venv_musetalk", "Scripts", "python.exe");
+            _logger.LogError("Python环境未找到，请确保虚拟环境存在。检查了以下路径:");
+            foreach (var path in knownPaths.Take(6)) // 只显示主要路径
+            {
+                _logger.LogError("  - {Path}", Path.GetFullPath(path));
+            }
+            _logger.LogError("建议创建虚拟环境: python -m venv ../venv_musetalk");
+            
             throw new FileNotFoundException($"Python环境未找到，请确保虚拟环境存在于: {expectedPath}");
         }
 
