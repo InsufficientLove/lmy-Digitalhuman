@@ -43,8 +43,23 @@ namespace LmyDigitalHuman.Controllers
                     return BadRequest(new { error = "模板ID不能为空" });
                 }
 
-                _logger.LogInformation("生成欢迎视频: TemplateId={TemplateId}", request.TemplateId);
+                _logger.LogInformation("欢迎请求: TemplateId={TemplateId} (跳过视频生成)", request.TemplateId);
 
+                // 直接返回纯音频响应，不生成视频
+                var response = new ConversationResponse
+                {
+                    Success = true,
+                    Message = "欢迎使用数字人服务！",
+                    HasVideo = false,
+                    VideoUrl = null,
+                    AudioUrl = null,  // 也不生成音频
+                    Duration = 0
+                };
+
+                return Ok(response);
+                
+                /*
+                // 原视频生成代码已禁用
                 var response = await _conversationService.GenerateWelcomeVideoAsync(request);
                 
                 if (response.Success)
