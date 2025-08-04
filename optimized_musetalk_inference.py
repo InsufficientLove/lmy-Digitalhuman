@@ -202,48 +202,31 @@ class OptimizedMuseTalkInference:
         
         # 🔧 提取面部坐标 - 使用MuseTalk原生逻辑
         print(f"🔍 提取面部坐标: {template_id}")
+        print(f"[CONFIG] 模板路径: {template_path}")
+        
         try:
             # 🎯 使用MuseTalk原生的get_landmark_and_bbox函数
+            # 现在使用英文SystemName，不再有中文路径问题
             coord_list, frame_list = get_landmark_and_bbox([template_path], self.config.bbox_shift)
             print(f"[OK] MuseTalk原生面部检测成功: {len(coord_list)} 个坐标")
             
-        except Exception as e:
-            print(f"[WARN] MuseTalk原生面部检测失败: {e}")
+            # 验证坐标有效性
+            if coord_list and len(coord_list) > 0:
+                for i, coord in enumerate(coord_list):
+                    print(f"[CONFIG] 坐标 {i+1}: {coord}")
             
-            # 🔧 中文路径问题的解决方案：创建临时文件
-            try:
-                import tempfile
-                import shutil
-                
-                # 创建临时文件（英文路径）
-                with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as temp_file:
-                    temp_path = temp_file.name
-                    
-                # 复制图片到临时路径
-                shutil.copy2(template_path, temp_path)
-                print(f"[CONFIG] 创建临时文件解决中文路径: {temp_path}")
-                
-                # 使用临时路径调用原生函数
-                coord_list, frame_list = get_landmark_and_bbox([temp_path], self.config.bbox_shift)
-                print(f"[OK] 使用临时文件成功: {len(coord_list)} 个坐标")
-                
-                # 清理临时文件
-                os.unlink(temp_path)
-                
-                # 替换frame_list为原始图片（因为我们已经正确读取了）
-                frame_list = [img]
-                
-            except Exception as e2:
-                print(f"[ERROR] 临时文件方案也失败: {e2}")
-                print(f"[FALLBACK] 使用MuseTalk标准的占位符坐标")
-                
-                # 🎯 使用MuseTalk的标准占位符逻辑
-                # 参考 preprocessing.py:26 的 coord_placeholder
-                coord_placeholder = (0.0, 0.0, 0.0, 0.0)
-                coord_list = [coord_placeholder]
-                frame_list = [img]
-                print(f"[FALLBACK] 使用占位符坐标: {coord_placeholder}")
-                print("[INFO] 这将使用MuseTalk的内置错误处理逻辑")
+        except Exception as e:
+            print(f"[ERROR] MuseTalk原生面部检测失败: {e}")
+            import traceback
+            traceback.print_exc()
+            
+            # 🎯 使用MuseTalk的标准占位符逻辑
+            print(f"[FALLBACK] 使用MuseTalk标准的占位符坐标")
+            coord_placeholder = (0.0, 0.0, 0.0, 0.0)
+            coord_list = [coord_placeholder]
+            frame_list = [img]
+            print(f"[FALLBACK] 使用占位符坐标: {coord_placeholder}")
+            print("[INFO] 这将使用MuseTalk的内置错误处理逻辑")
         
         # 预计算VAE编码
         print(f"🧠 预计算VAE编码: {template_id}")

@@ -11,8 +11,21 @@ namespace LmyDigitalHuman.Models
     {
         public string TemplateId { get; set; } = string.Empty;
         public string Id { get => TemplateId; set => TemplateId = value; }
-        public string TemplateName { get; set; } = string.Empty;
-        public string Name { get => TemplateName; set => TemplateName = value; }
+        
+        /// <summary>
+        /// 显示名称（中文名，用户友好）
+        /// </summary>
+        public string DisplayName { get; set; } = string.Empty;
+        
+        /// <summary>
+        /// 系统名称（英文名，文件系统使用）
+        /// </summary>
+        public string SystemName { get; set; } = string.Empty;
+        
+        // 向后兼容的属性
+        public string TemplateName { get => DisplayName; set => DisplayName = value; }
+        public string Name { get => DisplayName; set => DisplayName = value; }
+        
         public string Description { get; set; } = string.Empty;
         public string TemplateType { get; set; } = "headshot"; // headshot, half_body, full_body
         public string Gender { get; set; } = "neutral"; // male, female, neutral
@@ -38,7 +51,10 @@ namespace LmyDigitalHuman.Models
     public class CreateTemplateRequest
     {
         [Required]
-        public string TemplateName { get; set; } = string.Empty;
+        public string TemplateName { get; set; } = string.Empty;  // 显示名称（中文）
+        
+        [Required]
+        public string SystemName { get; set; } = string.Empty;    // 系统名称（英文）
         
         [Required]
         public IFormFile ImageFile { get; set; } = default!;
@@ -792,7 +808,10 @@ namespace LmyDigitalHuman.Models
     public class CreateDigitalHumanTemplateRequest
     {
         [Required]
-        public string TemplateName { get; set; } = string.Empty;
+        public string TemplateName { get; set; } = string.Empty;  // 显示名称（中文）
+        
+        [Required]
+        public string SystemName { get; set; } = string.Empty;    // 系统名称（英文）
         
         [Required]
         public IFormFile ImageFile { get; set; } = default!;

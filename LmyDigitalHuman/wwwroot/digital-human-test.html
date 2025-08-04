@@ -660,12 +660,27 @@
             <form id="createTemplateForm" onsubmit="createTemplate(event)">
                 <div class="form-row">
                     <div class="input-group">
-                        <label for="templateName">模板名称 *</label>
-                        <input type="text" id="templateName" class="form-control" required placeholder="请输入模板名称">
+                        <label for="templateName">显示名称 *</label>
+                        <input type="text" id="templateName" class="form-control" required placeholder="请输入中文显示名称，如：小哈">
                     </div>
+                    <div class="input-group">
+                        <label for="systemName">英文标识 *</label>
+                        <input type="text" id="systemName" class="form-control" required 
+                               placeholder="请输入英文标识，如：xiaoha" 
+                               pattern="[a-zA-Z0-9_-]+" 
+                               title="只能包含英文字母、数字、下划线和连字符"
+                               oninput="validateSystemName(this)">
+                        <small style="color: #666; font-size: 0.8em;">用于文件存储，只能包含英文、数字、下划线和连字符</small>
+                    </div>
+                </div>
+                
+                <div class="form-row">
                     <div class="input-group">
                         <label for="templateDescription">模板描述</label>
                         <input type="text" id="templateDescription" class="form-control" placeholder="简短描述这个模板">
+                    </div>
+                    <div class="input-group">
+                        <!-- 占位，保持布局平衡 -->
                     </div>
                 </div>
 
@@ -1362,6 +1377,20 @@
             }
         }
 
+        // 验证SystemName输入
+        function validateSystemName(input) {
+            const value = input.value;
+            const isValid = /^[a-zA-Z0-9_-]*$/.test(value);
+            
+            if (!isValid && value.length > 0) {
+                input.style.borderColor = '#ff4444';
+                input.style.backgroundColor = '#fff5f5';
+            } else {
+                input.style.borderColor = '#ddd';
+                input.style.backgroundColor = '#fff';
+            }
+        }
+
         async function createTemplate(event) {
             event.preventDefault();
             
@@ -1373,8 +1402,15 @@
             updateProgress(10);
 
             try {
+                // 验证SystemName
+                const systemName = document.getElementById('systemName').value;
+                if (!/^[a-zA-Z0-9_-]+$/.test(systemName)) {
+                    throw new Error('英文标识只能包含英文字母、数字、下划线和连字符');
+                }
+                
                 const formData = new FormData();
                 formData.append('templateName', document.getElementById('templateName').value);
+                formData.append('systemName', systemName);
                 formData.append('description', document.getElementById('templateDescription').value);
                 formData.append('gender', document.getElementById('templateGender').value);
                 formData.append('style', document.getElementById('templateStyle').value);

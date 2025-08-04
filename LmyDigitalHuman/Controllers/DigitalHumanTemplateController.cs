@@ -38,10 +38,22 @@ namespace LmyDigitalHuman.Controllers
 
                 if (string.IsNullOrWhiteSpace(request.TemplateName))
                 {
-                    return BadRequest(new { error = "模板名称不能为空" });
+                    return BadRequest(new { error = "显示名称不能为空" });
                 }
 
-                _logger.LogInformation("开始创建数字人模板: {TemplateName}", request.TemplateName);
+                if (string.IsNullOrWhiteSpace(request.SystemName))
+                {
+                    return BadRequest(new { error = "英文标识不能为空" });
+                }
+
+                // 验证SystemName格式
+                if (!System.Text.RegularExpressions.Regex.IsMatch(request.SystemName, @"^[a-zA-Z0-9_-]+$"))
+                {
+                    return BadRequest(new { error = "英文标识只能包含英文字母、数字、下划线和连字符" });
+                }
+
+                _logger.LogInformation("开始创建数字人模板: DisplayName={DisplayName}, SystemName={SystemName}", 
+                    request.TemplateName, request.SystemName);
 
                 var result = await _templateService.CreateTemplateAsync(request);
                 

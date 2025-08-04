@@ -60,13 +60,14 @@ namespace LmyDigitalHuman.Services
             
             try
             {
-                _logger.LogInformation("开始创建数字人模板: {TemplateName}", request.TemplateName);
+                _logger.LogInformation("开始创建数字人模板: DisplayName={DisplayName}, SystemName={SystemName}", 
+                    request.TemplateName, request.SystemName);
 
                 // 生成模板ID
                 var templateId = Guid.NewGuid().ToString("N");
                 
-                // 🎯 直接使用模板名称作为文件名，支持中英文
-                var imageFileName = $"{request.TemplateName}.jpg";
+                // 🎯 使用英文SystemName作为文件名，解决中文路径问题
+                var imageFileName = $"{request.SystemName}.jpg";
                 
                 // 确保使用完整的绝对路径
                 var fullTemplatesPath = Path.IsPathRooted(_templatesPath) 
@@ -95,7 +96,8 @@ namespace LmyDigitalHuman.Services
                 var template = new DigitalHumanTemplate
                 {
                     TemplateId = templateId,
-                    TemplateName = request.TemplateName,
+                    DisplayName = request.TemplateName,  // 中文显示名
+                    SystemName = request.SystemName,     // 英文系统名
                     Description = request.Description,
                     TemplateType = request.TemplateType,
                     Gender = request.Gender,
@@ -121,26 +123,29 @@ namespace LmyDigitalHuman.Services
                 {
                     try
                     {
-                        _logger.LogInformation("🔧 开始MuseTalk模板预处理: {TemplateName}", template.TemplateName);
+                        _logger.LogInformation("🔧 开始MuseTalk模板预处理: DisplayName={DisplayName}, SystemName={SystemName}", 
+                            template.DisplayName, template.SystemName);
                         
                         // 🎯 第一步：进行MuseTalk预处理（永久化模型）
-                        // 使用模板名称而不是GUID，因为图片文件名是基于模板名称的
-                        await _museTalkService.PreprocessTemplateAsync(template.TemplateName);
-                        _logger.LogInformation("✅ MuseTalk预处理完成: {TemplateName}", template.TemplateName);
+                        // 使用SystemName（英文名）作为文件标识，避免中文路径问题
+                        await _museTalkService.PreprocessTemplateAsync(template.SystemName);
+                        _logger.LogInformation("✅ MuseTalk预处理完成: SystemName={SystemName}", template.SystemName);
                         
                         // ✅ 预处理完成，模板就绪（不生成预览视频）
-                        _logger.LogInformation("✅ 模板预处理完成，已就绪: {TemplateName}", template.TemplateName);
+                        _logger.LogInformation("✅ 模板预处理完成，已就绪: DisplayName={DisplayName}", template.DisplayName);
                         
                         // 更新模板状态为就绪
                         template.Status = "ready";
                         template.UpdatedAt = DateTime.Now;
                         
                         await SaveTemplateToFileAsync(template); // 更新模板信息
-                        _logger.LogInformation("✅ 模板创建完成: {TemplateName}, 预处理+预览视频已就绪", template.TemplateName);
+                        _logger.LogInformation("✅ 模板创建完成: DisplayName={DisplayName}, SystemName={SystemName}, 预处理已就绪", 
+                            template.DisplayName, template.SystemName);
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "❌ 模板预处理或预览视频生成失败: {TemplateName}", template.TemplateName);
+                        _logger.LogError(ex, "❌ 模板预处理失败: DisplayName={DisplayName}, SystemName={SystemName}", 
+                            template.DisplayName, template.SystemName);
                         template.Status = "error";
                         template.UpdatedAt = DateTime.Now;
                         await SaveTemplateToFileAsync(template);
