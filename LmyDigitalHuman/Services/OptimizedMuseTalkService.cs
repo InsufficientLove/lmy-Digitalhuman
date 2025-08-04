@@ -1409,20 +1409,15 @@ namespace LmyDigitalHuman.Services
                 
                 // 🔧 使用正确的MuseTalk脚本路径
                 var contentRoot = _pathManager.GetContentRootPath();
-                var museTalkDir = Path.Combine(contentRoot, "..", "MuseTalk");
                 var pythonPath = await GetCachedPythonPathAsync();
                 
-                // 检查脚本路径
-                var optimizedScriptPath = Path.Combine(museTalkDir, "optimized_musetalk_inference.py");
+                // 检查脚本路径 - 直接在项目根目录查找
+                var optimizedScriptPath = Path.Combine(contentRoot, "..", "optimized_musetalk_inference.py");
+                var museTalkDir = Path.Combine(contentRoot, "..");
+                
                 if (!File.Exists(optimizedScriptPath))
                 {
-                    // 尝试在工作目录中查找
-                    optimizedScriptPath = Path.Combine(contentRoot, "optimized_musetalk_inference.py");
-                    if (!File.Exists(optimizedScriptPath))
-                    {
-                        throw new FileNotFoundException($"找不到MuseTalk推理脚本: {optimizedScriptPath}");
-                    }
-                    museTalkDir = contentRoot; // 更新工作目录
+                    throw new FileNotFoundException($"找不到MuseTalk推理脚本: {optimizedScriptPath}");
                 }
                 
                 _logger.LogInformation("📄 使用MuseTalk脚本: {ScriptPath}", optimizedScriptPath);
