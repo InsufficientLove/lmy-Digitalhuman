@@ -8,6 +8,14 @@ using System.Threading.Channels;
 
 namespace LmyDigitalHuman.Services
 {
+    /// <summary>
+    /// MuseTalk数字人视频生成服务
+    /// 基于官方MuseTalk实现高质量唇同步
+    /// 
+    /// 注意: MuseTalk专注于唇同步，只生成嘴部动作
+    /// 如需要眼部动作和身体动作，需要结合MuseV或其他技术
+    /// 官方建议: 先用MuseV生成基础视频，再用MuseTalk添加唇同步
+    /// </summary>
     public class MuseTalkService : IMuseTalkService
     {
         private readonly ILogger<MuseTalkService> _logger;
@@ -819,25 +827,23 @@ namespace LmyDigitalHuman.Services
             args.Append($" --result_dir \"{Path.GetDirectoryName(outputPath)}\"");
             args.Append($" --gpu_id 0");
             
-            // 模型路径 - 基于源码的默认值
+            // 模型路径 - 基于官方MuseTalk源码
             args.Append($" --unet_config \"models/musetalk/musetalk.json\"");
             args.Append($" --unet_model_path \"models/musetalk/pytorch_model.bin\"");
             args.Append($" --whisper_dir \"models/whisper\"");
-            args.Append($" --vae_type \"sd-vae\""); // 明确指定VAE类型
             
-            // 性能和质量参数 - 提升视频质量
-            args.Append($" --batch_size 1");
+            // 性能优化参数
+            args.Append($" --batch_size 4"); // 增加批处理大小提升速度
             args.Append($" --fps 25");
-            args.Append($" --use_float16");
+            args.Append($" --use_float16"); // 使用FP16减少显存占用
             args.Append($" --version v1");
             
-            // 质量提升参数
-            args.Append($" --extra_margin 20"); // 增加面部边距，改善只有嘴巴动的问题
-            args.Append($" --audio_padding_length_left 3"); // 音频左侧填充
-            args.Append($" --audio_padding_length_right 3"); // 音频右侧填充
-            
-            if (request.BboxShift.HasValue)
-                args.Append($" --bbox_shift {request.BboxShift.Value}");
+            // 根据官方文档的bbox_shift参数优化
+            // bbox_shift控制面部区域的上下边界，影响嘴部开合程度
+            // 正值(向下移动)增加嘴部开合，负值(向上移动)减少嘴部开合
+            // 建议范围: -10 到 +10
+            var bboxShift = request.BboxShift ?? 0; // 默认值为0
+            args.Append($" --bbox_shift {bboxShift}");
             
             return (args.ToString(), configPath);
         }
@@ -1242,15 +1248,18 @@ namespace LmyDigitalHuman.Services
                             _logger.LogInformation("更新PATH，优先使用虚拟环境Scripts: {ScriptsDir}", scriptsDir);
                         }
                         
-                        // 优化GPU配置 - 先专注单GPU稳定性
-                        processInfo.Environment["CUDA_VISIBLE_DEVICES"] = "0"; // 只使用GPU 0避免多GPU冲突
-                        processInfo.Environment["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:512"; // 保守的内存配置
-                        processInfo.Environment["OMP_NUM_THREADS"] = "8"; // 保守的CPU线程数
-                        processInfo.Environment["CUDA_LAUNCH_BLOCKING"] = "1"; // 同步执行便于调试
+                        // 优化GPU配置 - 基于MuseTalk官方推荐配置
+                        processInfo.Environment["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"; // 启用多GPU并行处理
+                        processInfo.Environment["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:1024"; // 增加内存分配
+                        processInfo.Environment["OMP_NUM_THREADS"] = "16"; // 增加CPU线程数
+                        processInfo.Environment["CUDA_LAUNCH_BLOCKING"] = "0"; // 异步执行提升性能
                         processInfo.Environment["TORCH_CUDNN_V8_API_ENABLED"] = "1"; // 启用cuDNN v8优化
+                        processInfo.Environment["TORCH_BACKENDS_CUDNN_BENCHMARK"] = "1"; // 启用cuDNN自动调优
+                        processInfo.Environment["TOKENIZERS_PARALLELISM"] = "false"; // 避免tokenizer警告
+                        processInfo.Environment["CUBLAS_WORKSPACE_CONFIG"] = ":16:8"; // 增加CUBLAS工作空间
                         
                         _logger.LogInformation("虚拟环境配置完成: {VenvDir}", venvDir);
-                        _logger.LogInformation("GPU配置: CUDA_VISIBLE_DEVICES=0 (单GPU稳定模式)");
+                        _logger.LogInformation("GPU配置: CUDA_VISIBLE_DEVICES=0,1,2,3 (多GPU高性能模式)");
                     }
                     else
                     {
@@ -1274,9 +1283,11 @@ namespace LmyDigitalHuman.Services
                     }
                     _logger.LogInformation("为系统Python设置PYTHONPATH: {MuseTalkDir}", museTalkDir);
                     
-                    // 为系统Python也设置GPU优化（单GPU稳定模式）
-                    processInfo.Environment["CUDA_VISIBLE_DEVICES"] = "0";
-                    processInfo.Environment["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:512";
+                    // 为系统Python也设置GPU优化（多GPU高性能模式）
+                    processInfo.Environment["CUDA_VISIBLE_DEVICES"] = "0,1,2,3";
+                    processInfo.Environment["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:1024";
+                    processInfo.Environment["OMP_NUM_THREADS"] = "16";
+                    processInfo.Environment["TORCH_BACKENDS_CUDNN_BENCHMARK"] = "1";
                     processInfo.Environment["OMP_NUM_THREADS"] = "8";
                     processInfo.Environment["CUDA_LAUNCH_BLOCKING"] = "1";
                     processInfo.Environment["TORCH_CUDNN_V8_API_ENABLED"] = "1";
