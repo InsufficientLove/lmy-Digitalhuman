@@ -741,8 +741,9 @@ namespace LmyDigitalHuman.Services
                 // 使用Python环境服务获取最佳Python路径
                 var bestPythonPath = await _pythonEnvironmentService.GetRecommendedPythonPathAsync();
                 
-                // MuseTalk工作目录应该是MuseTalk目录的父目录，因为Python命令中使用的是"MuseTalk/..."相对路径
-                var workingDir = Directory.GetParent(_pathManager.GetContentRootPath())?.FullName ?? _pathManager.GetContentRootPath();
+                // MuseTalk工作目录应该是MuseTalk目录本身，因为scripts.inference使用相对路径"./musetalk/..."
+                var parentDir = Directory.GetParent(_pathManager.GetContentRootPath())?.FullName ?? _pathManager.GetContentRootPath();
+                var workingDir = Path.Combine(parentDir, "MuseTalk");
                 
                 _logger.LogInformation("执行Python命令: {PythonPath} {Arguments}", bestPythonPath, arguments);
                 _logger.LogInformation("ContentRoot: {ContentRoot}", _pathManager.GetContentRootPath());
@@ -766,16 +767,28 @@ namespace LmyDigitalHuman.Services
                 processInfo.Environment["PYTHONUTF8"] = "1";
                 
                 // 检查MuseTalk目录是否存在
-                var museTalkDir = Path.Combine(workingDir, "MuseTalk");
-                if (!Directory.Exists(museTalkDir))
+                if (!Directory.Exists(workingDir))
                 {
-                    _logger.LogError("MuseTalk目录不存在: {MuseTalkDir}", museTalkDir);
-                    _logger.LogError("工作目录: {WorkingDir}", workingDir);
-                    _logger.LogError("请确保MuseTalk目录位于项目父目录下");
+                    _logger.LogError("MuseTalk目录不存在: {MuseTalkDir}", workingDir);
+                    _logger.LogError("请确保MuseTalk目录位于: {ExpectedPath}", workingDir);
                     return new PythonResult
                     {
                         Success = false,
-                        Output = $"MuseTalk目录不存在: {museTalkDir}"
+                        Output = $"MuseTalk目录不存在: {workingDir}"
+                    };
+                }
+                
+                // 检查关键的脚本目录是否存在
+                var scriptsDir = Path.Combine(workingDir, "scripts");
+                var musetalkDir = Path.Combine(workingDir, "musetalk");
+                if (!Directory.Exists(scriptsDir) || !Directory.Exists(musetalkDir))
+                {
+                    _logger.LogError("MuseTalk关键目录缺失: scripts={ScriptsExists}, musetalk={MusetalkExists}", 
+                        Directory.Exists(scriptsDir), Directory.Exists(musetalkDir));
+                    return new PythonResult
+                    {
+                        Success = false,
+                        Output = $"MuseTalk目录结构不完整，缺少scripts或musetalk目录"
                     };
                 }
                 
@@ -1013,8 +1026,8 @@ namespace LmyDigitalHuman.Services
                         var sitePackages = Path.Combine(venvDir, "Lib", "site-packages");
                         if (Directory.Exists(sitePackages))
                         {
-                            // 获取MuseTalk目录路径
-                            var museTalkDir = Path.Combine(processInfo.WorkingDirectory, "MuseTalk");
+                            // 工作目录就是MuseTalk目录，直接将其添加到PYTHONPATH
+                            var museTalkDir = processInfo.WorkingDirectory;
                             // 将MuseTalk目录和site-packages都添加到PYTHONPATH
                             processInfo.Environment["PYTHONPATH"] = museTalkDir + ";" + sitePackages;
                             _logger.LogInformation("设置PYTHONPATH: {MuseTalkDir};{SitePackages}", museTalkDir, sitePackages);
@@ -1048,20 +1061,17 @@ namespace LmyDigitalHuman.Services
                     _logger.LogInformation("使用系统Python: {PythonPath}", pythonPath);
                     
                     // 为系统Python也设置MuseTalk目录到PYTHONPATH
-                    var museTalkDir = Path.Combine(processInfo.WorkingDirectory, "MuseTalk");
-                    if (Directory.Exists(museTalkDir))
+                    var museTalkDir = processInfo.WorkingDirectory; // 工作目录就是MuseTalk目录
+                    var currentPythonPath = Environment.GetEnvironmentVariable("PYTHONPATH") ?? "";
+                    if (!string.IsNullOrEmpty(currentPythonPath))
                     {
-                        var currentPythonPath = Environment.GetEnvironmentVariable("PYTHONPATH") ?? "";
-                        if (!string.IsNullOrEmpty(currentPythonPath))
-                        {
-                            processInfo.Environment["PYTHONPATH"] = museTalkDir + ";" + currentPythonPath;
-                        }
-                        else
-                        {
-                            processInfo.Environment["PYTHONPATH"] = museTalkDir;
-                        }
-                        _logger.LogInformation("为系统Python设置PYTHONPATH: {MuseTalkDir}", museTalkDir);
+                        processInfo.Environment["PYTHONPATH"] = museTalkDir + ";" + currentPythonPath;
                     }
+                    else
+                    {
+                        processInfo.Environment["PYTHONPATH"] = museTalkDir;
+                    }
+                    _logger.LogInformation("为系统Python设置PYTHONPATH: {MuseTalkDir}", museTalkDir);
                 }
             }
             catch (Exception ex)
