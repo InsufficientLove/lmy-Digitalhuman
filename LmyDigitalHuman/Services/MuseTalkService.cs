@@ -924,6 +924,27 @@ namespace LmyDigitalHuman.Services
                     {
                         _logger.LogWarning("MuseTalk进程超时，正在终止进程: PID={ProcessId}, Timeout={Timeout}s", 
                             process.Id, timeout.TotalSeconds);
+                            
+                        // 收集超时前的输出，帮助诊断问题
+                        string partialOutput = "";
+                        string partialError = "";
+                        try
+                        {
+                            if (outputTask.IsCompletedSuccessfully)
+                                partialOutput = await outputTask;
+                            if (errorTask.IsCompletedSuccessfully) 
+                                partialError = await errorTask;
+                                
+                            _logger.LogInformation("超时前的Python标准输出: {Output}", 
+                                string.IsNullOrEmpty(partialOutput) ? "[空]" : (partialOutput.Length > 1000 ? partialOutput.Substring(0, 1000) + "..." : partialOutput));
+                            _logger.LogInformation("超时前的Python错误输出: {Error}", 
+                                string.IsNullOrEmpty(partialError) ? "[空]" : (partialError.Length > 1000 ? partialError.Substring(0, 1000) + "..." : partialError));
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "收集超时输出失败");
+                        }
+                        
                         try
                         {
                             if (!process.HasExited)
@@ -940,7 +961,8 @@ namespace LmyDigitalHuman.Services
                         return new PythonResult
                         {
                             Success = false,
-                            Output = $"MuseTalk脚本执行超时({timeout.TotalSeconds}秒)"
+                            Output = $"MuseTalk脚本执行超时({timeout.TotalSeconds}秒)。" +
+                                    (string.IsNullOrEmpty(partialError) ? "" : $" 错误信息: {partialError}")
                         };
                     }
                 }
