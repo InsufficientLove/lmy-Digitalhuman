@@ -99,8 +99,8 @@ namespace LmyDigitalHuman.Services
                     AgeRange = request.AgeRange,
                     Style = request.Style,
                     EnableEmotion = request.EnableEmotion,
-                    ImagePath = $"/templates/{imageFileName}",
-                    ImageUrl = $"/templates/{imageFileName}",
+                    ImagePath = imagePath, // 🎯 使用实际物理路径，便于Python直接访问
+                    ImageUrl = $"/templates/{imageFileName}", // Web访问路径
                     DefaultVoiceSettings = request.DefaultVoiceSettings ?? new VoiceSettings(),
                     CustomParameters = request.CustomParameters ?? new Dictionary<string, object>(),
                     CreatedAt = DateTime.Now,

@@ -106,7 +106,7 @@ namespace LmyDigitalHuman.Services
                 
                 var videoResponse = await _museTalkService.GenerateVideoAsync(new DigitalHumanRequest
                 {
-                    AvatarImagePath = template.ImagePath,
+                    AvatarImagePath = template.ImagePath, // 现在使用物理路径，直接传递给Python
                     AudioPath = ttsResult.AudioPath,
                     Quality = request.Quality,
                     EnableEmotion = true,

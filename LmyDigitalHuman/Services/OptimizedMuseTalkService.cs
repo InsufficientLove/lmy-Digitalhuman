@@ -858,7 +858,7 @@ namespace LmyDigitalHuman.Services
         /// </summary>
         private async Task<string> ExecuteOptimizedInferenceAsync(string templateId, string audioPath)
         {
-            var outputFileName = $"optimized_{templateId}_{DateTime.Now:yyyyMMdd_HHmmss}_{Guid.NewGuid():N[..8]}.mp4";
+            var outputFileName = $"optimized_{templateId}_{DateTime.Now:yyyyMMdd_HHmmss}_{Guid.NewGuid().ToString("N")[..8]}.mp4";
             var outputPath = Path.Combine(_pathManager.GetContentRootPath(), "wwwroot", "videos", outputFileName);
             
             var museTalkDir = Path.Combine(_pathManager.GetContentRootPath(), "..", "MuseTalk");
@@ -987,19 +987,14 @@ namespace LmyDigitalHuman.Services
         }
         
         /// <summary>
-        /// 获取模板ID - 从前端传入的路径中提取模板名称
-        /// 支持用户自定义的可读模板名称，而不是GUID
+        /// 获取模板ID - 从路径中提取模板名称（支持物理路径和web路径）
         /// </summary>
         private string GetTemplateId(string avatarPath)
         {
-            // 处理前端传入的路径格式，如: /templates/美女主播.jpg 或 /templates/商务男士.jpg
-            if (avatarPath.StartsWith("/"))
-            {
-                return Path.GetFileNameWithoutExtension(avatarPath);
-            }
-            
-            // 处理绝对路径格式
-            return Path.GetFileNameWithoutExtension(avatarPath);
+            // 🎯 统一处理：直接提取文件名（不含扩展名）作为模板ID
+            var templateId = Path.GetFileNameWithoutExtension(avatarPath);
+            _logger.LogDebug("提取模板ID: {AvatarPath} → {TemplateId}", avatarPath, templateId);
+            return templateId;
         }
         
         /// <summary>
@@ -1335,7 +1330,7 @@ namespace LmyDigitalHuman.Services
                 throw new InvalidOperationException($"模板 {templateId} 模型未加载到GPU内存");
             }
 
-            var outputFileName = $"realtime_{templateId}_{DateTime.Now:yyyyMMdd_HHmmss}_{Guid.NewGuid():N[..8]}.mp4";
+            var outputFileName = $"realtime_{templateId}_{DateTime.Now:yyyyMMdd_HHmmss}_{Guid.NewGuid().ToString("N")[..8]}.mp4";
             var outputPath = Path.Combine(_pathManager.GetContentRootPath(), "wwwroot", "videos", outputFileName);
 
             _logger.LogInformation("⚡ 执行实时推理: {TemplateId} (GPU:{GPU})", templateId, modelInfo.AssignedGPU);

@@ -116,35 +116,34 @@ namespace LmyDigitalHuman.Services
             if (string.IsNullOrEmpty(imagePath))
                 return _templatesPath;
 
-            // 检查是否是错误的绝对路径 C:\templates\xxx
-            if (imagePath.StartsWith("C:\\templates\\") || imagePath.StartsWith("C:/templates/"))
-            {
-                // 提取文件名，使用正确的templates路径
-                var fileName = Path.GetFileName(imagePath);
-                _logger.LogWarning("修正错误的绝对路径: {ErrorPath} → {CorrectPath}", imagePath, Path.Combine(_templatesPath, fileName));
-                return Path.GetFullPath(Path.Combine(_templatesPath, fileName));
-            }
-                
-            // 如果是其他绝对路径且文件存在，直接返回
-            if (Path.IsPathRooted(imagePath) && File.Exists(imagePath))
-                return Path.GetFullPath(imagePath);
-
-            // 对于web路径格式（如 /templates/xxx.jpg），直接转换为物理路径
+            // 🎯 快速路径解析 - 直接基于wwwroot/templates构建，避免重复检查
+            string fileName;
+            
+            // 处理web路径格式（如 /templates/小哈.jpg）
             if (imagePath.StartsWith("/templates/"))
             {
-                var fileName = imagePath.Substring("/templates/".Length);
-                return Path.GetFullPath(Path.Combine(_templatesPath, fileName));
+                fileName = imagePath.Substring("/templates/".Length);
             }
-            
-            // 对于其他web路径（如 /images/xxx.jpg）
-            if (imagePath.StartsWith("/"))
+            // 处理错误的绝对路径 C:\templates\xxx
+            else if (imagePath.StartsWith("C:\\templates\\") || imagePath.StartsWith("C:/templates/"))
             {
-                var relativePath = imagePath.TrimStart('/');
-                return Path.GetFullPath(Path.Combine(_webRootPath, relativePath));
+                fileName = Path.GetFileName(imagePath);
+                _logger.LogDebug("修正错误路径: {ErrorPath} → 文件名: {FileName}", imagePath, fileName);
+            }
+            // 处理其他绝对路径
+            else if (Path.IsPathRooted(imagePath))
+            {
+                fileName = Path.GetFileName(imagePath);
+            }
+            // 处理相对路径
+            else
+            {
+                fileName = imagePath;
             }
             
-            // 其他情况，默认在templates目录中查找
-            return Path.GetFullPath(Path.Combine(_templatesPath, imagePath));
+            var fullPath = Path.GetFullPath(Path.Combine(_templatesPath, fileName));
+            _logger.LogDebug("解析图片路径: {InputPath} → {FullPath}", imagePath, fullPath);
+            return fullPath;
         }
 
         public string ResolveAudioPath(string audioPath)
