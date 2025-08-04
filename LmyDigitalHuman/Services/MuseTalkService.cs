@@ -832,14 +832,16 @@ namespace LmyDigitalHuman.Services
             args.Append($" --unet_model_path \"models/musetalk/pytorch_model.bin\"");
             args.Append($" --whisper_dir \"models/whisper\"");
             
-            // 基于官方基准优化 - RTX 4090性能最大化
-            args.Append($" --use_float16"); // 官方推荐的FP16模式
+            // 🚀 基于源码分析的RTX 4090最大性能配置
+            args.Append($" --batch_size 8"); // 源码默认值，完美匹配RTX 4090
+            args.Append($" --use_float16"); // 官方推荐FP16模式
             args.Append($" --fps 25");
             args.Append($" --version v1");
+            args.Append($" --use_saved_coord"); // 复用坐标加速
+            args.Append($" --saved_coord"); // 保存坐标供后续使用
             
-            // 官方基准：RTX 3050 Ti (4GB) fp16模式 = 8秒视频5分钟
-            // RTX 4090 (24GB) = 6倍显存 = 理论6倍性能提升
-            // 预期：3秒视频应在15-30秒内完成
+            // 🎯 性能预期：RTX 4090 vs RTX 3050 Ti = 6倍性能提升
+            // 官方基准：8秒视频5分钟 → 预期：3秒视频15-30秒
             
             // 根据官方文档的bbox_shift参数优化
             // bbox_shift控制面部区域的上下边界，影响嘴部开合程度
@@ -1251,25 +1253,29 @@ namespace LmyDigitalHuman.Services
                             _logger.LogInformation("更新PATH，优先使用虚拟环境Scripts: {ScriptsDir}", scriptsDir);
                         }
                         
-                        // RTX 4090单GPU最大性能配置
-                        processInfo.Environment["CUDA_VISIBLE_DEVICES"] = "0"; // 使用最强的GPU
-                        processInfo.Environment["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:2048,expandable_segments:True"; // RTX 4090大内存
-                        processInfo.Environment["OMP_NUM_THREADS"] = "16"; // 充分利用CPU
-                        processInfo.Environment["CUDA_LAUNCH_BLOCKING"] = "0"; // 异步执行提升性能
-                        processInfo.Environment["TORCH_CUDNN_V8_API_ENABLED"] = "1"; // cuDNN v8
+                        // 🚀 RTX 4090极致性能配置 - 基于官方基准6倍性能提升
+                        processInfo.Environment["CUDA_VISIBLE_DEVICES"] = "0"; // 使用最强GPU
+                        processInfo.Environment["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:4096,expandable_segments:True,roundup_power2_divisions:16"; // RTX 4090 24GB极致配置
+                        processInfo.Environment["OMP_NUM_THREADS"] = "32"; // 最大化CPU并行(源码batch_size=8需要)
+                        processInfo.Environment["CUDA_LAUNCH_BLOCKING"] = "0"; // 异步CUDA调用
+                        processInfo.Environment["TORCH_CUDNN_V8_API_ENABLED"] = "1"; // cuDNN v8 API
                         processInfo.Environment["TORCH_BACKENDS_CUDNN_BENCHMARK"] = "1"; // cuDNN自动调优
-                        processInfo.Environment["TORCH_BACKENDS_CUDNN_DETERMINISTIC"] = "0"; // 禁用确定性提升速度
+                        processInfo.Environment["TORCH_BACKENDS_CUDNN_DETERMINISTIC"] = "0"; // 禁用确定性换取速度
+                        processInfo.Environment["TORCH_BACKENDS_CUDNN_ALLOW_TF32"] = "1"; // 启用TF32加速
+                        processInfo.Environment["TORCH_ALLOW_TF32_CUBLAS_OVERRIDE"] = "1"; // CUBLAS TF32
                         processInfo.Environment["TOKENIZERS_PARALLELISM"] = "false"; // 避免警告
-                        processInfo.Environment["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"; // 最大CUBLAS工作空间
+                        processInfo.Environment["CUBLAS_WORKSPACE_CONFIG"] = ":16:8"; // 优化CUBLAS工作空间
                         
-                        // RTX 4090专用优化
-                        processInfo.Environment["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"; // 确保设备顺序
-                        processInfo.Environment["TORCH_CUDA_ARCH_LIST"] = "8.9"; // RTX 4090架构
-                        processInfo.Environment["TORCH_COMPILE"] = "1"; // 启用torch.compile
+                        // RTX 4090 Ada Lovelace架构专用优化
+                        processInfo.Environment["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"; // PCI设备顺序
+                        processInfo.Environment["TORCH_CUDA_ARCH_LIST"] = "8.9"; // RTX 4090 Ada架构
+                        processInfo.Environment["TORCH_COMPILE"] = "1"; // PyTorch 2.0编译优化
                         processInfo.Environment["TORCH_CUDNN_SDPA_ENABLED"] = "1"; // 优化注意力机制
+                        processInfo.Environment["CUDA_MODULE_LOADING"] = "LAZY"; // 延迟模块加载
                         
                         _logger.LogInformation("虚拟环境配置完成: {VenvDir}", venvDir);
-                        _logger.LogInformation("GPU配置: CUDA_VISIBLE_DEVICES=0 (RTX 4090单GPU最大性能模式)");
+                        _logger.LogInformation("🚀 RTX 4090极致性能模式已启用");
+                        _logger.LogInformation("📊 性能预期: 3秒视频15-30秒完成 (基于官方基准6倍提升)");
                     }
                     else
                     {
