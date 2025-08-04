@@ -769,10 +769,13 @@ namespace LmyDigitalHuman.Services
             var configPath = Path.Combine(configDir, $"dynamic_{Guid.NewGuid():N}.yaml");
             var taskId = "task_001";
             
-            // 生成YAML配置内容
+            // 生成YAML配置内容 - 使用正斜杠避免转义问题
+            var videoPath = request.AvatarImagePath.Replace("\\", "/");
+            var audioPath = request.AudioPath.Replace("\\", "/");
+            
             var yamlContent = $@"{taskId}:
-  video_path: ""{request.AvatarImagePath}""
-  audio_path: ""{request.AudioPath}""
+  video_path: ""{videoPath}""
+  audio_path: ""{audioPath}""
   bbox_shift: {request.BboxShift ?? 0}
   result_name: ""{Path.GetFileName(outputPath)}""
 ";
