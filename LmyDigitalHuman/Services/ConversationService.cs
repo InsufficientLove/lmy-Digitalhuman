@@ -101,35 +101,21 @@ namespace LmyDigitalHuman.Services
                     };
                 }
 
-                // 🎬 直接使用模板的预览视频（已在创建时生成）
-                _logger.LogInformation("使用预生成的预览视频: {PreviewVideoPath}", template.PreviewVideoPath);
+                // 🎬 使用预处理信息 + 固定欢迎语 实时生成数字人视频
+                _logger.LogInformation("🎬 开始生成数字人欢迎视频: {TemplateId}", request.TemplateId);
                 
-                string videoUrl = template.PreviewVideoPath;
-                
-                // 如果没有预览视频，才进行实时生成
-                if (string.IsNullOrEmpty(videoUrl))
+                var videoResponse = await _museTalkService.GenerateVideoAsync(new DigitalHumanRequest
                 {
-                    _logger.LogInformation("预览视频不存在，开始实时生成...");
-                    
-                    var videoResponse = await _museTalkService.GenerateVideoAsync(new DigitalHumanRequest
-                    {
-                        AvatarImagePath = template.ImagePath,
-                        AudioPath = ttsResult.AudioPath,
-                        Quality = request.Quality,
-                        EnableEmotion = true,
-                        CacheKey = $"welcome_{request.TemplateId}_{request.Quality}"
-                    });
-                    
-                    if (!videoResponse.Success)
-                    {
-                        return new ConversationResponse
-                        {
-                            Success = false,
-                            Message = $"欢迎视频生成失败: {videoResponse.Message}"
-                        };
-                    }
-                    
-                    videoUrl = videoResponse.VideoUrl;
+                    AvatarImagePath = template.ImagePath,
+                    AudioPath = ttsResult.AudioPath,
+                    Quality = request.Quality,
+                    EnableEmotion = true,
+                    CacheKey = $"welcome_{request.TemplateId}_{request.Quality}"
+                });
+                
+                if (!videoResponse.Success)
+                {
+                    throw new Exception($"数字人视频生成失败: {videoResponse.Message}");
                 }
 
                 stopwatch.Stop();
@@ -137,16 +123,16 @@ namespace LmyDigitalHuman.Services
                 return new ConversationResponse
                 {
                     Success = true,
-                    Message = "欢迎视频已就绪",
+                    Message = "数字人视频生成成功",
                     InputText = "模板选择", 
                     ResponseText = welcomeText,
-                    VideoUrl = videoUrl,
+                    VideoUrl = videoResponse.VideoUrl, // 使用实际生成的视频路径
                     // AudioUrl 已移除 - 不再显示音频
                     DetectedEmotion = "friendly",
                     ProcessingTime = $"{stopwatch.ElapsedMilliseconds}ms",
-                    FromCache = !string.IsNullOrEmpty(template.PreviewVideoPath), // 使用预览视频算作缓存
-                    HasVideo = !string.IsNullOrEmpty(videoUrl),
-                    Duration = 3.1 // 预估时长（秒）
+                    FromCache = false, // 实时生成，不是缓存
+                    HasVideo = !string.IsNullOrEmpty(videoResponse.VideoUrl),
+                    Duration = videoResponse.Duration // 使用实际视频时长
                 };
             }
             catch (Exception ex)

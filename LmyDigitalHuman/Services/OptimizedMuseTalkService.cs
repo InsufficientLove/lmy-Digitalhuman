@@ -692,10 +692,14 @@ namespace LmyDigitalHuman.Services
                 _logger.LogInformation("✅ 4GPU实时推理完成: TemplateId={TemplateId}, 耗时={ElapsedMs}ms, 完成率={CompletionRate:P2}", 
                     templateId, stopwatch.ElapsedMilliseconds, (double)_completedRequests / _totalRequests);
                 
+                // 🌐 转换物理路径为前端可访问的URL
+                var videoUrl = ConvertToWebUrl(outputPath);
+                
                 return new DigitalHumanResponse
                 {
                     Success = true,
-                    VideoPath = outputPath,
+                    VideoPath = outputPath,  // 物理路径（服务器内部使用）
+                    VideoUrl = videoUrl,     // Web URL（前端使用）
                     Duration = duration,
                     Message = $"⚡ 4GPU实时推理完成 (模板: {templateId}, 耗时: {stopwatch.ElapsedMilliseconds}ms)"
                 };
@@ -1605,6 +1609,47 @@ namespace LmyDigitalHuman.Services
             }
         }
         
+        /// <summary>
+        /// 转换物理路径为前端可访问的Web URL
+        /// </summary>
+        private string ConvertToWebUrl(string physicalPath)
+        {
+            try
+            {
+                var contentRoot = _pathManager.GetContentRootPath();
+                var wwwrootPath = Path.Combine(contentRoot, "wwwroot");
+                
+                // 确保路径是绝对路径
+                if (!Path.IsPathRooted(physicalPath))
+                {
+                    physicalPath = Path.GetFullPath(physicalPath);
+                }
+                
+                // 检查文件是否在wwwroot下
+                if (physicalPath.StartsWith(wwwrootPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    // 获取相对于wwwroot的路径
+                    var relativePath = Path.GetRelativePath(wwwrootPath, physicalPath);
+                    
+                    // 转换为Web URL格式（使用/而不是\）
+                    var webUrl = "/" + relativePath.Replace(Path.DirectorySeparatorChar, '/');
+                    
+                    _logger.LogInformation("🌐 路径转换: {PhysicalPath} -> {WebUrl}", physicalPath, webUrl);
+                    return webUrl;
+                }
+                else
+                {
+                    _logger.LogWarning("⚠️ 视频文件不在wwwroot目录下: {PhysicalPath}", physicalPath);
+                    return string.Empty;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ 路径转换失败: {PhysicalPath}", physicalPath);
+                return string.Empty;
+            }
+        }
+
         /// <summary>
         /// 保存模板信息到文件系统 - 确保前端可以读取
         /// </summary>
