@@ -717,27 +717,18 @@ namespace LmyDigitalHuman.Services
             // 直接使用官方MuseTalk的inference脚本
             args.Append($"-m scripts.inference");
             
-            // 使用相对于MuseTalk工作目录的路径（因为WorkingDirectory已经是MuseTalk目录）
+            // 基于日志中的帮助信息，尝试最简参数组合
             args.Append($" --inference_config \"configs/inference/test.yaml\"");
             args.Append($" --result_dir \"{Path.GetDirectoryName(outputPath)}\"");
+            args.Append($" --gpu_id 0");
             
-            // 模型路径 - 相对于MuseTalk目录
-            args.Append($" --unet_model_path \"models/musetalk/pytorch_model.bin\"");
+            // 模型路径
             args.Append($" --unet_config \"models/musetalk/musetalk.json\"");
+            args.Append($" --unet_model_path \"models/musetalk/pytorch_model.bin\"");
             
-            // 版本和其他参数
-            args.Append($" --version v1");
+            // 尝试不同的参数名 - 基于常见的MuseTalk参数
+            // 先测试最基本的配置，看是否能启动
             
-            if (request.BboxShift.HasValue)
-                args.Append($" --bbox_shift {request.BboxShift.Value}");
-            
-            // 调试模式参数 - 先确保稳定运行
-            args.Append($" --use_float16"); // 使用float16，节省显存
-            args.Append($" --batch_size 1"); // 最小batch size确保稳定
-            args.Append($" --fps 25"); // 设置合适的FPS
-            args.Append($" --gpu_id 0"); // 指定GPU 0
-            args.Append($" --verbose"); // 启用详细输出（如果支持）
-                
             return args.ToString();
         }
 
