@@ -108,6 +108,83 @@ class OptimizedMuseTalkInference:
             )
         else:
             self.fp = FaceParsing()
+        
+        # 初始化OpenCV面部检测器
+        self._init_face_detector()
+
+    def _init_face_detector(self):
+        """初始化OpenCV面部检测器"""
+        try:
+            # 尝试使用Haar级联分类器
+            self.face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+            if self.face_cascade.empty():
+                print("[WARN] Haar级联分类器加载失败")
+                self.face_cascade = None
+            else:
+                print("[OK] OpenCV Haar面部检测器初始化成功")
+        except Exception as e:
+            print(f"[WARN] 面部检测器初始化失败: {e}")
+            self.face_cascade = None
+
+    def _detect_face_with_opencv(self, img, template_id):
+        """使用OpenCV检测面部区域"""
+        if self.face_cascade is None:
+            return [], []
+            
+        try:
+            # 转换为灰度图
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            
+            # 检测面部
+            faces = self.face_cascade.detectMultiScale(
+                gray,
+                scaleFactor=1.1,
+                minNeighbors=5,
+                minSize=(50, 50),  # 最小面部尺寸
+                flags=cv2.CASCADE_SCALE_IMAGE
+            )
+            
+            if len(faces) == 0:
+                print(f"[WARN] 未检测到面部: {template_id}")
+                return [], []
+            
+            # 选择最大的面部（通常是主要人物）
+            largest_face = max(faces, key=lambda rect: rect[2] * rect[3])
+            x, y, w, h = largest_face
+            
+            # 扩展面部区域以包含更多上下文（MuseTalk需要）
+            expand_ratio = 0.3  # 扩展30%
+            expand_w = int(w * expand_ratio)
+            expand_h = int(h * expand_ratio)
+            
+            x1 = max(0, x - expand_w)
+            y1 = max(0, y - expand_h)
+            x2 = min(img.shape[1], x + w + expand_w)
+            y2 = min(img.shape[0], y + h + expand_h)
+            
+            # 确保是正方形（MuseTalk要求）
+            center_x = (x1 + x2) // 2
+            center_y = (y1 + y2) // 2
+            size = max(x2 - x1, y2 - y1)
+            half_size = size // 2
+            
+            x1 = max(0, center_x - half_size)
+            y1 = max(0, center_y - half_size)
+            x2 = min(img.shape[1], center_x + half_size)
+            y2 = min(img.shape[0], center_y + half_size)
+            
+            # 最终调整确保是正方形
+            actual_size = min(x2 - x1, y2 - y1)
+            x2 = x1 + actual_size
+            y2 = y1 + actual_size
+            
+            print(f"[OK] OpenCV检测到面部: {template_id}, 原始({x}, {y}, {w}, {h}) -> 调整后({x1}, {y1}, {x2}, {y2}), 尺寸: {actual_size}x{actual_size}")
+            
+            return [(x1, y1, x2, y2)], [img]
+            
+        except Exception as e:
+            print(f"[ERROR] OpenCV面部检测异常: {e}")
+            return [], []
     
     def _preprocess_templates(self):
         """预处理所有模板"""
@@ -205,30 +282,27 @@ class OptimizedMuseTalkInference:
             # 先尝试使用路径（可能在某些情况下工作）
             coord_list, frame_list = get_landmark_and_bbox([template_path], self.config.bbox_shift)
         except Exception as e:
-            print(f"[CONFIG] 路径方式失败，使用图片数据方式: {e}")
-            # 如果路径方式失败，我们需要手动检测面部区域
-            h, w = img.shape[:2]
+            print(f"[CONFIG] 路径方式失败，使用OpenCV动态面部检测: {e}")
             
-            # 根据MuseTalk标准，面部区域应该是256x256，我们需要找到合适的面部区域
-            # 假设面部在图片的中央区域，使用更合理的面部比例
-            face_size = min(w, h) // 2  # 面部区域大约是图片的一半
-            center_x, center_y = w // 2, h // 2
+            # 使用OpenCV进行真正的面部检测
+            coord_list, frame_list = self._detect_face_with_opencv(img, template_id)
             
-            # 计算面部边界框，确保是正方形且不超出图片边界
-            half_size = face_size // 2
-            x1 = max(0, center_x - half_size)
-            y1 = max(0, center_y - half_size)
-            x2 = min(w, center_x + half_size)
-            y2 = min(h, center_y + half_size)
-            
-            # 确保是正方形
-            size = min(x2 - x1, y2 - y1)
-            x2 = x1 + size
-            y2 = y1 + size
-            
-            coord_list = [(x1, y1, x2, y2)]  # 使用面部坐标
-            frame_list = [img]  # 使用已读取的图片
-            print(f"[CONFIG] 使用估算的面部区域坐标: ({x1}, {y1}, {x2}, {y2}), 面部尺寸: {size}x{size}")
+            if not coord_list:
+                print(f"[WARN] OpenCV面部检测失败，使用备用方案")
+                # 备用方案：使用图片中心区域
+                h, w = img.shape[:2]
+                face_size = min(w, h) // 2
+                center_x, center_y = w // 2, h // 2
+                half_size = face_size // 2
+                x1 = max(0, center_x - half_size)
+                y1 = max(0, center_y - half_size)
+                x2 = min(w, center_x + half_size)
+                y2 = min(h, center_y + half_size)
+                size = min(x2 - x1, y2 - y1)
+                x2, y2 = x1 + size, y1 + size
+                coord_list = [(x1, y1, x2, y2)]
+                frame_list = [img]
+                print(f"[FALLBACK] 使用中心区域作为面部坐标: ({x1}, {y1}, {x2}, {y2})")
         
         # 预计算VAE编码
         print(f"🧠 预计算VAE编码: {template_id}")
