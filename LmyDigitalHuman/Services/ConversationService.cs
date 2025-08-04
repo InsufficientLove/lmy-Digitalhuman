@@ -146,7 +146,7 @@ namespace LmyDigitalHuman.Services
                     ProcessingTime = $"{stopwatch.ElapsedMilliseconds}ms",
                     FromCache = !string.IsNullOrEmpty(template.PreviewVideoPath), // 使用预览视频算作缓存
                     HasVideo = !string.IsNullOrEmpty(videoUrl),
-                    Duration = "3.1s" // 预估时长
+                    Duration = 3.1 // 预估时长（秒）
                 };
             }
             catch (Exception ex)
