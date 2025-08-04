@@ -206,15 +206,29 @@ class OptimizedMuseTalkInference:
             coord_list, frame_list = get_landmark_and_bbox([template_path], self.config.bbox_shift)
         except Exception as e:
             print(f"[CONFIG] 路径方式失败，使用图片数据方式: {e}")
-            # 如果路径方式失败，我们使用整个图片的坐标作为面部区域
+            # 如果路径方式失败，我们需要手动检测面部区域
             h, w = img.shape[:2]
-            # 使用图片中心区域作为面部区域，留出一些边距
-            margin = min(w, h) // 10  # 10%边距
-            x1, y1 = margin, margin
-            x2, y2 = w - margin, h - margin
-            coord_list = [(x1, y1, x2, y2)]  # 使用有效的坐标
+            
+            # 根据MuseTalk标准，面部区域应该是256x256，我们需要找到合适的面部区域
+            # 假设面部在图片的中央区域，使用更合理的面部比例
+            face_size = min(w, h) // 2  # 面部区域大约是图片的一半
+            center_x, center_y = w // 2, h // 2
+            
+            # 计算面部边界框，确保是正方形且不超出图片边界
+            half_size = face_size // 2
+            x1 = max(0, center_x - half_size)
+            y1 = max(0, center_y - half_size)
+            x2 = min(w, center_x + half_size)
+            y2 = min(h, center_y + half_size)
+            
+            # 确保是正方形
+            size = min(x2 - x1, y2 - y1)
+            x2 = x1 + size
+            y2 = y1 + size
+            
+            coord_list = [(x1, y1, x2, y2)]  # 使用面部坐标
             frame_list = [img]  # 使用已读取的图片
-            print(f"[CONFIG] 使用整个图片区域作为面部坐标: ({x1}, {y1}, {x2}, {y2})")
+            print(f"[CONFIG] 使用估算的面部区域坐标: ({x1}, {y1}, {x2}, {y2}), 面部尺寸: {size}x{size}")
         
         # 预计算VAE编码
         print(f"🧠 预计算VAE编码: {template_id}")
@@ -226,11 +240,27 @@ class OptimizedMuseTalkInference:
             if x1 >= x2 or y1 >= y2:
                 print(f"[WARN] 跳过无效坐标: {bbox}")
                 continue
+                
+            # 确保坐标在图片范围内
+            h, w = frame.shape[:2]
+            x1, y1 = max(0, int(x1)), max(0, int(y1))
+            x2, y2 = min(w, int(x2)), min(h, int(y2))
+            
             if self.config.version == "v15":
                 y2 = y2 + self.config.extra_margin
                 y2 = min(y2, frame.shape[0])
             
+            # 裁剪面部区域
             crop_frame = frame[y1:y2, x1:x2]
+            
+            # 检查裁剪后的图片是否有效
+            if crop_frame.size == 0:
+                print(f"[WARN] 裁剪后的面部区域为空: ({x1}, {y1}, {x2}, {y2})")
+                continue
+                
+            print(f"[OK] 面部区域裁剪成功: ({x1}, {y1}, {x2}, {y2}), 尺寸: {crop_frame.shape}")
+            
+            # 调整到MuseTalk标准尺寸256x256
             resized_crop_frame = cv2.resize(crop_frame, (256, 256), interpolation=cv2.INTER_LANCZOS4)
             
             with torch.no_grad():
@@ -249,14 +279,35 @@ class OptimizedMuseTalkInference:
         
         for i, frame in enumerate(tqdm(frame_list_cycle, desc="预计算面部解析")):
             x1, y1, x2, y2 = coord_list_cycle[i]
+            
+            # 确保坐标有效
+            h, w = frame.shape[:2]
+            x1, y1 = max(0, int(x1)), max(0, int(y1))
+            x2, y2 = min(w, int(x2)), min(h, int(y2))
+            
+            # 检查坐标是否有效
+            if x1 >= x2 or y1 >= y2:
+                print(f"[WARN] 跳过无效的面部解析坐标: ({x1}, {y1}, {x2}, {y2})")
+                # 使用默认值
+                mask_coords_list_cycle.append([0, 0, 256, 256])
+                mask_list_cycle.append(np.ones((256, 256), dtype=np.uint8) * 255)
+                continue
+            
             if self.config.version == "v15":
                 mode = self.config.parsing_mode
             else:
                 mode = "raw"
             
-            mask, crop_box = get_image_prepare_material(frame, [x1, y1, x2, y2], fp=self.fp, mode=mode)
-            mask_coords_list_cycle.append(crop_box)
-            mask_list_cycle.append(mask)
+            try:
+                mask, crop_box = get_image_prepare_material(frame, [x1, y1, x2, y2], fp=self.fp, mode=mode)
+                mask_coords_list_cycle.append(crop_box)
+                mask_list_cycle.append(mask)
+                print(f"[OK] 面部解析完成: 坐标({x1}, {y1}, {x2}, {y2})")
+            except Exception as e:
+                print(f"[WARN] 面部解析失败: {e}, 使用默认mask")
+                # 使用默认值
+                mask_coords_list_cycle.append([x1, y1, x2, y2])
+                mask_list_cycle.append(np.ones((256, 256), dtype=np.uint8) * 255)
         
         # 构建模板数据
         template_data = {
