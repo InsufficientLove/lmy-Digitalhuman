@@ -116,12 +116,19 @@ namespace LmyDigitalHuman.Services
                 _templates[templateId] = template;
                 await SaveTemplateToFileAsync(template);
 
-                // 异步生成预览视频，不阻塞模板创建
+                // 🚀 异步进行MuseTalk预处理和预览视频生成
                 _ = Task.Run(async () =>
                 {
                     try
                     {
-                        _logger.LogInformation("开始生成预览视频: {TemplateName}", template.TemplateName);
+                        _logger.LogInformation("🔧 开始MuseTalk模板预处理: {TemplateName}", template.TemplateName);
+                        
+                        // 🎯 第一步：进行MuseTalk预处理（永久化模型）
+                        await _museTalkService.PreprocessTemplateAsync(templateId);
+                        _logger.LogInformation("✅ MuseTalk预处理完成: {TemplateName}", template.TemplateName);
+                        
+                        // 🎬 第二步：生成预览视频
+                        _logger.LogInformation("🎬 开始生成预览视频: {TemplateName}", template.TemplateName);
                         var previewText = "你好，我是" + template.TemplateName + "，欢迎咨询";
                         var audioUrl = await GenerateAudioAsync(previewText, template.DefaultVoiceSettings);
                         var videoUrl = await GenerateVideoWithMuseTalkAsync(template.TemplateName, audioUrl, "medium");
@@ -132,11 +139,11 @@ namespace LmyDigitalHuman.Services
                         template.UpdatedAt = DateTime.Now;
                         
                         await SaveTemplateToFileAsync(template); // 更新模板信息
-                        _logger.LogInformation("预览视频生成成功: {VideoUrl}", videoUrl);
+                        _logger.LogInformation("✅ 模板创建完成: {TemplateName}, 预处理+预览视频已就绪", template.TemplateName);
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "生成预览视频失败: {TemplateName}", template.TemplateName);
+                        _logger.LogError(ex, "❌ 模板预处理或预览视频生成失败: {TemplateName}", template.TemplateName);
                         template.Status = "error";
                         template.UpdatedAt = DateTime.Now;
                         await SaveTemplateToFileAsync(template);

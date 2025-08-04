@@ -284,6 +284,19 @@ namespace LmyDigitalHuman.Services
         /// </summary>
         public async Task<PreprocessingResult> PreprocessTemplateAsync(string templateId)
         {
+            // 🔧 检查是否已经预处理过，避免重复预处理
+            if (_persistentModels.ContainsKey(templateId))
+            {
+                _logger.LogInformation("✅ 模板 {TemplateId} 已预处理完成，跳过重复预处理", templateId);
+                return new PreprocessingResult
+                {
+                    Success = true,
+                    TemplateId = templateId,
+                    ProcessingTime = TimeSpan.Zero,
+                    Message = "模板已预处理完成"
+                };
+            }
+            
             var stopwatch = Stopwatch.StartNew();
             
             try
@@ -651,15 +664,16 @@ namespace LmyDigitalHuman.Services
                 // 📊 更新模板使用统计
                 _templateUsageCount.AddOrUpdate(templateId, 1, (key, oldValue) => oldValue + 1);
                 
-                // 🎯 检查模板是否已永久化（避免重复预处理）
+                // 🎯 检查模板是否已永久化（优先使用预处理好的模板）
                 if (!_persistentModels.ContainsKey(templateId))
                 {
-                    _logger.LogWarning("⚠️ 模板 {TemplateId} 未进行永久化预处理，将自动进行预处理", templateId);
+                    _logger.LogWarning("⚠️ 模板 {TemplateId} 未进行预处理，这通常表示模板创建时预处理失败", templateId);
+                    _logger.LogInformation("🔧 正在进行紧急预处理，建议重新创建模板以获得最佳性能...", templateId);
                     await PreprocessTemplateAsync(templateId);
                 }
                 else
                 {
-                    _logger.LogInformation("✅ 模板 {TemplateId} 已永久化，直接使用缓存模型", templateId);
+                    _logger.LogInformation("⚡ 模板 {TemplateId} 已预处理完成，使用永久化模型进行极速推理", templateId);
                 }
                 
                 // 🚀 执行实时推理（使用永久化模型）
@@ -1409,7 +1423,6 @@ namespace LmyDigitalHuman.Services
                 _logger.LogInformation("📄 使用MuseTalk脚本: {ScriptPath}", optimizedScriptPath);
                 
                 // 构建MuseTalk推理命令
-                var templatesDir = Path.Combine(_pathManager.GetContentRootPath(), "wwwroot", "templates");
                 var arguments = new StringBuilder();
                 arguments.Append($"\"{optimizedScriptPath}\"");
                 arguments.Append($" --template_id \"{templateId}\"");
