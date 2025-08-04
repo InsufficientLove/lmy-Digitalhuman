@@ -1358,13 +1358,26 @@ namespace LmyDigitalHuman.Services
             
             try
             {
-                // 构建模板图片路径
-                var imagePath = Path.Combine(_pathManager.GetContentRootPath(), "wwwroot", "templates", $"{templateId}.jpg");
+                // 🔧 构建模板图片路径 - 处理中文文件名
+                var templatesDir = Path.Combine(_pathManager.GetContentRootPath(), "wwwroot", "templates");
+                var imagePath = Path.Combine(templatesDir, $"{templateId}.jpg");
                 
+                // 检查文件是否存在
                 if (!File.Exists(imagePath))
                 {
+                    _logger.LogError("❌ 模板图片不存在: {ImagePath}", imagePath);
+                    
+                    // 列出目录中的所有文件进行调试
+                    if (Directory.Exists(templatesDir))
+                    {
+                        var files = Directory.GetFiles(templatesDir, "*.jpg");
+                        _logger.LogInformation("📁 模板目录中的图片文件: {Files}", string.Join(", ", files.Select(Path.GetFileName)));
+                    }
+                    
                     throw new FileNotFoundException($"模板图片不存在: {imagePath}");
                 }
+                
+                _logger.LogInformation("✅ 找到模板图片: {ImagePath}, 大小: {Size} bytes", imagePath, new FileInfo(imagePath).Length);
                 
                 if (!File.Exists(audioPath))
                 {
@@ -1396,18 +1409,26 @@ namespace LmyDigitalHuman.Services
                 _logger.LogInformation("📄 使用MuseTalk脚本: {ScriptPath}", optimizedScriptPath);
                 
                 // 构建MuseTalk推理命令
+                var templatesDir = Path.Combine(_pathManager.GetContentRootPath(), "wwwroot", "templates");
                 var arguments = new StringBuilder();
                 arguments.Append($"\"{optimizedScriptPath}\"");
                 arguments.Append($" --template_id \"{templateId}\"");
                 arguments.Append($" --audio_path \"{audioPath}\"");
                 arguments.Append($" --output_path \"{outputPath}\"");
-                arguments.Append($" --template_dir \"{Path.Combine(_pathManager.GetContentRootPath(), "wwwroot", "templates")}\"");
+                arguments.Append($" --template_dir \"{templatesDir}\"");
                 arguments.Append($" --version v1");
                 arguments.Append($" --batch_size 64");
                 arguments.Append($" --fps 25");
                 arguments.Append($" --unet_config \"models/musetalk/musetalk.json\"");
                 arguments.Append($" --unet_model_path \"models/musetalk/pytorch_model.bin\"");
                 arguments.Append($" --whisper_dir \"models/whisper\"");
+                
+                _logger.LogInformation("🔧 推理参数:");
+                _logger.LogInformation("   模板ID: {TemplateId}", templateId);
+                _logger.LogInformation("   模板图片: {ImagePath}", imagePath);
+                _logger.LogInformation("   模板目录: {TemplateDir}", templatesDir);
+                _logger.LogInformation("   音频文件: {AudioPath}", audioPath);
+                _logger.LogInformation("   输出路径: {OutputPath}", outputPath);
                 
                 _logger.LogInformation("🎮 执行MuseTalk推理命令: {Command}", $"{pythonPath} {arguments}");
                 
@@ -1430,8 +1451,9 @@ namespace LmyDigitalHuman.Services
                 processInfo.Environment["PYTHONIOENCODING"] = "utf-8";
                 processInfo.Environment["PYTHONUNBUFFERED"] = "1";
                 processInfo.Environment["PYTHONUTF8"] = "1";
-                processInfo.Environment["LANG"] = "en_US.UTF-8";
-                processInfo.Environment["LC_ALL"] = "en_US.UTF-8";
+                processInfo.Environment["LANG"] = "zh_CN.UTF-8";  // 改为中文UTF-8
+                processInfo.Environment["LC_ALL"] = "zh_CN.UTF-8";
+                processInfo.Environment["PYTHONLEGACYWINDOWSSTDIO"] = "1";  // Windows兼容性
                 
                 var process = new Process { StartInfo = processInfo };
                 var outputBuilder = new StringBuilder();

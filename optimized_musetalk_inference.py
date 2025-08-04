@@ -158,12 +158,43 @@ class OptimizedMuseTalkInference:
         device = self.models[0]['device']
         vae = self.models[0]['vae']
         
-        # 读取模板图片
+        # 🔧 读取模板图片 - 处理中文路径
+        print(f"[CONFIG] 读取模板图片: {template_path}")
+        print(f"[CONFIG] 文件存在检查: {os.path.exists(template_path)}")
+        
         if os.path.isfile(template_path):
-            frame_list = [cv2.imread(template_path)]
-            if frame_list[0] is None:
+            # 方法1: 直接读取
+            img = cv2.imread(template_path)
+            
+            if img is None:
+                # 方法2: 使用numpy读取（处理中文路径）
+                try:
+                    import numpy as np
+                    print(f"[CONFIG] 尝试使用numpy读取中文路径图片")
+                    with open(template_path, 'rb') as f:
+                        img_data = f.read()
+                    img_array = np.frombuffer(img_data, np.uint8)
+                    img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+                    print(f"[OK] numpy方法读取成功")
+                except Exception as e:
+                    print(f"[ERROR] numpy读取失败: {e}")
+                    
+            if img is None:
+                # 列出目录文件进行调试
+                dir_path = os.path.dirname(template_path)
+                if os.path.exists(dir_path):
+                    files = os.listdir(dir_path)
+                    print(f"[ERROR] 目录中的文件: {files}")
                 raise ValueError(f"无法读取模板图片: {template_path}")
+            
+            frame_list = [img]
+            print(f"[OK] 成功读取模板图片，尺寸: {img.shape}")
         else:
+            # 列出目录文件进行调试
+            dir_path = os.path.dirname(template_path)
+            if os.path.exists(dir_path):
+                files = os.listdir(dir_path)
+                print(f"[ERROR] 目录中的文件: {files}")
             raise ValueError(f"模板文件不存在: {template_path}")
         
         # 提取面部坐标
