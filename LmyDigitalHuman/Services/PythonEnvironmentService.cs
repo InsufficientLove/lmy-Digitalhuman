@@ -12,6 +12,7 @@ namespace LmyDigitalHuman.Services
         Task<bool> ValidatePythonEnvironmentAsync(string pythonPath, params string[] requiredPackages);
         Task<string> GetRecommendedPythonPathAsync();
         Task<List<PythonEnvironmentInfo>> GetAllAvailablePythonEnvironmentsAsync();
+        void ClearCache();
     }
 
     public class PythonEnvironmentInfo
@@ -93,30 +94,66 @@ namespace LmyDigitalHuman.Services
             return bestEnv;
         }
 
+        private static string? _cachedPythonPath;
+        private static DateTime _cacheTime = DateTime.MinValue;
+        private static readonly TimeSpan CacheExpiry = TimeSpan.FromMinutes(5);
+
         public async Task<string> GetRecommendedPythonPathAsync()
         {
-            // 首先尝试配置文件中的路径
-            var configuredPaths = new[]
+            // 使用缓存避免重复检测
+            if (_cachedPythonPath != null && DateTime.Now - _cacheTime < CacheExpiry)
             {
-                _configuration["DigitalHuman:EdgeTTS:PythonPath"],
-                _configuration["DigitalHuman:MuseTalk:PythonPath"],
-                _configuration["RealtimeDigitalHuman:SadTalker:PythonPath"],
-                _configuration["RealtimeDigitalHuman:Whisper:PythonPath"]
-            }.Where(p => !string.IsNullOrEmpty(p)).ToArray();
+                _logger.LogDebug("使用缓存的Python路径: {PythonPath}", _cachedPythonPath);
+                return _cachedPythonPath;
+            }
 
-            foreach (var configPath in configuredPaths)
+            // 优先使用MuseTalk专用配置，因为这通常是最优的
+            var museTalkPath = _configuration["DigitalHuman:MuseTalk:PythonPath"];
+            if (!string.IsNullOrEmpty(museTalkPath))
             {
-                var resolvedPath = _pathManager.ResolvePath(configPath!);
-                if (await ValidatePythonEnvironmentAsync(resolvedPath, "edge_tts"))
+                var resolvedPath = _pathManager.ResolvePath(museTalkPath);
+                if (File.Exists(resolvedPath))
                 {
-                    _logger.LogInformation("使用配置文件中的Python路径: {PythonPath}", resolvedPath);
+                    _logger.LogInformation("使用MuseTalk配置的Python路径: {PythonPath}", resolvedPath);
+                    _cachedPythonPath = resolvedPath;
+                    _cacheTime = DateTime.Now;
                     return resolvedPath;
                 }
             }
 
-            // 如果配置的路径都无效，使用自动检测
+            // 快速检查常见的虚拟环境路径
+            var quickPaths = new[]
+            {
+                "../venv_musetalk/Scripts/python.exe",
+                "venv_musetalk/Scripts/python.exe",
+                "../venv_musetalk/bin/python"
+            };
+
+            foreach (var quickPath in quickPaths)
+            {
+                var resolvedPath = _pathManager.ResolvePath(quickPath);
+                if (File.Exists(resolvedPath))
+                {
+                    _logger.LogInformation("使用快速检测的Python路径: {PythonPath}", resolvedPath);
+                    _cachedPythonPath = resolvedPath;
+                    _cacheTime = DateTime.Now;
+                    return resolvedPath;
+                }
+            }
+
+            // 最后才进行完整检测（较慢）
+            _logger.LogWarning("快速检测失败，进行完整Python环境检测...");
             var bestEnv = await DetectBestPythonEnvironmentAsync();
+            _cachedPythonPath = bestEnv.PythonPath;
+            _cacheTime = DateTime.Now;
             return bestEnv.PythonPath;
+        }
+
+        public void ClearCache()
+        {
+            _cachedPythonPath = null;
+            _cacheTime = DateTime.MinValue;
+            _logger.LogInformation("Python路径缓存已清除");
         }
 
         public async Task<List<PythonEnvironmentInfo>> GetAllAvailablePythonEnvironmentsAsync()
@@ -323,7 +360,7 @@ namespace LmyDigitalHuman.Services
                     return (false, "", "无法启动Python进程");
                 }
 
-                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
                 try
                 {
                     await process.WaitForExitAsync(cts.Token);

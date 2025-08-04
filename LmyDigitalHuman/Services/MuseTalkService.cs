@@ -659,10 +659,10 @@ namespace LmyDigitalHuman.Services
             try
             {
                 var arguments = BuildPythonArguments(request, outputPath);
-                // 欢迎视频使用更短的超时，减少等待时间
+                // 根据视频类型设置合适的超时时间
                 var timeout = request.CacheKey?.StartsWith("welcome_") == true 
-                    ? TimeSpan.FromSeconds(30) 
-                    : TimeSpan.FromMinutes(5);
+                    ? TimeSpan.FromMinutes(3)  // 欢迎视频3分钟超时
+                    : TimeSpan.FromMinutes(10); // 普通视频10分钟超时
                 var result = await RunPythonCommandAsync(arguments, timeout);
                 
                 stopwatch.Stop();
