@@ -206,22 +206,26 @@ class OptimizedMuseTalkInference:
             coord_list, frame_list = get_landmark_and_bbox([template_path], self.config.bbox_shift)
         except Exception as e:
             print(f"[CONFIG] 路径方式失败，使用图片数据方式: {e}")
-            # 如果路径方式失败，我们需要修改策略
-            # 暂时使用默认的面部坐标
-            coord_list = [(0.0, 0.0, 0.0, 0.0)]  # 默认坐标
+            # 如果路径方式失败，我们使用整个图片的坐标作为面部区域
+            h, w = img.shape[:2]
+            # 使用图片中心区域作为面部区域，留出一些边距
+            margin = min(w, h) // 10  # 10%边距
+            x1, y1 = margin, margin
+            x2, y2 = w - margin, h - margin
+            coord_list = [(x1, y1, x2, y2)]  # 使用有效的坐标
             frame_list = [img]  # 使用已读取的图片
-            print(f"[CONFIG] 使用默认面部坐标和已读取的图片")
+            print(f"[CONFIG] 使用整个图片区域作为面部坐标: ({x1}, {y1}, {x2}, {y2})")
         
         # 预计算VAE编码
         print(f"🧠 预计算VAE编码: {template_id}")
         input_latent_list = []
-        coord_placeholder = (0.0, 0.0, 0.0, 0.0)
         
         for bbox, frame in zip(coord_list, frame_list):
-            if bbox == coord_placeholder:
-                continue
-            
+            # 检查坐标是否有效（不为0且有实际区域）
             x1, y1, x2, y2 = bbox
+            if x1 >= x2 or y1 >= y2:
+                print(f"[WARN] 跳过无效坐标: {bbox}")
+                continue
             if self.config.version == "v15":
                 y2 = y2 + self.config.extra_margin
                 y2 = min(y2, frame.shape[0])
@@ -513,7 +517,7 @@ def main():
     parser.add_argument("--unet_config", type=str, default="./models/musetalk/musetalk.json")
     parser.add_argument("--unet_model_path", type=str, default="./models/musetalk/pytorch_model.bin")
     parser.add_argument("--whisper_dir", type=str, default="./models/whisper")
-    parser.add_argument("--vae_type", type=str, default="sd-vae")
+    parser.add_argument("--vae_type", type=str, default="sd-vae-ft-mse")
     parser.add_argument("--batch_size", type=int, default=64, help="批处理大小 - 4x RTX 4090优化")
     parser.add_argument("--bbox_shift", type=int, default=0)
     parser.add_argument("--extra_margin", type=int, default=10)

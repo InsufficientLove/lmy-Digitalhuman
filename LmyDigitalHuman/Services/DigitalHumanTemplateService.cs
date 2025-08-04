@@ -128,14 +128,11 @@ namespace LmyDigitalHuman.Services
                         await _museTalkService.PreprocessTemplateAsync(template.TemplateName);
                         _logger.LogInformation("✅ MuseTalk预处理完成: {TemplateName}", template.TemplateName);
                         
-                        // 🎬 第二步：生成预览视频
-                        _logger.LogInformation("🎬 开始生成预览视频: {TemplateName}", template.TemplateName);
-                        var previewText = "你好，我是" + template.TemplateName + "，欢迎咨询";
-                        var audioUrl = await GenerateAudioAsync(previewText, template.DefaultVoiceSettings);
-                        var videoUrl = await GenerateVideoWithMuseTalkAsync(template.TemplateName, audioUrl, "medium");
+                        // 🎬 第二步：标记为就绪状态（预览视频将在首次访问时生成）
+                        _logger.LogInformation("✅ 模板预处理完成，标记为就绪状态: {TemplateName}", template.TemplateName);
                         
-                        // 更新模板状态
-                        template.PreviewVideoPath = videoUrl;
+                        // 更新模板状态 - 不立即生成预览视频，避免与用户点击冲突
+                        template.PreviewVideoPath = ""; // 将在首次访问时生成
                         template.Status = "ready";
                         template.UpdatedAt = DateTime.Now;
                         
