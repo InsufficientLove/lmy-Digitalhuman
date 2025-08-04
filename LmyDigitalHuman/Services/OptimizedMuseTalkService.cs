@@ -1448,9 +1448,15 @@ namespace LmyDigitalHuman.Services
                 _logger.LogInformation("   音频文件: {AudioPath}", audioPath);
                 _logger.LogInformation("   输出路径: {OutputPath}", outputPath);
                 
-                // 🔧 首先测试中文路径图片读取
-                _logger.LogInformation("🧪 测试中文路径图片读取...");
-                await TestChineseImageRead(pythonPath, imagePath);
+                // 🔧 检查是否有其他进程正在处理同一模板
+                var activeJobKey = $"musetalk_{templateId}";
+                if (_activeJobs.ContainsKey(activeJobKey))
+                {
+                    _logger.LogWarning("⚠️ 模板 {TemplateId} 正在被其他进程处理，跳过重复推理", templateId);
+                    throw new InvalidOperationException($"模板 {templateId} 正在处理中，请稍后再试");
+                }
+                
+                _activeJobs.TryAdd(activeJobKey, DateTime.Now);
                 
                 _logger.LogInformation("🎮 执行MuseTalk推理命令: {Command}", $"{pythonPath} {arguments}");
                 
@@ -1531,6 +1537,13 @@ namespace LmyDigitalHuman.Services
             {
                 _logger.LogError(ex, "❌ GPU:{GPU} MuseTalk推理失败: {TemplateId}", gpuId, templateId);
                 throw;
+            }
+            finally
+            {
+                // 🔧 清理活跃任务
+                var activeJobKey = $"musetalk_{templateId}";
+                _activeJobs.TryRemove(activeJobKey, out _);
+                _logger.LogDebug("🧹 清理活跃任务: {JobKey}", activeJobKey);
             }
         }
 
