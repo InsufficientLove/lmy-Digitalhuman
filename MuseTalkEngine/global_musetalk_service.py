@@ -465,22 +465,45 @@ class GlobalMuseTalkService:
     def start_ipc_server(self, port=9999):
         """启动IPC服务器，接收推理请求"""
         try:
+            print(f"🔧 创建socket对象...")
+            sys.stdout.flush()
             self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            
+            print(f"🔧 设置socket选项...")
+            sys.stdout.flush()
             self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            
+            print(f"🔧 绑定端口 {port}...")
+            sys.stdout.flush()
             self.server_socket.bind(('localhost', port))
+            
+            print(f"🔧 开始监听连接...")
+            sys.stdout.flush()
             self.server_socket.listen(5)
+            
+            print(f"🔧 设置服务器运行状态...")
+            sys.stdout.flush()
             self.is_server_running = True
             
             print(f"🌐 IPC服务器启动成功，监听端口: {port}")
             print("📡 等待C#客户端连接...")
             print("✅ 全局MuseTalk服务完全就绪！")
+            sys.stdout.flush()
+            
+            print(f"🔧 进入主循环，等待客户端连接...")
+            sys.stdout.flush()
             
             while self.is_server_running:
                 try:
+                    print(f"🔧 等待accept()...")
+                    sys.stdout.flush()
                     client_socket, addr = self.server_socket.accept()
                     print(f"🔗 客户端连接: {addr}")
+                    sys.stdout.flush()
                     
                     # 处理客户端请求
+                    print(f"🔧 启动处理线程...")
+                    sys.stdout.flush()
                     threading.Thread(target=self._handle_client, args=(client_socket,)).start()
                     
                 except Exception as e:
