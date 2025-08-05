@@ -473,9 +473,9 @@ class GlobalMuseTalkService:
             sys.stdout.flush()
             self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             
-            print(f"🔧 绑定端口 {port}...")
+            print(f"🔧 绑定端口 {port}... (地址: 127.0.0.1)")
             sys.stdout.flush()
-            self.server_socket.bind(('localhost', port))
+            self.server_socket.bind(('127.0.0.1', port))
             
             print(f"🔧 开始监听连接...")
             sys.stdout.flush()
@@ -495,10 +495,10 @@ class GlobalMuseTalkService:
             
             while self.is_server_running:
                 try:
-                    print(f"🔧 等待accept()...")
+                    print(f"🔧 等待accept()... (端口: {port})")
                     sys.stdout.flush()
                     client_socket, addr = self.server_socket.accept()
-                    print(f"🔗 客户端连接: {addr}")
+                    print(f"🔗 客户端连接成功: {addr}")
                     sys.stdout.flush()
                     
                     # 处理客户端请求
@@ -509,6 +509,9 @@ class GlobalMuseTalkService:
                 except Exception as e:
                     if self.is_server_running:
                         print(f"❌ 接受连接失败: {str(e)}")
+                        import traceback
+                        traceback.print_exc()
+                        sys.stdout.flush()
                     
         except Exception as e:
             print(f"❌ IPC服务器启动失败: {str(e)}")
@@ -517,8 +520,11 @@ class GlobalMuseTalkService:
         """处理客户端请求"""
         try:
             print("🔗 开始处理客户端请求...")
+            sys.stdout.flush()
             
             # 🔧 关键检查：确保模型已初始化
+            print(f"🔧 检查模型初始化状态: {self.is_initialized}")
+            sys.stdout.flush()
             if not self.is_initialized:
                 print("❌ 模型未初始化，无法处理推理请求")
                 error_response = {'Success': False, 'OutputPath': None}
