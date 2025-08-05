@@ -322,40 +322,79 @@ class EnhancedMuseTalkPreprocessor:
 
 
 def main():
-    """示例使用"""
-    # 初始化预处理器
-    preprocessor = EnhancedMuseTalkPreprocessor(
-        device="cuda:0",
-        cache_dir="./template_cache"
-    )
+    """命令行接口"""
+    import argparse
     
-    # 示例：预处理模板
-    template_id = "xiaoha"
-    template_image = "./wwwroot/templates/xiaoha.jpg"
+    parser = argparse.ArgumentParser(description="Enhanced MuseTalk 模板预处理工具")
+    parser.add_argument("--template_id", required=True, help="模板ID")
+    parser.add_argument("--template_image", required=True, help="模板图片路径")
+    parser.add_argument("--output_state", help="输出状态文件路径")
+    parser.add_argument("--cache_dir", default="./template_cache", help="缓存目录")
+    parser.add_argument("--device", default="cuda:0", help="计算设备")
+    parser.add_argument("--bbox_shift", type=int, default=0, help="边界框偏移")
+    parser.add_argument("--parsing_mode", default="jaw", help="解析模式")
+    parser.add_argument("--force_refresh", action="store_true", help="强制刷新缓存")
+    
+    args = parser.parse_args()
+    
+    # 验证输入文件
+    if not os.path.exists(args.template_image):
+        print(f"❌ 模板图片不存在: {args.template_image}")
+        return 1
     
     try:
+        print(f"🚀 开始预处理模板: {args.template_id}")
+        print(f"📁 模板图片: {args.template_image}")
+        print(f"💾 缓存目录: {args.cache_dir}")
+        print(f"🎮 设备: {args.device}")
+        
+        # 初始化预处理器
+        preprocessor = EnhancedMuseTalkPreprocessor(
+            device=args.device,
+            cache_dir=args.cache_dir
+        )
+        
         # 预处理模板
         metadata = preprocessor.preprocess_template(
-            template_id=template_id,
-            template_image_path=template_image,
-            bbox_shift=0,
-            parsing_mode="jaw",
-            force_refresh=False  # 使用缓存
+            template_id=args.template_id,
+            template_image_path=args.template_image,
+            bbox_shift=args.bbox_shift,
+            parsing_mode=args.parsing_mode,
+            force_refresh=args.force_refresh
         )
         
         print(f"✅ 预处理完成: {metadata}")
         
-        # 加载预处理数据
-        data, meta = preprocessor.load_preprocessed_template(template_id)
-        print(f"📦 加载数据成功，帧数: {len(data['frame_list_cycle'])}")
+        # 如果指定了输出状态文件，保存到指定位置
+        if args.output_state:
+            cache_file = os.path.join(args.cache_dir, f"{args.template_id}_preprocessed.pkl")
+            if os.path.exists(cache_file):
+                # 确保输出目录存在
+                os.makedirs(os.path.dirname(args.output_state), exist_ok=True)
+                
+                # 复制缓存文件到指定位置
+                import shutil
+                shutil.copy2(cache_file, args.output_state)
+                print(f"📦 状态文件已保存: {args.output_state}")
+            else:
+                print(f"⚠️ 缓存文件不存在: {cache_file}")
+        
+        # 验证预处理结果
+        data, meta = preprocessor.load_preprocessed_template(args.template_id)
+        print(f"🎯 验证成功，预处理帧数: {len(data['frame_list_cycle'])}")
         
         # 显示缓存信息
         cache_info = preprocessor.get_cache_info()
-        print(f"💾 缓存信息: {cache_info}")
+        print(f"💾 缓存统计: {cache_info}")
+        
+        return 0
         
     except Exception as e:
-        print(f"❌ 处理失败: {e}")
+        print(f"❌ 预处理失败: {e}")
+        import traceback
+        traceback.print_exc()
+        return 1
 
 
 if __name__ == "__main__":
-    main()
+    exit(main())
