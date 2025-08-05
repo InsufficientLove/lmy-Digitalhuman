@@ -1233,7 +1233,7 @@ namespace LmyDigitalHuman.Services
                 }
                 
                 _logger.LogInformation("🔍 首次检测Python路径...");
-                _cachedPythonPath = _pythonEnvironmentService.GetRecommendedPythonPathAsync().Result;
+                _cachedPythonPath = Task.Run(async () => await _pythonEnvironmentService.GetRecommendedPythonPathAsync()).Result;
                 _logger.LogInformation("✅ Python路径已缓存: {PythonPath}", _cachedPythonPath);
                 
                 return _cachedPythonPath;
@@ -1258,7 +1258,7 @@ namespace LmyDigitalHuman.Services
                 }
                 
                 _logger.LogInformation("🔍 首次检测Python路径...");
-                _cachedPythonPath = _pythonEnvironmentService.GetRecommendedPythonPathAsync().Result;
+                _cachedPythonPath = Task.Run(async () => await _pythonEnvironmentService.GetRecommendedPythonPathAsync()).Result;
                 _logger.LogInformation("✅ Python路径已缓存: {PythonPath}", _cachedPythonPath);
                 
                 return _cachedPythonPath;
@@ -1586,10 +1586,11 @@ namespace LmyDigitalHuman.Services
                     _logger.LogWarning("⚠️ 本地MuseTalk目录不存在，创建目录: {MuseTalkDir}", museTalkDir);
                     Directory.CreateDirectory(museTalkDir);
                 }
-                    if (!File.Exists(optimizedScriptPath))
-                    {
-                        throw new FileNotFoundException($"找不到MuseTalk推理脚本: {optimizedScriptPath}");
-                    }
+                
+                // 检查推理脚本是否存在
+                if (!File.Exists(optimizedScriptPath))
+                {
+                    throw new FileNotFoundException($"找不到MuseTalk推理脚本: {optimizedScriptPath}");
                 }
                 
                 _logger.LogInformation("📄 使用MuseTalk脚本: {ScriptPath}", optimizedScriptPath);
