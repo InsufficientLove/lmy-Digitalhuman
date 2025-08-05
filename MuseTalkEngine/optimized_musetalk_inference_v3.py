@@ -73,9 +73,9 @@ class TrueParallelMuseTalkInference:
             try:
                 # 尝试新版本load_all_model调用
                 audio_processor, vae, unet, pe = load_all_model(
-                    unet_model_path="models/musetalk/pytorch_model.bin",
-                    vae_type="sd-vae",
-                    unet_config="models/musetalk/musetalk.json",
+                                     unet_model_path="../MuseTalk/models/musetalk/pytorch_model.bin",
+                 vae_type="sd-vae", 
+                 unet_config="../MuseTalk/models/musetalk/musetalk.json",
                     device=device
                 )
             except TypeError:
@@ -434,14 +434,14 @@ def main():
     parser.add_argument("--template_dir", default="./wwwroot/templates")
     parser.add_argument("--fps", type=int, default=25)
     parser.add_argument("--batch_size", type=int, default=32)
-    parser.add_argument("--unet_config", default="models/musetalk/musetalk.json")
+    parser.add_argument("--unet_config", default="../MuseTalk/models/musetalk/musetalk.json")
     parser.add_argument("--version", default="v1")
     parser.add_argument("--parsing_mode", default="jaw")
     parser.add_argument("--fp16", action="store_true", default=True)
     
     # 🔧 兼容C#传递的额外参数（忽略不使用）
-    parser.add_argument("--unet_model_path", default="models/musetalk/pytorch_model.bin", help="UNet模型路径（兼容参数）")
-    parser.add_argument("--whisper_dir", default="models/whisper", help="Whisper模型目录（兼容参数）")
+    parser.add_argument("--unet_model_path", default="../MuseTalk/models/musetalk/pytorch_model.bin", help="UNet模型路径（兼容参数）")
+    parser.add_argument("--whisper_dir", default="../MuseTalk/models/whisper", help="Whisper模型目录（兼容参数）")
     parser.add_argument("--vae_type", default="sd-vae", help="VAE类型（兼容参数）")
     
     args = parser.parse_args()

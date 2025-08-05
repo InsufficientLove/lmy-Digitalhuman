@@ -49,10 +49,10 @@ class EnhancedMuseTalkInferenceV4:
     """
     
     def __init__(self, 
-                 unet_config="models/musetalk/musetalk.json",
-                 unet_model_path="models/musetalk/pytorch_model.bin",
+                 unet_config="../MuseTalk/models/musetalk/musetalk.json",
+                 unet_model_path="../MuseTalk/models/musetalk/pytorch_model.bin",
                  vae_type="sd-vae",
-                 whisper_dir="models/whisper",
+                 whisper_dir="../MuseTalk/models/whisper",
                  device="cuda:0",
                  cache_dir="./model_states",
                  batch_size=32,
@@ -305,10 +305,10 @@ def main():
     parser.add_argument("--batch_size", type=int, default=32, help="批处理大小")
     
     # 模型参数
-    parser.add_argument("--unet_config", default="models/musetalk/musetalk.json", help="UNet配置路径")
-    parser.add_argument("--unet_model_path", default="models/musetalk/pytorch_model.bin", help="UNet模型路径")
+    parser.add_argument("--unet_config", default="../MuseTalk/models/musetalk/musetalk.json", help="UNet配置路径")
+    parser.add_argument("--unet_model_path", default="../MuseTalk/models/musetalk/pytorch_model.bin", help="UNet模型路径")
     parser.add_argument("--vae_type", default="sd-vae", help="VAE类型")
-    parser.add_argument("--whisper_dir", default="models/whisper", help="Whisper目录")
+    parser.add_argument("--whisper_dir", default="../MuseTalk/models/whisper", help="Whisper目录")
     
     # 高级参数
     parser.add_argument("--device", default="cuda:0", help="计算设备")
