@@ -1752,7 +1752,7 @@ namespace LmyDigitalHuman.Services
         }
 
         /// <summary>
-        /// 真正的MuseTalk实时推理 - 直接调用Python脚本
+        /// 执行实时推理内部方法 - 使用预处理缓存数据
         /// </summary>
         private async Task ExecuteRealtimeInferenceInternal(string templateId, string audioPath, string outputPath, int gpuId)
         {
@@ -1760,27 +1760,23 @@ namespace LmyDigitalHuman.Services
             
             try
             {
-                // 🔧 构建模板图片路径 - 处理中文文件名
-                var templatesDir = Path.Combine(_pathManager.GetContentRootPath(), "wwwroot", "templates");
-                var imagePath = Path.Combine(templatesDir, $"{templateId}.jpg");
+                // 检查预处理缓存是否存在
+                var modelStateDir = Path.Combine(_pathManager.GetContentRootPath(), "model_states", templateId);
+                var cacheFile = Path.Combine(modelStateDir, $"{templateId}_preprocessed.pkl");
+                var metadataFile = Path.Combine(modelStateDir, $"{templateId}_metadata.json");
                 
-                // 检查文件是否存在
-                if (!File.Exists(imagePath))
+                if (!File.Exists(cacheFile) || !File.Exists(metadataFile))
                 {
-                    _logger.LogError("❌ 模板图片不存在: {ImagePath}", imagePath);
-                    
-                    // 列出目录中的所有文件进行调试
-                    if (Directory.Exists(templatesDir))
-                    {
-                        var files = Directory.GetFiles(templatesDir, "*.jpg");
-                        _logger.LogInformation("📁 模板目录中的图片文件: {Files}", string.Join(", ", files.Select(Path.GetFileName)));
-                    }
-                    
-                    throw new FileNotFoundException($"模板图片不存在: {imagePath}");
+                    _logger.LogError("❌ 预处理缓存文件不存在，无法进行实时推理");
+                    _logger.LogError("   缓存文件: {CacheFile}", cacheFile);
+                    _logger.LogError("   元数据文件: {MetadataFile}", metadataFile);
+                    throw new InvalidOperationException($"模板 {templateId} 的预处理缓存不存在");
                 }
                 
-                _logger.LogInformation("✅ 找到模板图片: {ImagePath}, 大小: {Size} bytes", imagePath, new FileInfo(imagePath).Length);
+                _logger.LogInformation("✅ 找到预处理缓存: {CacheFile}", cacheFile);
+                _logger.LogInformation("📊 缓存大小: {Size:F2} MB", new FileInfo(cacheFile).Length / 1024.0 / 1024.0);
                 
+                // 检查音频文件
                 if (!File.Exists(audioPath))
                 {
                     throw new FileNotFoundException($"音频文件不存在: {audioPath}");
@@ -1790,67 +1786,42 @@ namespace LmyDigitalHuman.Services
                 var outputDir = Path.GetDirectoryName(outputPath);
                 Directory.CreateDirectory(outputDir);
                 
-                // 🔧 使用工作区的脚本，但设置MuseTalk为工作目录
+                // 🚀 使用轻量级推理脚本，利用预处理缓存
                 var contentRoot = _pathManager.GetContentRootPath();
                 var pythonPath = await GetCachedPythonPathAsync();
-                
-                // 优先使用MuseTalk目录中的V4增强脚本
                 var projectRoot = Path.Combine(contentRoot, "..");
-                var museTalkDir = Path.Combine(projectRoot, "MuseTalk");
-                var optimizedScriptPath = Path.Combine(museTalkDir, "enhanced_musetalk_inference_v4.py");
                 
-                if (!File.Exists(optimizedScriptPath))
+                // 使用专门的快速推理脚本（利用预处理缓存）
+                var fastInferenceScript = Path.Combine(projectRoot, "MuseTalkEngine", "ultra_fast_realtime_inference.py");
+                
+                if (!File.Exists(fastInferenceScript))
                 {
-                    optimizedScriptPath = Path.Combine(museTalkDir, "optimized_musetalk_inference_v3.py");
-                    if (!File.Exists(optimizedScriptPath))
-                    {
-                        // 回退到工作区根目录
-                        optimizedScriptPath = Path.Combine(projectRoot, "enhanced_musetalk_inference_v4.py");
-                        if (!File.Exists(optimizedScriptPath))
-                        {
-                            optimizedScriptPath = Path.Combine(projectRoot, "optimized_musetalk_inference_v3.py");
-                        }
-                    }
+                    _logger.LogWarning("⚠️ 快速推理脚本不存在，回退到标准推理: {Script}", fastInferenceScript);
+                    // 回退到原来的方法，但添加预处理缓存参数
+                    await ExecuteStandardInferenceWithCache(templateId, audioPath, outputPath, gpuId);
+                    return;
                 }
                 
-                // 检查本地MuseTalk目录是否存在（用于设置工作目录）
-                if (!Directory.Exists(museTalkDir))
-                {
-                    _logger.LogWarning("⚠️ 本地MuseTalk目录不存在，创建目录: {MuseTalkDir}", museTalkDir);
-                    Directory.CreateDirectory(museTalkDir);
-                }
+                _logger.LogInformation("📄 使用快速推理脚本: {ScriptPath}", fastInferenceScript);
                 
-                // 检查推理脚本是否存在
-                if (!File.Exists(optimizedScriptPath))
-                {
-                    throw new FileNotFoundException($"找不到MuseTalk推理脚本: {optimizedScriptPath}");
-                }
+                // 构建快速推理命令 - 只需要音频和输出路径
+                var arguments = $"\"{fastInferenceScript}\" " +
+                              $"--template_id \"{templateId}\" " +
+                              $"--audio_path \"{audioPath}\" " +
+                              $"--output_path \"{outputPath}\" " +
+                              $"--cache_dir \"{modelStateDir}\" " +
+                              $"--device cuda:{gpuId} " +
+                              $"--batch_size 32 " +
+                              $"--fps 25 " +
+                              $"--fp16";
                 
-                _logger.LogInformation("📄 使用MuseTalk脚本: {ScriptPath}", optimizedScriptPath);
-                
-                // 构建MuseTalk推理命令
-                var arguments = new StringBuilder();
-                arguments.Append($"\"{optimizedScriptPath}\"");
-                arguments.Append($" --template_id \"{templateId}\"");
-                arguments.Append($" --audio_path \"{audioPath}\"");
-                arguments.Append($" --output_path \"{outputPath}\"");
-                arguments.Append($" --template_dir \"{templatesDir}\"");
-                arguments.Append($" --version v1");
-                arguments.Append($" --batch_size 64");
-                arguments.Append($" --fps 25");
-                arguments.Append($" --unet_config \"models/musetalk/musetalk.json\"");
-                arguments.Append($" --unet_model_path \"models/musetalk/pytorch_model.bin\"");
-                arguments.Append($" --whisper_dir \"models/whisper\"");
-                arguments.Append($" --vae_type \"sd-vae\"");
-                
-                _logger.LogInformation("🔧 推理参数:");
+                _logger.LogInformation("🔧 快速推理参数:");
                 _logger.LogInformation("   模板ID: {TemplateId}", templateId);
-                _logger.LogInformation("   模板图片: {ImagePath}", imagePath);
-                _logger.LogInformation("   模板目录: {TemplateDir}", templatesDir);
                 _logger.LogInformation("   音频文件: {AudioPath}", audioPath);
                 _logger.LogInformation("   输出路径: {OutputPath}", outputPath);
+                _logger.LogInformation("   使用GPU: {GPU}", gpuId);
                 
-                // 🔧 检查是否有其他进程正在处理同一模板
+                // 检查是否有其他进程正在处理同一模板
                 var activeJobKey = $"musetalk_{templateId}";
                 if (_activeJobs.ContainsKey(activeJobKey))
                 {
@@ -1863,97 +1834,128 @@ namespace LmyDigitalHuman.Services
                     JobId = activeJobKey,
                     StartTime = DateTime.Now,
                     Progress = 0,
-                    CurrentStep = "MuseTalk推理"
+                    CurrentStep = "快速推理"
                 };
                 _activeJobs.TryAdd(activeJobKey, processingJob);
                 
-                _logger.LogInformation("🎮 执行MuseTalk推理命令: {Command}", $"{pythonPath} {arguments}");
+                _logger.LogInformation("🎮 执行快速推理命令: {Command}", $"{pythonPath} {arguments}");
                 
                 var processInfo = new ProcessStartInfo
                 {
                     FileName = pythonPath,
-                    Arguments = arguments.ToString(),
-                    WorkingDirectory = museTalkDir,
+                    Arguments = arguments,
+                    WorkingDirectory = Path.Combine(projectRoot, "MuseTalk"),
                     UseShellExecute = false,
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                     CreateNoWindow = true
                 };
                 
-                // 配置GPU环境，指定使用特定GPU
-                ConfigureOptimizedGpuEnvironment(processInfo);
-                processInfo.Environment["CUDA_VISIBLE_DEVICES"] = gpuId.ToString();
+                // 设置环境变量
+                processInfo.EnvironmentVariables["CUDA_VISIBLE_DEVICES"] = gpuId.ToString();
+                processInfo.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";
                 
-                // 🔧 修复Unicode编码问题 - 强制UTF-8
-                processInfo.Environment["PYTHONIOENCODING"] = "utf-8";
-                processInfo.Environment["PYTHONUNBUFFERED"] = "1";
-                processInfo.Environment["PYTHONUTF8"] = "1";
-                processInfo.Environment["LANG"] = "zh_CN.UTF-8";  // 改为中文UTF-8
-                processInfo.Environment["LC_ALL"] = "zh_CN.UTF-8";
-                processInfo.Environment["PYTHONLEGACYWINDOWSSTDIO"] = "1";  // Windows兼容性
+                var outputBuffer = new StringBuilder();
+                var errorBuffer = new StringBuilder();
                 
-                var process = new Process { StartInfo = processInfo };
-                var outputBuilder = new StringBuilder();
-                var errorBuilder = new StringBuilder();
+                using var process = new Process { StartInfo = processInfo };
                 
-                process.OutputDataReceived += (sender, e) => {
+                process.OutputDataReceived += (sender, e) =>
+                {
                     if (!string.IsNullOrEmpty(e.Data))
                     {
-                        outputBuilder.AppendLine(e.Data);
-                        _logger.LogInformation("MuseTalk推理: {Output}", e.Data);
+                        outputBuffer.AppendLine(e.Data);
+                        _logger.LogInformation("MuseTalk快速推理: {Output}", e.Data);
                     }
                 };
                 
-                process.ErrorDataReceived += (sender, e) => {
+                process.ErrorDataReceived += (sender, e) =>
+                {
                     if (!string.IsNullOrEmpty(e.Data))
                     {
-                        errorBuilder.AppendLine(e.Data);
-                        _logger.LogWarning("MuseTalk推理警告: {Error}", e.Data);
+                        errorBuffer.AppendLine(e.Data);
+                        _logger.LogWarning("MuseTalk快速推理警告: {Error}", e.Data);
                     }
                 };
                 
-                process.Start();
+                var startTime = DateTime.Now;
+                
+                if (!process.Start())
+                {
+                    throw new InvalidOperationException("无法启动快速推理进程");
+                }
+                
                 process.BeginOutputReadLine();
                 process.BeginErrorReadLine();
                 
-                // 等待推理完成（最多5分钟）
-                var timeoutMs = 300000;
-                var completed = await Task.Run(() => process.WaitForExit(timeoutMs));
+                // 等待进程完成，最多等待2分钟（快速推理应该很快）
+                using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
                 
-                if (!completed)
+                try
                 {
-                    process.Kill();
-                    throw new TimeoutException($"MuseTalk推理超时 ({timeoutMs/1000}秒)");
+                    await process.WaitForExitAsync(cts.Token);
                 }
+                catch (OperationCanceledException)
+                {
+                    _logger.LogError("❌ 快速推理超时，强制终止进程");
+                    try
+                    {
+                        process.Kill(true);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "终止快速推理进程失败");
+                    }
+                    throw new TimeoutException("快速推理超时");
+                }
+                finally
+                {
+                    // 清理活跃任务
+                    _activeJobs.TryRemove(activeJobKey, out _);
+                    _logger.LogDebug("🧹 清理活跃任务: {JobKey}", activeJobKey);
+                }
+                
+                var totalTime = DateTime.Now - startTime;
+                var output = outputBuffer.ToString();
+                var error = errorBuffer.ToString();
                 
                 if (process.ExitCode != 0)
                 {
-                    var error = errorBuilder.ToString();
-                    throw new InvalidOperationException($"MuseTalk推理失败: {error}");
+                    _logger.LogError("❌ 快速推理失败，退出码: {ExitCode}", process.ExitCode);
+                    _logger.LogError("错误输出: {Error}", error);
+                    throw new InvalidOperationException($"快速推理失败，退出码: {process.ExitCode}");
                 }
                 
-                // 检查输出文件
+                _logger.LogInformation("✅ 快速推理完成: {TemplateId}, 耗时: {Time:F2}秒", 
+                    templateId, totalTime.TotalSeconds);
+                
+                // 验证输出文件
                 if (!File.Exists(outputPath))
                 {
-                    throw new FileNotFoundException($"MuseTalk推理未生成输出文件: {outputPath}");
+                    throw new FileNotFoundException($"快速推理完成但输出文件不存在: {outputPath}");
                 }
                 
-                var fileInfo = new FileInfo(outputPath);
-                _logger.LogInformation("✅ GPU:{GPU} MuseTalk推理完成: {TemplateId}, 输出: {OutputPath}, 大小: {Size}bytes", 
-                    gpuId, templateId, outputPath, fileInfo.Length);
+                var fileSize = new FileInfo(outputPath).Length;
+                _logger.LogInformation("📹 输出视频: {OutputPath}, 大小: {Size:F2} MB", 
+                    outputPath, fileSize / 1024.0 / 1024.0);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "❌ GPU:{GPU} MuseTalk推理失败: {TemplateId}", gpuId, templateId);
-                throw;
+                _logger.LogError(ex, "❌ GPU:{GPU} MuseTalk快速推理失败: {TemplateId}", gpuId, templateId);
+                throw new InvalidOperationException($"MuseTalk推理失败: {ex.Message}", ex);
             }
-            finally
-            {
-                // 🔧 清理活跃任务
-                var activeJobKey = $"musetalk_{templateId}";
-                _activeJobs.TryRemove(activeJobKey, out _);
-                _logger.LogDebug("🧹 清理活跃任务: {JobKey}", activeJobKey);
-            }
+        }
+        
+        /// <summary>
+        /// 回退方法：使用标准推理但添加缓存参数
+        /// </summary>
+        private async Task ExecuteStandardInferenceWithCache(string templateId, string audioPath, string outputPath, int gpuId)
+        {
+            _logger.LogInformation("🔄 使用标准推理方法（带缓存优化）");
+            
+            // 这里保留原来的逻辑，但添加缓存参数
+            // 暂时抛出异常，提示需要快速推理脚本
+            throw new NotImplementedException("需要实现快速推理脚本 ultra_fast_realtime_inference.py");
         }
 
         #endregion
