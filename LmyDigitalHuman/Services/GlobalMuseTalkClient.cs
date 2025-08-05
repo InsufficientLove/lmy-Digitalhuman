@@ -165,10 +165,13 @@ namespace LmyDigitalHuman.Services
                 var pythonPath = GetPythonPath();
                 
                 var workingDir = Path.Combine(projectRoot, "MuseTalk");
+                // 🔧 临时：先测试Python环境
+                var testScript = Path.Combine(projectRoot, "MuseTalkEngine", "test_env.py");
                 var processInfo = new System.Diagnostics.ProcessStartInfo
                 {
                     FileName = pythonPath,
-                    Arguments = $"\"{serviceScript}\" --mode server --multi_gpu --port {port} --gpu_id 0",
+                    Arguments = $"\"{testScript}\"", // 临时使用测试脚本
+                    // Arguments = $"\"{serviceScript}\" --mode server --multi_gpu --port {port} --gpu_id 0",
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                     UseShellExecute = false,
@@ -185,6 +188,24 @@ namespace LmyDigitalHuman.Services
                 processInfo.EnvironmentVariables["PYTHONPATH"] = pythonPathEnv;
                 processInfo.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";
                 processInfo.EnvironmentVariables["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"; // 🎯 4GPU并行
+                
+                // 🔧 关键修复：激活虚拟环境
+                var venvPath = Path.Combine(projectRoot, "venv_musetalk");
+                var venvScriptsPath = Path.Combine(venvPath, "Scripts");
+                var venvLibPath = Path.Combine(venvPath, "Lib", "site-packages");
+                
+                // 设置虚拟环境相关的环境变量
+                processInfo.EnvironmentVariables["VIRTUAL_ENV"] = venvPath;
+                processInfo.EnvironmentVariables["PATH"] = $"{venvScriptsPath};{Environment.GetEnvironmentVariable("PATH")}";
+                
+                // 确保Python能找到虚拟环境的包
+                var currentPythonPath = processInfo.EnvironmentVariables.ContainsKey("PYTHONPATH") 
+                    ? processInfo.EnvironmentVariables["PYTHONPATH"] 
+                    : "";
+                processInfo.EnvironmentVariables["PYTHONPATH"] = $"{venvLibPath};{currentPythonPath}";
+                
+                _logger.LogInformation("🔧 虚拟环境路径: {VenvPath}", venvPath);
+                _logger.LogInformation("🔧 虚拟环境包路径: {VenvLibPath}", venvLibPath);
 
                 _logger.LogInformation("🚀 启动4GPU共享全局MuseTalk服务...");
                 _logger.LogInformation("   脚本路径: {ScriptPath}", serviceScript);
@@ -216,8 +237,8 @@ namespace LmyDigitalHuman.Services
                 
                 _logger.LogInformation("🐍 Python进程已启动: PID={ProcessId}", _pythonProcess.Id);
 
-                // 等待服务启动
-                await Task.Delay(2000);
+                // 等待服务启动并检查Python输出
+                await Task.Delay(5000); // 增加等待时间，让Python有时间输出日志
 
                 // 🔧 检查Python进程是否还在运行
                 if (_pythonProcess.HasExited)
