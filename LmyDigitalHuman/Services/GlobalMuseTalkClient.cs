@@ -165,12 +165,12 @@ namespace LmyDigitalHuman.Services
                 var pythonPath = GetPythonPath();
                 
                 var workingDir = Path.Combine(projectRoot, "MuseTalk");
-                // 🔧 临时：使用最简化服务测试导入问题
-                var minimalScript = Path.Combine(projectRoot, "MuseTalkEngine", "minimal_service.py");
+                // 🔧 临时：使用Hello World测试脚本
+                var helloScript = Path.Combine(projectRoot, "MuseTalkEngine", "hello_test.py");
                 var processInfo = new System.Diagnostics.ProcessStartInfo
                 {
                     FileName = pythonPath,
-                    Arguments = $"\"{minimalScript}\" --port {port}",
+                    Arguments = $"\"{helloScript}\"",
                     // Arguments = $"\"{serviceScript}\" --mode server --multi_gpu --port {port} --gpu_id 0",
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
@@ -208,7 +208,7 @@ namespace LmyDigitalHuman.Services
                 _logger.LogInformation("🔧 虚拟环境包路径: {VenvLibPath}", venvLibPath);
 
                 _logger.LogInformation("🚀 启动4GPU共享全局MuseTalk服务...");
-                _logger.LogInformation("   脚本路径: {ScriptPath}", serviceScript);
+                _logger.LogInformation("   脚本路径: {ScriptPath}", helloScript);
                 _logger.LogInformation("   Python路径: {PythonPath}", pythonPath);
                 _logger.LogInformation("   GPU配置: 0,1,2,3 (4GPU并行算力)");
                 _logger.LogInformation("   端口: {Port}", port);
