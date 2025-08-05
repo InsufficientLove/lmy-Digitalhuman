@@ -33,7 +33,7 @@ namespace LmyDigitalHuman.Services
         // 全局模型组件永久化 - 只初始化一次
         private static readonly object _globalInitLock = new object();
         private static bool _globalModelsInitialized = false;
-        private static Process? _persistentMuseTalkProcess = null;
+        // 移除：不再管理自己的Python进程，使用GlobalMuseTalkServiceManager的全局服务
         
         // 兼容性字段 - 保持原有功能
         private static readonly object _initLock = new object();
@@ -1388,52 +1388,16 @@ namespace LmyDigitalHuman.Services
 
                 _logger.LogInformation("🔧 初始化全局MuseTalk模型组件...");
 
-                try
-                {
-                    // 启动持久化的MuseTalk进程
-                    _persistentMuseTalkProcess = StartPersistentMuseTalkProcess();
-                    _globalModelsInitialized = true;
+                // 不再启动自己的进程，依赖GlobalMuseTalkServiceManager启动的全局服务
+                // 只需要设置初始化标志，表示我们准备好使用全局服务了
+                _globalModelsInitialized = true;
                     
-                    _logger.LogInformation("✅ 全局MuseTalk模型组件初始化完成");
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "❌ 全局模型组件初始化失败");
-                    throw;
-                }
+                _logger.LogInformation("✅ 全局MuseTalk服务连接准备完成");
             }
         }
 
-        /// <summary>
-        /// 启动持久化的MuseTalk进程
-        /// </summary>
-        private Process StartPersistentMuseTalkProcess()
-        {
-            var museTalkDir = Path.Combine(_pathManager.GetContentRootPath(), "..", "MuseTalk");
-            var pythonPath = GetCachedPythonPathSync();
-            
-            // 基于MuseTalk realtime_inference.py的持久化进程
-            var processInfo = new ProcessStartInfo
-            {
-                FileName = pythonPath,
-                Arguments = $"-u -c \"import sys; sys.path.append('{museTalkDir.Replace("\\", "/")}'); from scripts.realtime_inference import PersistentMuseTalkServer; server = PersistentMuseTalkServer(); server.start_server()\"",
-                WorkingDirectory = museTalkDir,
-                UseShellExecute = false,
-                RedirectStandardInput = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true
-            };
-
-            // 配置4GPU环境
-            ConfigureOptimizedGpuEnvironment(processInfo);
-
-            var process = new Process { StartInfo = processInfo };
-            process.Start();
-
-            _logger.LogInformation("🚀 持久化MuseTalk进程已启动，PID: {ProcessId}", process.Id);
-            return process;
-        }
+        // 移除：StartPersistentMuseTalkProcess方法已删除
+        // 使用GlobalMuseTalkServiceManager管理的全局服务，不再启动独立进程
 
         /// <summary>
         /// 为模板创建永久化模型状态 - 真正的预处理
@@ -1837,15 +1801,7 @@ namespace LmyDigitalHuman.Services
                 // 1. 保存模板信息到wwwroot/templates
                 SaveTemplateInfoToFileSystem();
                 
-                // 2. 清理持久化进程
-                if (_persistentMuseTalkProcess != null && !_persistentMuseTalkProcess.HasExited)
-                {
-                    _logger.LogInformation("🔄 正在终止持久化MuseTalk进程...");
-                    _persistentMuseTalkProcess.Kill();
-                    _persistentMuseTalkProcess.WaitForExit(5000); // 等待5秒
-                    _persistentMuseTalkProcess.Dispose();
-                    _logger.LogInformation("✅ 持久化进程已清理");
-                }
+                // 移除：不再管理自己的进程，GlobalMuseTalkServiceManager负责全局服务的生命周期
                 
                 // 3. 清理内存缓存
                 _persistentModels.Clear();
