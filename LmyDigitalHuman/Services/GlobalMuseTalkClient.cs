@@ -165,13 +165,10 @@ namespace LmyDigitalHuman.Services
                 var pythonPath = GetPythonPath();
                 
                 var workingDir = Path.Combine(projectRoot, "MuseTalk");
-                // 🔧 临时：使用导入测试脚本诊断问题
-                var debugScript = Path.Combine(projectRoot, "MuseTalkEngine", "debug_imports.py");
                 var processInfo = new System.Diagnostics.ProcessStartInfo
                 {
                     FileName = pythonPath,
-                    Arguments = $"\"{debugScript}\"",
-                    // Arguments = $"\"{serviceScript}\" --mode server --multi_gpu --port {port} --gpu_id 0",
+                    Arguments = $"\"{serviceScript}\" --mode server --multi_gpu --port {port} --gpu_id 0",
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                     UseShellExecute = false,

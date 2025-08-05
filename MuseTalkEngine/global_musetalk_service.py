@@ -558,19 +558,27 @@ global_service = GlobalMuseTalkService()
 
 def main():
     """命令行接口"""
-    print("🚀 Python全局服务main函数启动...")
-    print(f"🐍 Python版本: {sys.version}")
-    print(f"🐍 工作目录: {os.getcwd()}")
-    
-    # 测试关键模块导入
     try:
-        import torch
-        print(f"✅ torch版本: {torch.__version__}")
-        print(f"✅ CUDA可用: {torch.cuda.is_available()}")
-        if torch.cuda.is_available():
-            print(f"✅ GPU数量: {torch.cuda.device_count()}")
+        print("🚀 Python全局服务main函数启动...")
+        print(f"🐍 Python版本: {sys.version}")
+        print(f"🐍 工作目录: {os.getcwd()}")
+        
+        # 测试关键模块导入
+        try:
+            import torch
+            print(f"✅ torch版本: {torch.__version__}")
+            print(f"✅ CUDA可用: {torch.cuda.is_available()}")
+            if torch.cuda.is_available():
+                print(f"✅ GPU数量: {torch.cuda.device_count()}")
+        except Exception as e:
+            print(f"❌ torch导入失败: {str(e)}")
+            sys.exit(1)
+        
+        print("🔧 开始解析命令行参数...")
     except Exception as e:
-        print(f"❌ torch导入失败: {str(e)}")
+        print(f"❌ main函数初始化失败: {str(e)}")
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
     
     parser = argparse.ArgumentParser(description='全局持久化MuseTalk服务 - 4GPU并行')
@@ -587,8 +595,16 @@ def main():
     parser.add_argument('--batch_size', type=int, default=8, help='批处理大小')
     parser.add_argument('--fps', type=int, default=25, help='视频帧率')
     
-    args = parser.parse_args()
-    print(f"📋 解析参数: mode={args.mode}, multi_gpu={args.multi_gpu}, gpu_id={args.gpu_id}, port={args.port}")
+    try:
+        args = parser.parse_args()
+        print(f"📋 解析参数: mode={args.mode}, multi_gpu={args.multi_gpu}, gpu_id={args.gpu_id}, port={args.port}")
+        
+        print("🔧 进入服务器模式逻辑...")
+    except Exception as e:
+        print(f"❌ 参数解析失败: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
     
     if args.mode == 'server':
         # 服务器模式：启动时初始化所有模型，然后监听请求
@@ -598,8 +614,16 @@ def main():
             print("🚀 启动全局MuseTalk服务器...")
         
         # 全局初始化模型（只执行一次）
-        if not global_service.initialize_models_once(args.gpu_id, multi_gpu=args.multi_gpu):
-            print("❌ 模型初始化失败")
+        print("🔧 准备初始化全局模型...")
+        try:
+            if not global_service.initialize_models_once(args.gpu_id, multi_gpu=args.multi_gpu):
+                print("❌ 模型初始化失败")
+                sys.exit(1)
+            print("✅ 模型初始化成功，准备启动IPC服务器...")
+        except Exception as e:
+            print(f"❌ 模型初始化异常: {str(e)}")
+            import traceback
+            traceback.print_exc()
             sys.exit(1)
         
         # 启动IPC服务器
