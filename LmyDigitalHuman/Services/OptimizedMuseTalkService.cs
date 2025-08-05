@@ -1688,23 +1688,35 @@ namespace LmyDigitalHuman.Services
                 throw new InvalidOperationException($"预处理状态文件不存在: {stateFilePath}");
             }
             
-            // 验证预处理缓存文件
-            var cacheDir = Path.Combine(_pathManager.GetContentRootPath(), "..", "MuseTalkEngine", "template_cache");
-            var cacheFile = Path.Combine(cacheDir, $"{templateId}_preprocessed.pkl");
+            // 验证预处理缓存文件 - 使用与Python脚本一致的路径
+            var modelStateDir = Path.Combine(_pathManager.GetContentRootPath(), "model_states", templateId);
+            var cacheFile = Path.Combine(modelStateDir, $"{templateId}_preprocessed.pkl");
             
             if (!File.Exists(cacheFile))
             {
+                _logger.LogError("❌ 预处理缓存文件不存在: {CacheFile}", cacheFile);
+                _logger.LogInformation("🔍 检查model_states目录结构:");
+                
+                var modelStatesDir = Path.Combine(_pathManager.GetContentRootPath(), "model_states");
+                if (Directory.Exists(modelStatesDir))
+                {
+                    var templateDirs = Directory.GetDirectories(modelStatesDir);
+                    foreach (var dir in templateDirs)
+                    {
+                        var dirName = Path.GetFileName(dir);
+                        var files = Directory.GetFiles(dir, "*.pkl");
+                        _logger.LogInformation("  📁 {DirName}: {FileCount} pkl files", dirName, files.Length);
+                        foreach (var file in files)
+                        {
+                            _logger.LogInformation("    📄 {FileName}", Path.GetFileName(file));
+                        }
+                    }
+                }
+                
                 throw new InvalidOperationException($"预处理缓存文件不存在: {cacheFile}");
             }
             
-            // 检查文件大小，确保预处理确实完成
-            var fileInfo = new FileInfo(stateFilePath);
-            if (fileInfo.Length < 1000) // 预处理文件应该至少有1KB
-            {
-                throw new InvalidOperationException($"预处理状态文件过小，可能未正确生成: {stateFilePath}");
-            }
-            
-            _logger.LogInformation("📊 预处理状态文件大小: {Size:F2} MB", fileInfo.Length / 1024.0 / 1024.0);
+            _logger.LogInformation("📊 预处理状态文件大小: {Size:F2} MB", new FileInfo(stateFilePath).Length / 1024.0 / 1024.0);
             
             _logger.LogInformation("✅ 模型已加载到GPU内存: {TemplateId} -> GPU:{GPU}", templateId, gpuId);
         }
