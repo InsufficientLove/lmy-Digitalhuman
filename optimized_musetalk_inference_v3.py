@@ -69,22 +69,22 @@ class TrueParallelMuseTalkInference:
             device = torch.device(f"cuda:{gpu_id}")
             print(f"🎮 初始化GPU {gpu_id}...")
             
-                         # 为每个GPU加载独立的模型
-             try:
-                 # 尝试新版本load_all_model调用
-                 audio_processor, vae, unet, pe = load_all_model(
-                     unet_model_path="models/musetalk/pytorch_model.bin",
-                     vae_type="sd-vae",
-                     unet_config="models/musetalk/musetalk.json",
-                     device=device
-                 )
-             except TypeError:
-                 # 回退到旧版本调用
-                 audio_processor, vae, unet, pe = load_all_model(
-                     getattr(self.config, 'version', 'v1'), 
-                     getattr(self.config, 'fp16', True), 
-                     device
-                 )
+            # 为每个GPU加载独立的模型
+            try:
+                # 尝试新版本load_all_model调用
+                audio_processor, vae, unet, pe = load_all_model(
+                    unet_model_path="models/musetalk/pytorch_model.bin",
+                    vae_type="sd-vae",
+                    unet_config="models/musetalk/musetalk.json",
+                    device=device
+                )
+            except TypeError:
+                # 回退到旧版本调用
+                audio_processor, vae, unet, pe = load_all_model(
+                    getattr(self.config, 'version', 'v1'), 
+                    getattr(self.config, 'fp16', True), 
+                    device
+                )
             
             # 初始化面部解析器
             if hasattr(self.config, 'version') and self.config.version == "v15":
