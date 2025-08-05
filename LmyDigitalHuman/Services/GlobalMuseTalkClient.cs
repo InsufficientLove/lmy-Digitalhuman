@@ -277,7 +277,7 @@ namespace LmyDigitalHuman.Services
             try
             {
                 using var testClient = new TcpClient();
-                await testClient.ConnectAsync("localhost", port);
+                await testClient.ConnectAsync("127.0.0.1", port);
                 _logger.LogInformation("✅ 端口{Port}连接测试成功", port);
                 return true;
             }
