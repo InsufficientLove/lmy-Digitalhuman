@@ -5,27 +5,11 @@
 基于官方MuseTalk架构，启动时加载所有模型，通过IPC通信实现真正的实时推理
 """
 
-# 🔧 立即输出，测试脚本是否开始执行
-print("🚀 global_musetalk_service.py 开始执行...")
-import sys
-sys.stdout.flush()
-
-print("📦 开始导入基础模块...")
-sys.stdout.flush()
-
 import os
 import sys
 import json
 import pickle
-print("✅ 基础模块导入完成")
-sys.stdout.flush()
-
-print("📦 开始导入torch...")
-sys.stdout.flush()
 import torch
-print("✅ torch导入完成")
-sys.stdout.flush()
-
 import cv2
 import numpy as np
 import argparse
@@ -37,74 +21,22 @@ import shutil
 import socket
 import struct
 from pathlib import Path
-print("✅ 系统模块导入完成")
-sys.stdout.flush()
-
-print("📦 开始导入第三方模块...")
-sys.stdout.flush()
 from tqdm import tqdm
 import copy
 from transformers import WhisperModel
 from moviepy.editor import VideoFileClip, AudioFileClip
 import imageio
-print("✅ 第三方模块导入完成")
-sys.stdout.flush()
 
 # 添加MuseTalk模块路径
-musetalk_path = os.path.join(os.path.dirname(__file__), '..', 'MuseTalk')
-sys.path.append(musetalk_path)
-print(f"📁 MuseTalk路径已添加: {musetalk_path}")
-sys.stdout.flush()
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'MuseTalk'))
 
-print("📦 开始导入MuseTalk模块...")
-sys.stdout.flush()
+from musetalk.utils.face_parsing import FaceParsing
+from musetalk.utils.utils import datagen, load_all_model
+from musetalk.utils.preprocessing import get_landmark_and_bbox, read_imgs
+from musetalk.utils.blending import get_image, get_image_prepare_material, get_image_blending
+from musetalk.utils.audio_processor import AudioProcessor
 
-try:
-    from musetalk.utils.face_parsing import FaceParsing
-    print("✅ FaceParsing导入成功")
-    sys.stdout.flush()
-except Exception as e:
-    print(f"❌ FaceParsing导入失败: {str(e)}")
-    sys.stdout.flush()
-    raise
-
-try:
-    from musetalk.utils.utils import datagen, load_all_model
-    print("✅ utils导入成功")
-    sys.stdout.flush()
-except Exception as e:
-    print(f"❌ utils导入失败: {str(e)}")
-    sys.stdout.flush()
-    raise
-
-try:
-    from musetalk.utils.preprocessing import get_landmark_and_bbox, read_imgs
-    print("✅ preprocessing导入成功")
-    sys.stdout.flush()
-except Exception as e:
-    print(f"❌ preprocessing导入失败: {str(e)}")
-    sys.stdout.flush()
-    raise
-
-try:
-    from musetalk.utils.blending import get_image, get_image_prepare_material, get_image_blending
-    print("✅ blending导入成功")
-    sys.stdout.flush()
-except Exception as e:
-    print(f"❌ blending导入失败: {str(e)}")
-    sys.stdout.flush()
-    raise
-
-try:
-    from musetalk.utils.audio_processor import AudioProcessor
-    print("✅ audio_processor导入成功")
-    sys.stdout.flush()
-except Exception as e:
-    print(f"❌ audio_processor导入失败: {str(e)}")
-    sys.stdout.flush()
-    raise
-
-print("🎉 所有MuseTalk模块导入完成！")
+print("🎉 MuseTalk全局服务模块导入完成")
 sys.stdout.flush()
 
 class GlobalMuseTalkService:
@@ -631,8 +563,10 @@ def main():
     """命令行接口"""
     try:
         print("🚀 Python全局服务main函数启动...")
+        sys.stdout.flush()
         print(f"🐍 Python版本: {sys.version}")
         print(f"🐍 工作目录: {os.getcwd()}")
+        sys.stdout.flush()
         
         # 测试关键模块导入
         try:
@@ -641,15 +575,19 @@ def main():
             print(f"✅ CUDA可用: {torch.cuda.is_available()}")
             if torch.cuda.is_available():
                 print(f"✅ GPU数量: {torch.cuda.device_count()}")
+            sys.stdout.flush()
         except Exception as e:
             print(f"❌ torch导入失败: {str(e)}")
+            sys.stdout.flush()
             sys.exit(1)
         
         print("🔧 开始解析命令行参数...")
+        sys.stdout.flush()
     except Exception as e:
         print(f"❌ main函数初始化失败: {str(e)}")
         import traceback
         traceback.print_exc()
+        sys.stdout.flush()
         sys.exit(1)
     
     parser = argparse.ArgumentParser(description='全局持久化MuseTalk服务 - 4GPU并行')
