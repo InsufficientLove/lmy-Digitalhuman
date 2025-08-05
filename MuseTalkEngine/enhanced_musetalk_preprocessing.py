@@ -298,10 +298,8 @@ class EnhancedMuseTalkPreprocessor:
             'cache_path': str(cache_path),
             'frame_count': len(frame_list_cycle),
             'input_latent_shape': list(input_latent_list_cycle[0].shape) if input_latent_list_cycle else [],
-            'version': '1.0',
-            # 新增：保存frame_list和mask_list到元数据（用于官方脚本）
-            'frame_list_cycle': [frame.tolist() if hasattr(frame, 'tolist') else frame for frame in frame_list_cycle],
-            'mask_list_cycle': [mask.tolist() if hasattr(mask, 'tolist') else mask for mask in mask_list_cycle]
+            'version': '1.0'
+            # 注意：不再保存frame_list_cycle和mask_list_cycle到元数据，避免日志冗余
         }
         
         # 调试：检查每个字段的类型（简化输出）
