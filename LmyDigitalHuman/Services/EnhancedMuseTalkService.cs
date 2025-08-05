@@ -2,6 +2,11 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using LmyDigitalHuman.Services;
+using LmyDigitalHuman.Models;
+using System.Diagnostics;
+using System.IO;
+using System;
+using System.Threading.Tasks;
 
 namespace LmyDigitalHuman.Services
 {
@@ -114,8 +119,8 @@ namespace LmyDigitalHuman.Services
         {
             try
             {
-                var pythonEnvService = _serviceProvider.GetRequiredService<PythonEnvironmentService>();
-                var pythonPath = await pythonEnvService.GetValidatedPythonPathAsync();
+                var pythonEnvService = _serviceProvider.GetRequiredService<IPythonEnvironmentService>();
+                var pythonPath = await pythonEnvService.GetRecommendedPythonPathAsync();
                 
                 var serviceScript = Path.Combine(
                     Directory.GetCurrentDirectory(), 
@@ -278,11 +283,27 @@ namespace LmyDigitalHuman.Services
         {
             _logger.LogInformation("🔄 使用传统模式生成视频");
             
-            return await _fallbackService.GenerateDigitalHumanVideoOptimizedAsync(
-                templateId: templateId,
-                audioPath: audioPath,
-                outputFileName: outputFileName
-            );
+            // 构建DigitalHumanRequest对象
+            var request = new DigitalHumanRequest
+            {
+                TemplateId = templateId,
+                AvatarImagePath = $"/templates/{templateId}.jpg",
+                AudioPath = audioPath,
+                Quality = "medium",
+                Fps = fps,
+                BboxShift = bboxShift
+            };
+            
+            var response = await _fallbackService.GenerateVideoAsync(request);
+            
+            if (response.Success)
+            {
+                return response.VideoPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "videos", outputFileName);
+            }
+            else
+            {
+                throw new InvalidOperationException($"传统模式视频生成失败: {response.Message}");
+            }
         }
 
         /// <summary>
