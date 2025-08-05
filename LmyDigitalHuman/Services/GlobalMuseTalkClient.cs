@@ -165,10 +165,13 @@ namespace LmyDigitalHuman.Services
                 var pythonPath = GetPythonPath();
                 
                 var workingDir = Path.Combine(projectRoot, "MuseTalk");
+                // 🔧 临时：使用最简化服务测试导入问题
+                var minimalScript = Path.Combine(projectRoot, "MuseTalkEngine", "minimal_service.py");
                 var processInfo = new System.Diagnostics.ProcessStartInfo
                 {
                     FileName = pythonPath,
-                    Arguments = $"\"{serviceScript}\" --mode server --multi_gpu --port {port} --gpu_id 0",
+                    Arguments = $"\"{minimalScript}\" --port {port}",
+                    // Arguments = $"\"{serviceScript}\" --mode server --multi_gpu --port {port} --gpu_id 0",
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                     UseShellExecute = false,
