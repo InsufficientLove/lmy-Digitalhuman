@@ -1503,6 +1503,9 @@ namespace LmyDigitalHuman.Services
                 startInfo.EnvironmentVariables["PYTHONPATH"] = museTalkDir;
             }
             
+            // 设置Python输出编码为UTF-8，解决Windows下Unicode问题
+            startInfo.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";
+            
             _logger.LogInformation("💻 执行预处理命令: {FileName} {Arguments}", startInfo.FileName, arguments);
             _logger.LogInformation("🐍 PYTHONPATH: {PythonPath}", museTalkDir);
             

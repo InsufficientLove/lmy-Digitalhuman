@@ -152,20 +152,15 @@ namespace LmyDigitalHuman.Services
                     }
                 });
 
-                template.Status = "ready";
-                template.UpdatedAt = DateTime.Now;
-
-                // 重新保存包含预览视频信息的模板
-                await SaveTemplateToFileAsync(template);
-
+                // 立即返回创建结果，状态为processing，预处理在后台进行
                 var processingTime = DateTime.Now - startTime;
 
                 return new CreateDigitalHumanTemplateResponse
                 {
                     Success = true,
                     TemplateId = templateId,
-                    Message = "数字人模板创建成功",
-                    Template = template,
+                    Message = "数字人模板创建成功，正在后台预处理...",
+                    Template = template,  // 状态仍为"processing"
                     ProcessingTime = $"{processingTime.TotalMilliseconds:F0}ms"
                 };
             }

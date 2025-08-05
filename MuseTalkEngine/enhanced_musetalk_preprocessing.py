@@ -30,7 +30,7 @@ musetalk_dir = os.path.join(os.path.dirname(current_dir), "MuseTalk")
 
 if os.path.exists(musetalk_dir) and musetalk_dir not in sys.path:
     sys.path.insert(0, musetalk_dir)
-    print(f"✅ 添加MuseTalk路径到Python路径: {musetalk_dir}")
+    print(f"Added MuseTalk path: {musetalk_dir}")
 
 # MuseTalk组件导入
 try:
@@ -38,14 +38,14 @@ try:
     from musetalk.utils.preprocessing import get_landmark_and_bbox, read_imgs
     from musetalk.utils.blending import get_image_prepare_material, get_image_blending
     from musetalk.utils.utils import load_all_model
-    print("✅ MuseTalk模块导入成功")
+    print("MuseTalk modules imported successfully")
 except ImportError as e:
-    print(f"❌ MuseTalk模块导入失败: {e}")
-    print(f"🔍 当前Python路径: {sys.path}")
-    print(f"🔍 MuseTalk目录: {musetalk_dir}")
-    print(f"🔍 MuseTalk目录存在: {os.path.exists(musetalk_dir)}")
+    print(f"MuseTalk import failed: {e}")
+    print(f"Python path: {sys.path}")
+    print(f"MuseTalk dir: {musetalk_dir}")
+    print(f"MuseTalk dir exists: {os.path.exists(musetalk_dir)}")
     if os.path.exists(musetalk_dir):
-        print(f"🔍 MuseTalk目录内容: {os.listdir(musetalk_dir)}")
+        print(f"MuseTalk dir contents: {os.listdir(musetalk_dir)}")
     raise
 
 
@@ -80,9 +80,9 @@ class EnhancedMuseTalkPreprocessor:
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         
-        print(f"🚀 初始化增强MuseTalk预处理器...")
-        print(f"📱 设备: {self.device}")
-        print(f"💾 缓存目录: {self.cache_dir}")
+        print(f"Initializing MuseTalk preprocessor...")
+        print(f"Device: {self.device}")
+        print(f"Cache dir: {self.cache_dir}")
         
         # 加载模型组件
         self._load_models(model_weights_path, vae_type, model_config_path)
