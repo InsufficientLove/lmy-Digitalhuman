@@ -28,13 +28,16 @@ def convert_numpy_types(obj):
     """转换numpy类型为Python原生类型，解决JSON序列化问题"""
     if isinstance(obj, np.ndarray):
         return obj.tolist()
-    elif isinstance(obj, np.integer):
+    elif isinstance(obj, (np.integer, np.int8, np.int16, np.int32, np.int64, 
+                         np.uint8, np.uint16, np.uint32, np.uint64)):
         return int(obj)
-    elif isinstance(obj, np.floating):
+    elif isinstance(obj, (np.floating, np.float16, np.float32, np.float64)):
         return float(obj)
+    elif isinstance(obj, np.bool_):
+        return bool(obj)
     elif isinstance(obj, dict):
         return {key: convert_numpy_types(value) for key, value in obj.items()}
-    elif isinstance(obj, list):
+    elif isinstance(obj, (list, tuple)):
         return [convert_numpy_types(item) for item in obj]
     else:
         return obj
@@ -267,8 +270,19 @@ class EnhancedMuseTalkPreprocessor:
             'version': '1.0'
         }
         
+        # 调试：检查每个字段的类型
+        print("🔍 检查元数据字段类型:")
+        for key, value in metadata.items():
+            print(f"  {key}: {type(value)} = {value}")
+        
         # 转换numpy类型为JSON可序列化类型
+        print("🔄 转换numpy类型...")
         metadata_serializable = convert_numpy_types(metadata)
+        
+        # 调试：检查转换后的类型
+        print("🔍 检查转换后的字段类型:")
+        for key, value in metadata_serializable.items():
+            print(f"  {key}: {type(value)} = {value}")
         
         # 安全保存元数据文件
         temp_metadata_path = metadata_path.with_suffix('.tmp')
