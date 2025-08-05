@@ -1466,12 +1466,7 @@ namespace LmyDigitalHuman.Services
             _logger.LogInformation("🎯 开始执行模板预处理: {TemplateId}", templateId);
             
             var pythonPath = await GetCachedPythonPathAsync();
-            var preprocessingScript = Path.Combine(_pathManager.GetContentRootPath(), "..", "MuseTalkEngine", "enhanced_musetalk_preprocessing.py");
-            
-            if (!File.Exists(preprocessingScript))
-            {
-                throw new FileNotFoundException($"预处理脚本不存在: {preprocessingScript}");
-            }
+            var preprocessingScript = Path.GetFullPath(Path.Combine(_pathManager.GetContentRootPath(), "..", "MuseTalkEngine", "enhanced_musetalk_preprocessing.py"));
             
             var arguments = $"\"{preprocessingScript}\" " +
                           $"--template_id \"{templateId}\" " +
@@ -1480,9 +1475,8 @@ namespace LmyDigitalHuman.Services
                           $"--cache_dir \"{Path.GetDirectoryName(stateFilePath)}\" " +
                           $"--device cuda:0";
             
-            // 设置路径 - 直接执行，不做额外检查以提升性能
+            // 设置路径 - 工作目录必须是MuseTalk目录以支持相对路径
             var museTalkDir = Path.Combine(_pathManager.GetContentRootPath(), "..", "MuseTalk");
-            var workingDir = Path.Combine(_pathManager.GetContentRootPath(), "..");
             
             var startInfo = new ProcessStartInfo
             {
@@ -1492,7 +1486,7 @@ namespace LmyDigitalHuman.Services
                 CreateNoWindow = true,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
-                WorkingDirectory = workingDir
+                WorkingDirectory = museTalkDir  // 设置为MuseTalk目录，支持相对路径
             };
             
             // 设置CUDA环境变量
