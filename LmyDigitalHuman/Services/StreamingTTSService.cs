@@ -56,7 +56,7 @@ namespace LmyDigitalHuman.Services
 
             // 这里应该实现实际的音频块获取逻辑
             // 暂时返回空数组
-            await Task.Delay(10);
+                            // 立即处理，无需延迟
             return Array.Empty<byte>();
         }
 

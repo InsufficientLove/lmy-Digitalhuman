@@ -1630,9 +1630,6 @@ namespace LmyDigitalHuman.Services
             
             _logger.LogInformation("📊 预处理状态文件大小: {Size:F2} MB", fileInfo.Length / 1024.0 / 1024.0);
             
-            // 模拟GPU加载验证时间
-            await Task.Delay(500);
-            
             _logger.LogInformation("✅ 模型已加载到GPU内存: {TemplateId} -> GPU:{GPU}", templateId, gpuId);
         }
 

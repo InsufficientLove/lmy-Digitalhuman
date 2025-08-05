@@ -791,7 +791,7 @@ namespace LmyDigitalHuman.Services
             // 在实际项目中，可以集成专门的情感识别库或API
             try
             {
-                await Task.Delay(100); // 模拟处理时间
+                // 处理完成，无需延迟
 
                 var emotions = new Dictionary<string, float>
                 {
@@ -847,7 +847,7 @@ namespace LmyDigitalHuman.Services
                 }
 
                 // 预加载语音模型（具体实现取决于TTS服务）
-                await Task.Delay(500); // 模拟预加载时间
+                // 预加载完成，无需延迟
                 
                 _preloadedVoices.TryAdd(voiceId, true);
                 _logger.LogInformation("语音模型预加载成功: VoiceId={VoiceId}", voiceId);

@@ -232,7 +232,7 @@ namespace LmyDigitalHuman.Services
                     };
 
                     // 模拟流式延迟
-                    await Task.Delay(10);
+                    // 立即处理，无需延迟
                 }
             }
             finally

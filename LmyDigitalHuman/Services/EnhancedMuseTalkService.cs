@@ -29,7 +29,6 @@ namespace LmyDigitalHuman.Services
         
         private readonly bool _enablePersistentMode;
         private readonly bool _autoStartService;
-        private readonly int _serviceStartupDelay;
         private bool _persistentModeAvailable = false;
         private bool _serviceStartAttempted = false;
 
@@ -49,7 +48,6 @@ namespace LmyDigitalHuman.Services
             // 读取配置
             _enablePersistentMode = _configuration.GetValue<bool>("PersistentMuseTalk:EnablePersistentMode", true);
             _autoStartService = _configuration.GetValue<bool>("PersistentMuseTalk:AutoStartService", true);
-            _serviceStartupDelay = _configuration.GetValue<int>("PersistentMuseTalk:ServiceStartupDelay", 2000);
             
             _logger.LogInformation("🚀 初始化增强MuseTalk服务");
             _logger.LogInformation("⚡ 持久化模式: {EnablePersistentMode}", _enablePersistentMode);
@@ -89,11 +87,8 @@ namespace LmyDigitalHuman.Services
                     
                     await StartPersistentServiceAsync();
                     
-                    // 等待服务启动
-                    await Task.Delay(_serviceStartupDelay);
-                    
-                    // 重新检查
-                    pingSuccess = await _persistentClient.PingAsync();
+                    // 智能等待服务启动 - 轮询检查而不是固定延迟
+                    pingSuccess = await WaitForServiceStartupAsync();
                     if (pingSuccess)
                     {
                         _persistentModeAvailable = true;
@@ -176,6 +171,33 @@ namespace LmyDigitalHuman.Services
                 _logger.LogError(ex, "❌ 启动持久化服务失败");
                 throw;
             }
+        }
+
+        /// <summary>
+        /// 智能等待服务启动 - 使用轮询而不是固定延迟
+        /// </summary>
+        private async Task<bool> WaitForServiceStartupAsync()
+        {
+            const int maxAttempts = 20; // 最多尝试20次
+            const int intervalMs = 100;  // 每100ms检查一次
+            
+            for (int attempt = 1; attempt <= maxAttempts; attempt++)
+            {
+                var pingSuccess = await _persistentClient.PingAsync();
+                if (pingSuccess)
+                {
+                    _logger.LogInformation("✅ 服务启动成功，用时: {Time}ms", attempt * intervalMs);
+                    return true;
+                }
+                
+                if (attempt < maxAttempts)
+                {
+                    await Task.Delay(intervalMs);
+                }
+            }
+            
+            _logger.LogWarning("⚠️ 服务启动超时，已尝试 {Attempts} 次", maxAttempts);
+            return false;
         }
 
         /// <summary>
