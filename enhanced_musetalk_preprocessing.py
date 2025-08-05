@@ -168,12 +168,12 @@ class EnhancedMuseTalkPreprocessor:
         
         print(f"🎭 掩码尺寸: {mask.shape}, 融合区域: {mask_crop_box}")
         
-        # 4. 创建循环数据（正向+反向）
-        frame_list_cycle = [frame] + [frame]  # 单帧情况，可扩展为多帧
-        coord_list_cycle = [bbox] + [bbox]
-        input_latent_list_cycle = [input_latent] + [input_latent]
-        mask_list_cycle = [mask] + [mask]
-        mask_coords_list_cycle = [mask_crop_box] + [mask_crop_box]
+        # 4. 创建循环数据（正向+反向，符合MuseTalk官方实现）
+        frame_list_cycle = [frame] + [frame][::-1] if len([frame]) > 1 else [frame] * 2
+        coord_list_cycle = [bbox] + [bbox][::-1] if len([bbox]) > 1 else [bbox] * 2
+        input_latent_list_cycle = [input_latent] + [input_latent][::-1] if len([input_latent]) > 1 else [input_latent] * 2
+        mask_list_cycle = [mask] + [mask][::-1] if len([mask]) > 1 else [mask] * 2
+        mask_coords_list_cycle = [mask_crop_box] + [mask_crop_box][::-1] if len([mask_crop_box]) > 1 else [mask_crop_box] * 2
         
         # 5. 准备缓存数据
         preprocessed_data = {
