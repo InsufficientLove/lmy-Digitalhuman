@@ -250,15 +250,47 @@ class EnhancedMuseTalkPreprocessor:
             'landmarks': landmarks
         }
         
-        # 保存预处理数据
+        # 💾 保存预处理缓存 - 兼容官方MuseTalk格式
         print(f"💾 保存预处理缓存: {cache_path}")
-        with open(cache_path, 'wb') as f:
-            pickle.dump(preprocessed_data, f, protocol=pickle.HIGHEST_PROTOCOL)
         
-        # 准备元数据
+        # 保存主要缓存数据（pickle格式，兼容现有逻辑）
+        cache_data = {
+            'input_latent_list_cycle': input_latent_list_cycle,
+            'coord_list_cycle': coord_list_cycle,
+            'frame_list_cycle': frame_list_cycle,
+            'mask_coords_list_cycle': mask_coords_list_cycle,
+            'mask_list_cycle': mask_list_cycle,
+            'bbox': bbox,
+            'processing_time': time.time() - start_time,
+            'processed_at': time.time()
+        }
+        
+        with open(cache_path, 'wb') as f:
+            pickle.dump(cache_data, f)
+        
+        # 🔧 新增：保存官方格式的独立缓存文件
+        coords_path = self.cache_dir / f"{template_id}_coords.pkl"
+        latents_path = self.cache_dir / f"{template_id}_latents.pt"
+        mask_coords_path = self.cache_dir / f"{template_id}_mask_coords.pkl"
+        
+        # 保存坐标文件
+        with open(coords_path, 'wb') as f:
+            pickle.dump(coord_list_cycle, f)
+        print(f"✅ 坐标文件已保存: {coords_path}")
+        
+        # 保存潜在向量文件
+        torch.save(input_latent_list_cycle, latents_path)
+        print(f"✅ 潜在向量已保存: {latents_path}")
+        
+        # 保存掩码坐标文件
+        with open(mask_coords_path, 'wb') as f:
+            pickle.dump(mask_coords_list_cycle, f)
+        print(f"✅ 掩码坐标已保存: {mask_coords_path}")
+        
+        # 构建元数据
         metadata = {
             'template_id': template_id,
-            'template_image_path': template_image_path,
+            'template_image_path': str(template_image_path),
             'bbox_shift': bbox_shift,
             'parsing_mode': parsing_mode,
             'bbox': bbox,
@@ -266,8 +298,11 @@ class EnhancedMuseTalkPreprocessor:
             'processed_at': time.time(),
             'cache_path': str(cache_path),
             'frame_count': len(frame_list_cycle),
-            'input_latent_shape': list(input_latent.shape),
-            'version': '1.0'
+            'input_latent_shape': list(input_latent_list_cycle[0].shape) if input_latent_list_cycle else [],
+            'version': '1.0',
+            # 新增：保存frame_list和mask_list到元数据（用于官方脚本）
+            'frame_list_cycle': [frame.tolist() if hasattr(frame, 'tolist') else frame for frame in frame_list_cycle],
+            'mask_list_cycle': [mask.tolist() if hasattr(mask, 'tolist') else mask for mask in mask_list_cycle]
         }
         
         # 调试：检查每个字段的类型

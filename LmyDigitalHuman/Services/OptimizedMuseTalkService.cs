@@ -1795,56 +1795,41 @@ namespace LmyDigitalHuman.Services
                 var outputDir = Path.GetDirectoryName(outputPath);
                 Directory.CreateDirectory(outputDir);
                 
-                // 🚀 使用已验证的推理脚本，添加预处理缓存参数
+                // 🚀 使用基于官方实现的推理脚本
                 var contentRoot = _pathManager.GetContentRootPath();
                 var pythonPath = await GetCachedPythonPathAsync();
                 var projectRoot = Path.Combine(contentRoot, "..");
                 var museTalkDir = Path.Combine(projectRoot, "MuseTalk");
                 
-                // 优先使用已验证的推理脚本
-                var inferenceScript = Path.Combine(museTalkDir, "enhanced_musetalk_inference_v4.py");
-                if (!File.Exists(inferenceScript))
-                {
-                    inferenceScript = Path.Combine(projectRoot, "MuseTalkEngine", "enhanced_musetalk_inference_v4.py");
-                }
+                // 优先使用官方实现的推理脚本
+                var inferenceScript = Path.Combine(projectRoot, "MuseTalkEngine", "official_realtime_inference.py");
                 
                 if (!File.Exists(inferenceScript))
                 {
-                    // 回退到v3版本
-                    inferenceScript = Path.Combine(museTalkDir, "optimized_musetalk_inference_v3.py");
-                    if (!File.Exists(inferenceScript))
-                    {
-                        inferenceScript = Path.Combine(projectRoot, "optimized_musetalk_inference_v3.py");
-                    }
+                    throw new FileNotFoundException($"找不到官方推理脚本: {inferenceScript}");
                 }
                 
-                if (!File.Exists(inferenceScript))
-                {
-                    throw new FileNotFoundException($"找不到推理脚本: {inferenceScript}");
-                }
+                _logger.LogInformation("📄 使用官方实现推理脚本: {ScriptPath}", inferenceScript);
                 
-                _logger.LogInformation("📄 使用已验证推理脚本: {ScriptPath}", inferenceScript);
-                
-                // 构建推理命令 - V4脚本会自动使用预处理缓存
+                // 构建推理命令 - 使用官方脚本参数
                 var arguments = $"\"{inferenceScript}\" " +
                               $"--template_id \"{templateId}\" " +
                               $"--audio_path \"{audioPath}\" " +
                               $"--output_path \"{outputPath}\" " +
-                              $"--template_dir \"{templatesDir}\" " +
-                              $"--version v1 " +
-                              $"--batch_size 64 " +
+                              $"--cache_dir \"{modelStateDir}\" " +
+                              $"--device cuda:{gpuId} " +
+                              $"--batch_size 8 " +
                               $"--fps 25 " +
                               $"--unet_config \"models/musetalk/musetalk.json\" " +
                               $"--unet_model_path \"models/musetalk/pytorch_model.bin\" " +
                               $"--whisper_dir \"models/whisper\" " +
                               $"--vae_type \"sd-vae\"";
                 
-                _logger.LogInformation("🔧 推理参数:");
+                _logger.LogInformation("🔧 官方推理参数:");
                 _logger.LogInformation("   模板ID: {TemplateId}", templateId);
-                _logger.LogInformation("   模板图片: {ImagePath}", imagePath);
                 _logger.LogInformation("   音频文件: {AudioPath}", audioPath);
                 _logger.LogInformation("   输出路径: {OutputPath}", outputPath);
-                _logger.LogInformation("   预处理缓存: {CacheFile} (自动检测)", cacheFile);
+                _logger.LogInformation("   缓存目录: {CacheDir}", modelStateDir);
                 _logger.LogInformation("   使用GPU: {GPU}", gpuId);
                 
                 // 检查是否有其他进程正在处理同一模板
