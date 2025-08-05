@@ -1758,11 +1758,12 @@ namespace LmyDigitalHuman.Services
         {
             try
             {
-                var projectRoot = GetProjectRoot();
-                var cacheDir = Path.Combine(GetModelStatesPath(), templateId);
+                var contentRoot = _pathManager.GetContentRootPath();
+                var projectRoot = Path.Combine(contentRoot, "..");
+                var cacheDir = Path.Combine(contentRoot, "model_states", templateId);
                 
                 // 🔧 修复音频路径问题 - 确保音频在项目temp目录
-                var projectTempDir = Path.Combine(projectRoot, "temp");
+                var projectTempDir = Path.Combine(contentRoot, "temp");
                 Directory.CreateDirectory(projectTempDir);
                 
                 var fixedAudioPath = audioPath;
@@ -1801,7 +1802,7 @@ namespace LmyDigitalHuman.Services
 
                 var processInfo = new ProcessStartInfo
                 {
-                    FileName = GetPythonPath(),
+                    FileName = GetCachedPythonPathSync(),
                     Arguments = $"\"{inferenceScript}\" " +
                                $"--template_id \"{templateId}\" " +
                                $"--audio_path \"{fixedAudioPath}\" " +

@@ -120,7 +120,7 @@ namespace LmyDigitalHuman.Services
                 var serviceScript = Path.Combine(
                     Directory.GetCurrentDirectory(), 
                     "..", 
-                    "MuseTalk", 
+                    "MuseTalkEngine", 
                     "persistent_musetalk_service.py"
                 );
                 
