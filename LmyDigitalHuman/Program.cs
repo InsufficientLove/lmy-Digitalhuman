@@ -39,6 +39,7 @@ builder.Services.AddSwaggerGen(c =>
 // Register services
 builder.Services.AddSingleton<IPathManager, PathManager>();  // 路径管理服务 - 必须最先注册
 builder.Services.AddSingleton<IPythonEnvironmentService, PythonEnvironmentService>();  // Python环境检测服务
+builder.Services.AddSingleton<GlobalMuseTalkServiceManager>();  // 🚀 全局MuseTalk服务管理器
 builder.Services.AddSingleton<IWhisperNetService, WhisperNetService>();
 builder.Services.AddSingleton<IStreamingTTSService, StreamingTTSService>();
 // 🚀 使用极致优化MuseTalk服务 - 专门针对固定模板的4x RTX 4090优化
@@ -113,6 +114,26 @@ Directory.CreateDirectory(videosPath);
 Directory.CreateDirectory(tempPath);
 Directory.CreateDirectory(templatesPath);
 Directory.CreateDirectory(imagesPath);
+
+// 🚀 启动全局MuseTalk服务
+var globalServiceManager = app.Services.GetRequiredService<GlobalMuseTalkServiceManager>();
+try
+{
+    app.Logger.LogInformation("🚀 正在启动全局MuseTalk服务...");
+    var startSuccess = await globalServiceManager.StartGlobalServiceAsync(gpuId: 0, port: 9999);
+    if (startSuccess)
+    {
+        app.Logger.LogInformation("✅ 全局MuseTalk服务启动成功");
+    }
+    else
+    {
+        app.Logger.LogError("❌ 全局MuseTalk服务启动失败");
+    }
+}
+catch (Exception ex)
+{
+    app.Logger.LogError(ex, "❌ 启动全局MuseTalk服务时发生异常");
+}
 
 // 静态文件服务
 app.UseStaticFiles();

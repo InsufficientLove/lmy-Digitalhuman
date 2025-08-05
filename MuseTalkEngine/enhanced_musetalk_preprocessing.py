@@ -54,7 +54,7 @@ if os.path.exists(musetalk_dir) and musetalk_dir not in sys.path:
 try:
     from musetalk.utils.face_parsing import FaceParsing
     from musetalk.utils.preprocessing import get_landmark_and_bbox, read_imgs
-    from musetalk.utils.blending import get_image_prepare_material, get_image_blending
+    from musetalk.utils.blending import get_image, get_image_prepare_material
     from musetalk.utils.utils import load_all_model
     print("MuseTalk modules imported successfully")
 except ImportError as e:

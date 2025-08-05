@@ -22,6 +22,7 @@ namespace LmyDigitalHuman.Services
         private readonly IConfiguration _configuration;
         private readonly IPathManager _pathManager;
         private readonly IPythonEnvironmentService _pythonEnvironmentService;
+        private readonly GlobalMuseTalkClient _globalClient;
         
         // 📊 模型永久化缓存管理 - 基于MuseTalk realtime_inference.py架构
         private readonly ConcurrentDictionary<string, PersistentModelInfo> _persistentModels = new();
@@ -49,16 +50,20 @@ namespace LmyDigitalHuman.Services
         
         public OptimizedMuseTalkService(
             ILogger<OptimizedMuseTalkService> logger,
-            IConfiguration configuration,
             IPathManager pathManager,
-            IPythonEnvironmentService pythonEnvironmentService)
+            IPythonEnvironmentService pythonEnvironmentService,
+            IConfiguration configuration)
         {
             _logger = logger;
-            _configuration = configuration;
             _pathManager = pathManager;
             _pythonEnvironmentService = pythonEnvironmentService;
+            _configuration = configuration;
+            _globalClient = new GlobalMuseTalkClient(logger);
             
-            _logger.LogInformation("🚀 优化版MuseTalk服务已启动");
+            // 初始化并发控制
+            InitializeConcurrencyControl();
+            
+            _logger.LogInformation("🚀 OptimizedMuseTalkService 已初始化 - 4GPU极速并行架构");
             
             // 加载已有的模板信息
             LoadTemplateInfoFromFileSystem();
@@ -1759,7 +1764,6 @@ namespace LmyDigitalHuman.Services
             try
             {
                 var contentRoot = _pathManager.GetContentRootPath();
-                var projectRoot = Path.Combine(contentRoot, "..");
                 var cacheDir = Path.Combine(contentRoot, "model_states", templateId);
                 
                 // 🔧 修复音频路径问题 - 确保音频在项目temp目录
@@ -1783,111 +1787,40 @@ namespace LmyDigitalHuman.Services
                         _logger.LogWarning("⚠️ 原音频文件不存在: {AudioPath}", audioPath);
                     }
                 }
-                
-                // 使用新的持久化推理脚本
-                var inferenceScript = Path.Combine(projectRoot, "MuseTalkEngine", "persistent_musetalk_service.py");
-                
-                if (!File.Exists(inferenceScript))
-                {
-                    throw new FileNotFoundException($"持久化推理脚本不存在: {inferenceScript}");
-                }
 
-                _logger.LogInformation("📄 使用持久化MuseTalk服务: {ScriptPath}", inferenceScript);
-                _logger.LogInformation("🔧 持久化推理参数:");
+                _logger.LogInformation("🌐 使用全局MuseTalk服务进行推理");
+                _logger.LogInformation("🔧 推理参数:");
                 _logger.LogInformation("   模板ID: {TemplateId}", templateId);
                 _logger.LogInformation("   音频文件: {AudioPath}", fixedAudioPath);
                 _logger.LogInformation("   输出路径: {OutputPath}", outputPath);
                 _logger.LogInformation("   缓存目录: {CacheDir}", cacheDir);
                 _logger.LogInformation("   使用GPU: {GpuId}", gpuId);
 
-                var processInfo = new ProcessStartInfo
+                // 🚀 使用全局IPC客户端进行推理
+                var resultPath = await _globalClient.SendInferenceRequestAsync(
+                    templateId: templateId,
+                    audioPath: fixedAudioPath,
+                    outputPath: outputPath,
+                    cacheDir: cacheDir,
+                    batchSize: 8,
+                    fps: 25
+                );
+
+                if (!string.IsNullOrEmpty(resultPath) && File.Exists(resultPath))
                 {
-                    FileName = GetCachedPythonPathSync(),
-                    Arguments = $"\"{inferenceScript}\" " +
-                               $"--template_id \"{templateId}\" " +
-                               $"--audio_path \"{fixedAudioPath}\" " +
-                               $"--output_path \"{outputPath}\" " +
-                               $"--cache_dir \"{cacheDir}\" " +
-                               $"--device cuda:{gpuId} " +
-                               $"--batch_size 8 " +
-                               $"--fps 25",
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    WorkingDirectory = Path.Combine(projectRoot, "MuseTalk")
-                };
-
-                // 设置Python环境变量
-                var museTalkPath = Path.Combine(projectRoot, "MuseTalk");
-                var museTalkEnginePath = Path.Combine(projectRoot, "MuseTalkEngine");
-                var pythonPath_env = $"{museTalkPath};{museTalkEnginePath}";
-                processInfo.EnvironmentVariables["PYTHONPATH"] = pythonPath_env;
-                processInfo.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";
-                processInfo.EnvironmentVariables["CUDA_VISIBLE_DEVICES"] = gpuId.ToString();
-
-                _logger.LogInformation("🔧 Python环境配置:");
-                _logger.LogInformation("   工作目录: {WorkingDir}", processInfo.WorkingDirectory);
-                _logger.LogInformation("   PYTHONPATH: {PythonPath}", pythonPath_env);
-                _logger.LogInformation("   CUDA_VISIBLE_DEVICES: {CudaDevices}", gpuId);
-
-                _logger.LogInformation("🎮 执行持久化推理命令: {Command} {Args}", processInfo.FileName, processInfo.Arguments);
-                _logger.LogInformation("🚀 已配置持久化MuseTalk服务 - 避免重复模型加载");
-
-                using var process = new Process { StartInfo = processInfo };
-                
-                var outputBuilder = new StringBuilder();
-                var errorBuilder = new StringBuilder();
-
-                process.OutputDataReceived += (sender, e) =>
-                {
-                    if (!string.IsNullOrEmpty(e.Data))
-                    {
-                        outputBuilder.AppendLine(e.Data);
-                        _logger.LogInformation("MuseTalk持久化推理: {Output}", e.Data);
-                    }
-                };
-
-                process.ErrorDataReceived += (sender, e) =>
-                {
-                    if (!string.IsNullOrEmpty(e.Data))
-                    {
-                        errorBuilder.AppendLine(e.Data);
-                        _logger.LogWarning("MuseTalk持久化推理警告: {Error}", e.Data);
-                    }
-                };
-
-                process.Start();
-                process.BeginOutputReadLine();
-                process.BeginErrorReadLine();
-
-                await process.WaitForExitAsync();
-
-                var output = outputBuilder.ToString();
-                var error = errorBuilder.ToString();
-
-                if (process.ExitCode == 0)
-                {
-                    if (File.Exists(outputPath))
-                    {
-                        var fileInfo = new FileInfo(outputPath);
-                        _logger.LogInformation("✅ 持久化推理完成: {TemplateId}, 输出: {OutputPath}, 大小: {Size}bytes", 
-                            templateId, outputPath, fileInfo.Length);
-                        return outputPath;
-                    }
-                    else
-                    {
-                        throw new InvalidOperationException($"推理完成但输出文件不存在: {outputPath}");
-                    }
+                    var fileInfo = new FileInfo(resultPath);
+                    _logger.LogInformation("✅ 全局推理完成: {TemplateId}, 输出: {OutputPath}, 大小: {Size}bytes", 
+                        templateId, resultPath, fileInfo.Length);
+                    return resultPath;
                 }
                 else
                 {
-                    throw new InvalidOperationException($"持久化推理失败，退出码: {process.ExitCode}\n标准输出: {output}\n错误输出: {error}");
+                    throw new InvalidOperationException($"全局推理失败或输出文件不存在: {outputPath}");
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "持久化推理执行失败: {TemplateId}", templateId);
+                _logger.LogError(ex, "全局推理执行失败: {TemplateId}", templateId);
                 throw;
             }
         }
