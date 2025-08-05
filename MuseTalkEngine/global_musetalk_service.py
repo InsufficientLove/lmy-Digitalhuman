@@ -143,6 +143,8 @@ class GlobalMuseTalkService:
             
         except Exception as e:
             print(f"❌ 全局模型初始化失败: {str(e)}")
+            import traceback
+            traceback.print_exc()
             return False
     
     def load_template_cache(self, cache_dir, template_id):

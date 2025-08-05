@@ -210,9 +210,26 @@ namespace LmyDigitalHuman.Services
                 _pythonProcess.Start();
                 _pythonProcess.BeginOutputReadLine();
                 _pythonProcess.BeginErrorReadLine();
+                
+                _logger.LogInformation("🐍 Python进程已启动: PID={ProcessId}", _pythonProcess.Id);
 
                 // 等待服务启动
                 await Task.Delay(2000);
+
+                // 🔧 检查Python进程是否还在运行
+                if (_pythonProcess.HasExited)
+                {
+                    _logger.LogError("❌ Python进程已退出，退出码: {ExitCode}", _pythonProcess.ExitCode);
+                    return false;
+                }
+
+                // 🔧 验证服务是否真的在监听端口
+                bool isListening = await TestPortConnection(port);
+                if (!isListening)
+                {
+                    _logger.LogError("❌ Python服务启动但端口{Port}不可达，可能初始化失败", port);
+                    return false;
+                }
 
                 lock (_lock)
                 {
@@ -230,6 +247,25 @@ namespace LmyDigitalHuman.Services
         }
 
 
+
+        /// <summary>
+        /// 测试端口连接
+        /// </summary>
+        private async Task<bool> TestPortConnection(int port)
+        {
+            try
+            {
+                using var testClient = new TcpClient();
+                await testClient.ConnectAsync("localhost", port);
+                _logger.LogInformation("✅ 端口{Port}连接测试成功", port);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning("⚠️ 端口{Port}连接测试失败: {Error}", port, ex.Message);
+                return false;
+            }
+        }
 
         /// <summary>
         /// 停止全局Python服务
