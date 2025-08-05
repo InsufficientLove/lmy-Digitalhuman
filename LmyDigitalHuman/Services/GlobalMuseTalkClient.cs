@@ -17,7 +17,7 @@ namespace LmyDigitalHuman.Services
         private readonly string _serverHost;
         private readonly int _serverPort;
 
-        public GlobalMuseTalkClient(ILogger<GlobalMuseTalkClient> logger, string serverHost = "localhost", int serverPort = 9999)
+        public GlobalMuseTalkClient(ILogger<GlobalMuseTalkClient> logger, string serverHost = "127.0.0.1", int serverPort = 9999)
         {
             _logger = logger;
             _serverHost = serverHost;
