@@ -63,6 +63,9 @@ namespace LmyDigitalHuman.Services
             // 加载已有的模板信息
             LoadTemplateInfoFromFileSystem();
             
+            // 清理损坏的缓存文件
+            _ = Task.Run(CleanupAllCorruptedCacheFiles);
+            
             // 不再预初始化Python推理器，改为按需初始化以提高启动速度
             _logger.LogInformation("Python推理器将在首次使用时初始化");
         }
@@ -1570,18 +1573,74 @@ namespace LmyDigitalHuman.Services
             {
                 _logger.LogError("❌ 预处理失败，退出码: {ExitCode}", process.ExitCode);
                 _logger.LogError("错误输出: {Error}", error);
+                
+                // 清理可能损坏的缓存文件
+                await CleanupCorruptedCacheFiles(templateId);
+                
                 throw new InvalidOperationException($"预处理失败，退出码: {process.ExitCode}");
             }
             
             // 验证预处理结果
             if (!File.Exists(stateFilePath))
             {
+                _logger.LogError("❌ 预处理完成但状态文件未生成: {StatePath}", stateFilePath);
+                
+                // 清理可能损坏的缓存文件
+                await CleanupCorruptedCacheFiles(templateId);
+                
                 throw new InvalidOperationException($"预处理完成但状态文件未生成: {stateFilePath}");
             }
             
             _logger.LogInformation("✅ 模板预处理完成: {TemplateId}, 耗时: {Time:F2}秒", 
                 templateId, totalTime.TotalSeconds);
             _logger.LogInformation("📊 预处理输出: {Output}", output.Trim());
+        }
+
+        /// <summary>
+        /// 清理损坏的缓存文件
+        /// </summary>
+        private async Task CleanupCorruptedCacheFiles(string templateId)
+        {
+            try
+            {
+                _logger.LogInformation("🧹 开始清理损坏的缓存文件: {TemplateId}", templateId);
+                
+                var modelStateDir = Path.Combine(_pathManager.GetContentRootPath(), "model_states", templateId);
+                
+                if (Directory.Exists(modelStateDir))
+                {
+                    // 清理整个模板缓存目录
+                    Directory.Delete(modelStateDir, true);
+                    _logger.LogInformation("🗑️ 已清理缓存目录: {Dir}", modelStateDir);
+                }
+                
+                // 如果使用了增强预处理脚本的缓存目录，也要清理
+                var enhancedCacheDir = Path.Combine(_pathManager.GetContentRootPath(), "model_states", templateId);
+                if (Directory.Exists(enhancedCacheDir))
+                {
+                    var cacheFiles = Directory.GetFiles(enhancedCacheDir, $"{templateId}_*.pkl");
+                    var metadataFiles = Directory.GetFiles(enhancedCacheDir, $"{templateId}_*.json");
+                    
+                    foreach (var file in cacheFiles.Concat(metadataFiles))
+                    {
+                        try
+                        {
+                            File.Delete(file);
+                            _logger.LogInformation("🗑️ 已删除损坏的缓存文件: {File}", file);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "⚠️ 删除缓存文件失败: {File}", file);
+                        }
+                    }
+                }
+                
+                _logger.LogInformation("✅ 缓存清理完成: {TemplateId}", templateId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ 清理缓存文件失败: {TemplateId}", templateId);
+            }
         }
 
         /// <summary>
@@ -2068,6 +2127,89 @@ namespace LmyDigitalHuman.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "加载模板信息失败");
+            }
+        }
+
+        /// <summary>
+        /// 清理所有损坏的缓存文件（服务启动时调用）
+        /// </summary>
+        private async Task CleanupAllCorruptedCacheFiles()
+        {
+            try
+            {
+                _logger.LogInformation("🧹 开始清理所有损坏的缓存文件...");
+                
+                var modelStatesDir = Path.Combine(_pathManager.GetContentRootPath(), "model_states");
+                
+                if (!Directory.Exists(modelStatesDir))
+                {
+                    _logger.LogInformation("📁 缓存目录不存在，跳过清理: {Dir}", modelStatesDir);
+                    return;
+                }
+                
+                var templateDirs = Directory.GetDirectories(modelStatesDir);
+                var cleanedCount = 0;
+                
+                foreach (var templateDir in templateDirs)
+                {
+                    var templateId = Path.GetFileName(templateDir);
+                    
+                    try
+                    {
+                        // 检查JSON元数据文件
+                        var metadataFiles = Directory.GetFiles(templateDir, "*_metadata.json");
+                        var hasCorruptedMetadata = false;
+                        
+                        foreach (var metadataFile in metadataFiles)
+                        {
+                            try
+                            {
+                                var content = await File.ReadAllTextAsync(metadataFile);
+                                if (string.IsNullOrWhiteSpace(content))
+                                {
+                                    _logger.LogWarning("⚠️ 发现空的元数据文件: {File}", metadataFile);
+                                    hasCorruptedMetadata = true;
+                                    break;
+                                }
+                                
+                                // 尝试解析JSON
+                                using var doc = System.Text.Json.JsonDocument.Parse(content);
+                                // 如果能解析成功，继续检查下一个文件
+                            }
+                            catch (System.Text.Json.JsonException ex)
+                            {
+                                _logger.LogWarning("⚠️ 发现损坏的JSON元数据文件: {File} - {Error}", metadataFile, ex.Message);
+                                hasCorruptedMetadata = true;
+                                break;
+                            }
+                        }
+                        
+                        // 如果发现损坏的元数据，清理整个模板缓存
+                        if (hasCorruptedMetadata)
+                        {
+                            _logger.LogInformation("🗑️ 清理损坏的模板缓存: {TemplateId}", templateId);
+                            Directory.Delete(templateDir, true);
+                            cleanedCount++;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "⚠️ 检查模板缓存时出错: {TemplateId}", templateId);
+                    }
+                }
+                
+                if (cleanedCount > 0)
+                {
+                    _logger.LogInformation("✅ 清理完成，共清理了 {Count} 个损坏的模板缓存", cleanedCount);
+                }
+                else
+                {
+                    _logger.LogInformation("✅ 缓存检查完成，未发现损坏的文件");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ 清理所有损坏缓存文件失败");
             }
         }
     }
