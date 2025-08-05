@@ -34,7 +34,18 @@ namespace LmyDigitalHuman.Services
                 _logger.LogInformation("🌐 连接全局MuseTalk服务: {Host}:{Port}", _serverHost, _serverPort);
 
                 using var client = new TcpClient();
-                await client.ConnectAsync(_serverHost, _serverPort);
+                
+                // 🔧 添加连接超时和重试机制
+                try
+                {
+                    await client.ConnectAsync(_serverHost, _serverPort);
+                    _logger.LogInformation("✅ TCP连接建立成功");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError("❌ 无法连接到Python服务: {Error}", ex.Message);
+                    throw new InvalidOperationException($"Python全局服务未运行或端口{_serverPort}不可达", ex);
+                }
                 
                 var stream = client.GetStream();
 

@@ -87,13 +87,13 @@ class GlobalMuseTalkService:
         try:
             # 🚀 4GPU并行配置
             if multi_gpu and torch.cuda.device_count() >= 4:
-                            print(f"🔧 全局初始化MuseTalk模型 (4GPU并行)...")
-            print(f"🎮 检测到GPU数量: {torch.cuda.device_count()}")
-            print(f"🚀 启用4GPU并行算力: cuda:0,1,2,3")
-            self.device = f'cuda:{gpu_id}'
-            self.multi_gpu = True
-            self.gpu_devices = [f'cuda:{i}' for i in range(4)]
-            print(f"✅ 4GPU设备列表: {self.gpu_devices}")
+                print(f"🔧 全局初始化MuseTalk模型 (4GPU并行)...")
+                print(f"🎮 检测到GPU数量: {torch.cuda.device_count()}")
+                print(f"🚀 启用4GPU并行算力: cuda:0,1,2,3")
+                self.device = f'cuda:{gpu_id}'
+                self.multi_gpu = True
+                self.gpu_devices = [f'cuda:{i}' for i in range(4)]
+                print(f"✅ 4GPU设备列表: {self.gpu_devices}")
             else:
                 print(f"🔧 全局初始化MuseTalk模型 (GPU:{gpu_id})...")
                 self.device = f'cuda:{gpu_id}'
@@ -414,6 +414,7 @@ class GlobalMuseTalkService:
             
             print(f"🌐 IPC服务器启动成功，监听端口: {port}")
             print("📡 等待C#客户端连接...")
+            print("✅ 全局MuseTalk服务完全就绪！")
             
             while self.is_server_running:
                 try:
