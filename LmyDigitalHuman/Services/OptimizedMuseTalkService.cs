@@ -1021,15 +1021,22 @@ namespace LmyDigitalHuman.Services
             
             var museTalkDir = Path.Combine(_pathManager.GetContentRootPath(), "..", "MuseTalk");
             var pythonPath = await GetCachedPythonPathAsync();
-                            var optimizedScriptPath = Path.Combine(museTalkDir, "optimized_musetalk_inference_v3.py");
+            
+            // 优先使用V4增强版本，支持30fps+超高速推理
+            var optimizedScriptPath = Path.Combine(museTalkDir, "enhanced_musetalk_inference_v4.py");
+            if (!File.Exists(optimizedScriptPath))
+            {
+                optimizedScriptPath = Path.Combine(museTalkDir, "optimized_musetalk_inference_v3.py");
                 if (!File.Exists(optimizedScriptPath))
                 {
-                    optimizedScriptPath = Path.Combine(museTalkDir, "optimized_musetalk_inference_v2.py");
+                    // 回退到工作区根目录的增强脚本
+                    optimizedScriptPath = Path.Combine(_pathManager.GetContentRootPath(), "..", "enhanced_musetalk_inference_v4.py");
                     if (!File.Exists(optimizedScriptPath))
                     {
-                        optimizedScriptPath = Path.Combine(museTalkDir, "optimized_musetalk_inference.py");
+                        optimizedScriptPath = Path.Combine(_pathManager.GetContentRootPath(), "..", "optimized_musetalk_inference_v3.py");
                     }
                 }
+            }
             
             // 构建优化推理命令
             var arguments = new StringBuilder();
@@ -1554,39 +1561,31 @@ namespace LmyDigitalHuman.Services
                 var contentRoot = _pathManager.GetContentRootPath();
                 var pythonPath = await GetCachedPythonPathAsync();
                 
-                // 脚本在工作区根目录，但工作目录设置为本地MuseTalk
+                // 优先使用MuseTalk目录中的V4增强脚本
                 var projectRoot = Path.Combine(contentRoot, "..");
-                var optimizedScriptPath = Path.Combine(projectRoot, "MuseTalk", "optimized_musetalk_inference_v3.py");
-                if (!File.Exists(optimizedScriptPath))
-                {
-                    optimizedScriptPath = Path.Combine(projectRoot, "MuseTalk", "optimized_musetalk_inference_v2.py");
-                    if (!File.Exists(optimizedScriptPath))
-                    {
-                        optimizedScriptPath = Path.Combine(projectRoot, "MuseTalk", "optimized_musetalk_inference.py");
-                    }
-                }
                 var museTalkDir = Path.Combine(projectRoot, "MuseTalk");
-                
-                // 检查本地MuseTalk目录是否存在
-                if (!Directory.Exists(museTalkDir))
-                {
-                    _logger.LogError("❌ 本地MuseTalk目录不存在: {MuseTalkDir}", museTalkDir);
-                    throw new DirectoryNotFoundException($"本地MuseTalk目录不存在: {museTalkDir}");
-                }
+                var optimizedScriptPath = Path.Combine(museTalkDir, "enhanced_musetalk_inference_v4.py");
                 
                 if (!File.Exists(optimizedScriptPath))
                 {
-                    _logger.LogWarning("⚠️ MuseTalk目录中没有优化脚本，尝试使用工作区脚本");
-                    // 回退到工作区脚本
-                    optimizedScriptPath = Path.Combine(projectRoot, "optimized_musetalk_inference_v3.py");
+                    optimizedScriptPath = Path.Combine(museTalkDir, "optimized_musetalk_inference_v3.py");
                     if (!File.Exists(optimizedScriptPath))
                     {
-                        optimizedScriptPath = Path.Combine(projectRoot, "optimized_musetalk_inference_v2.py");
+                        // 回退到工作区根目录
+                        optimizedScriptPath = Path.Combine(projectRoot, "enhanced_musetalk_inference_v4.py");
                         if (!File.Exists(optimizedScriptPath))
                         {
-                            optimizedScriptPath = Path.Combine(projectRoot, "optimized_musetalk_inference.py");
+                            optimizedScriptPath = Path.Combine(projectRoot, "optimized_musetalk_inference_v3.py");
                         }
                     }
+                }
+                
+                // 检查本地MuseTalk目录是否存在（用于设置工作目录）
+                if (!Directory.Exists(museTalkDir))
+                {
+                    _logger.LogWarning("⚠️ 本地MuseTalk目录不存在，创建目录: {MuseTalkDir}", museTalkDir);
+                    Directory.CreateDirectory(museTalkDir);
+                }
                     if (!File.Exists(optimizedScriptPath))
                     {
                         throw new FileNotFoundException($"找不到MuseTalk推理脚本: {optimizedScriptPath}");

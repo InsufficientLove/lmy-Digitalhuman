@@ -43,16 +43,13 @@ namespace LmyDigitalHuman.Services
         // 常见的虚拟环境路径模式（优先级顺序）
         private readonly string[] _commonVenvPatterns = new[]
         {
-            "venv_musetalk/Scripts/python.exe",  // 项目专用虚拟环境
-            "../venv_musetalk/Scripts/python.exe", // 上级目录
-            "venv/Scripts/python.exe", 
-            "env/Scripts/python.exe",
-            ".venv/Scripts/python.exe",
-            "venv_musetalk/bin/python",
-            "../venv_musetalk/bin/python",
-            "venv/bin/python",
-            "env/bin/python", 
-            ".venv/bin/python"
+            // 优先使用项目专用虚拟环境 venv_musetalk
+            "../venv_musetalk/Scripts/python.exe", // 项目根目录的虚拟环境（最高优先级）
+            "../../venv_musetalk/Scripts/python.exe", // 上上级目录
+            "venv_musetalk/Scripts/python.exe",    // 当前目录的虚拟环境
+            "../venv_musetalk/bin/python",         // Linux版本
+            "../../venv_musetalk/bin/python",
+            "venv_musetalk/bin/python"
         };
 
         public PythonEnvironmentService(
