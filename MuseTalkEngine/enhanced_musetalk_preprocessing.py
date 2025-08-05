@@ -24,6 +24,21 @@ from tqdm import tqdm
 import time
 from pathlib import Path
 
+def convert_numpy_types(obj):
+    """转换numpy类型为Python原生类型，解决JSON序列化问题"""
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        return float(obj)
+    elif isinstance(obj, dict):
+        return {key: convert_numpy_types(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_numpy_types(item) for item in obj]
+    else:
+        return obj
+
 # 动态添加MuseTalk路径到Python路径
 current_dir = os.path.dirname(os.path.abspath(__file__))
 musetalk_dir = os.path.join(os.path.dirname(current_dir), "MuseTalk")
@@ -225,8 +240,11 @@ class EnhancedMuseTalkPreprocessor:
             'version': '1.0'
         }
         
+        # 转换numpy类型为JSON可序列化类型
+        metadata_serializable = convert_numpy_types(metadata)
+        
         with open(metadata_path, 'w', encoding='utf-8') as f:
-            json.dump(metadata, f, indent=2, ensure_ascii=False)
+            json.dump(metadata_serializable, f, indent=2, ensure_ascii=False)
         
         processing_time = time.time() - start_time
         print(f"✅ 模板预处理完成: {template_id}")

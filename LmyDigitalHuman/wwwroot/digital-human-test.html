@@ -858,21 +858,79 @@
             templates.forEach(template => {
                 const templateCard = document.createElement('div');
                 templateCard.className = 'template-card';
-                templateCard.onclick = (event) => selectTemplate(template, event);
                 
-                templateCard.innerHTML = `
-                    <img src="${template.imageUrl || '/images/default-avatar.svg'}" 
-                         alt="${template.templateName}" class="template-image"
-                         onerror="this.src='/images/default-avatar.svg'">
-                    <div class="template-name">${template.templateName}</div>
-                    <div class="template-info">${template.gender} · ${template.style}</div>
-                `;
+                // 根据状态设置样式和行为
+                if (template.status === 'ready') {
+                    // 正常可用模板
+                    templateCard.onclick = (event) => selectTemplate(template, event);
+                    templateCard.innerHTML = `
+                        <img src="${template.imageUrl || '/images/default-avatar.svg'}" 
+                             alt="${template.templateName}" class="template-image"
+                             onerror="this.src='/images/default-avatar.svg'">
+                        <div class="template-name">${template.templateName}</div>
+                        <div class="template-info">${template.gender} · ${template.style}</div>
+                    `;
+                } else if (template.status === 'processing') {
+                    // 预处理中的模板 - 禁用状态
+                    templateCard.style.opacity = '0.6';
+                    templateCard.style.cursor = 'not-allowed';
+                    templateCard.innerHTML = `
+                        <img src="${template.imageUrl || '/images/default-avatar.svg'}" 
+                             alt="${template.templateName}" class="template-image"
+                             onerror="this.src='/images/default-avatar.svg'">
+                        <div class="template-name">${template.templateName}</div>
+                        <div class="template-info" style="color: #ffc107;">⏳ 预处理中...</div>
+                    `;
+                } else if (template.status === 'error') {
+                    // 预处理失败的模板 - 错误状态
+                    templateCard.style.opacity = '0.6';
+                    templateCard.style.cursor = 'not-allowed';
+                    templateCard.innerHTML = `
+                        <img src="${template.imageUrl || '/images/default-avatar.svg'}" 
+                             alt="${template.templateName}" class="template-image"
+                             onerror="this.src='/images/default-avatar.svg'">
+                        <div class="template-name">${template.templateName}</div>
+                        <div class="template-info" style="color: #dc3545;">❌ 预处理失败</div>
+                    `;
+                } else {
+                    // 其他状态 - 显示状态信息
+                    templateCard.innerHTML = `
+                        <img src="${template.imageUrl || '/images/default-avatar.svg'}" 
+                             alt="${template.templateName}" class="template-image"
+                             onerror="this.src='/images/default-avatar.svg'">
+                        <div class="template-name">${template.templateName}</div>
+                        <div class="template-info">${template.status || '未知状态'}</div>
+                    `;
+                }
                 
                 container.appendChild(templateCard);
             });
+            
+            // 统计显示信息
+            const readyCount = templates.filter(t => t.status === 'ready').length;
+            const processingCount = templates.filter(t => t.status === 'processing').length;
+            const errorCount = templates.filter(t => t.status === 'error').length;
+            
+            if (readyCount === 0 && (processingCount > 0 || errorCount > 0)) {
+                addLog(`模板状态: ${readyCount}可用, ${processingCount}预处理中, ${errorCount}失败`, 'warning');
+            } else {
+                addLog(`模板状态: ${readyCount}可用, ${processingCount}预处理中, ${errorCount}失败`, 'info');
+            }
         }
 
         function selectTemplate(template, event) {
+            // 检查模板状态
+            if (template.status !== 'ready') {
+                if (template.status === 'processing') {
+                    alert('模板正在预处理中，请稍后再试');
+                } else if (template.status === 'error') {
+                    alert('模板预处理失败，无法使用');
+                } else {
+                    alert('模板状态异常，无法使用');
+                }
+                return;
+            }
+            
             // 移除之前的选中状态
             document.querySelectorAll('.template-card').forEach(card => {
                 card.classList.remove('selected');
