@@ -514,7 +514,14 @@ class EnhancedMuseTalkPreprocessor:
         for frame, coord in zip(frame_list_cycle, coord_list_cycle):
             # 使用官方的掩码生成方法
             x1, y1, x2, y2 = coord
-            mask, crop_box = get_image_prepare_material(frame, [x1, y1, x2, y2], fp=self.face_parser, mode=parsing_mode)
+            mask, crop_box = get_image_prepare_material(
+                image=frame, 
+                face_box=[x1, y1, x2, y2], 
+                upper_boundary_ratio=0.5, 
+                expand=1.5, 
+                fp=self.face_parser, 
+                mode=parsing_mode
+            )
             
             mask_coords_list_cycle.append(crop_box)
             mask_list_cycle.append(mask)

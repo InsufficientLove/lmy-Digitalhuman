@@ -423,7 +423,7 @@ namespace LmyDigitalHuman.Services
                 _logger.LogInformation("⚡ 执行实时推理: {TemplateId} (GPU:{GPU})", templateId, modelInfo.AssignedGPU);
                 
                 // 调用私有方法执行实际推理
-                await ExecuteRealtimeInferenceInternal(templateId, request.AudioPath, outputPath, modelInfo.AssignedGPU);
+                var resultPath = await ExecuteRealtimeInferenceInternal(templateId, request.AudioPath, outputPath, modelInfo.AssignedGPU);
                 
                 stopwatch.Stop();
                 
@@ -1743,7 +1743,7 @@ namespace LmyDigitalHuman.Services
 
             // 这里应该通过IPC与持久化进程通信
             // 发送推理请求到指定GPU上的模型
-            await ExecuteRealtimeInferenceInternal(templateId, audioPath, outputPath, modelInfo.AssignedGPU);
+            var resultPath = await ExecuteRealtimeInferenceInternal(templateId, audioPath, outputPath, modelInfo.AssignedGPU);
 
             modelInfo.LastUsed = DateTime.Now;
             modelInfo.UsageCount++;
@@ -1754,217 +1754,140 @@ namespace LmyDigitalHuman.Services
         /// <summary>
         /// 执行实时推理内部方法 - 使用预处理缓存数据
         /// </summary>
-        private async Task ExecuteRealtimeInferenceInternal(string templateId, string audioPath, string outputPath, int gpuId)
+        private async Task<string> ExecuteRealtimeInferenceInternal(string templateId, string audioPath, string outputPath, int gpuId = 0)
         {
-            _logger.LogInformation("🚀 GPU:{GPU} 开始MuseTalk实时推理: {TemplateId}", gpuId, templateId);
-            
             try
             {
-                // 检查预处理缓存是否存在
-                var modelStateDir = Path.Combine(_pathManager.GetContentRootPath(), "model_states", templateId);
-                var cacheFile = Path.Combine(modelStateDir, $"{templateId}_preprocessed.pkl");
-                var metadataFile = Path.Combine(modelStateDir, $"{templateId}_metadata.json");
+                var projectRoot = GetProjectRoot();
+                var cacheDir = Path.Combine(GetModelStatesPath(), templateId);
                 
-                if (!File.Exists(cacheFile) || !File.Exists(metadataFile))
+                // 🔧 修复音频路径问题 - 确保音频在项目temp目录
+                var projectTempDir = Path.Combine(projectRoot, "temp");
+                Directory.CreateDirectory(projectTempDir);
+                
+                var fixedAudioPath = audioPath;
+                if (audioPath.Contains(@"AppData\Local\Temp"))
                 {
-                    _logger.LogError("❌ 预处理缓存文件不存在，无法进行实时推理");
-                    _logger.LogError("   缓存文件: {CacheFile}", cacheFile);
-                    _logger.LogError("   元数据文件: {MetadataFile}", metadataFile);
-                    throw new InvalidOperationException($"模板 {templateId} 的预处理缓存不存在");
+                    // 音频在系统临时目录，复制到项目temp目录
+                    var audioFileName = Path.GetFileName(audioPath);
+                    fixedAudioPath = Path.Combine(projectTempDir, audioFileName);
+                    
+                    if (File.Exists(audioPath))
+                    {
+                        File.Copy(audioPath, fixedAudioPath, true);
+                        _logger.LogInformation("🔧 音频路径修复: {OldPath} -> {NewPath}", audioPath, fixedAudioPath);
+                    }
+                    else
+                    {
+                        _logger.LogWarning("⚠️ 原音频文件不存在: {AudioPath}", audioPath);
+                    }
                 }
                 
-                _logger.LogInformation("✅ 找到预处理缓存: {CacheFile}", cacheFile);
-                _logger.LogInformation("📊 缓存大小: {Size:F2} MB", new FileInfo(cacheFile).Length / 1024.0 / 1024.0);
-                
-                // 🔧 构建模板图片路径
-                var templatesDir = Path.Combine(_pathManager.GetContentRootPath(), "wwwroot", "templates");
-                var imagePath = Path.Combine(templatesDir, $"{templateId}.jpg");
-                
-                if (!File.Exists(imagePath))
-                {
-                    throw new FileNotFoundException($"模板图片不存在: {imagePath}");
-                }
-                
-                // 检查音频文件
-                if (!File.Exists(audioPath))
-                {
-                    throw new FileNotFoundException($"音频文件不存在: {audioPath}");
-                }
-                
-                // 确保输出目录存在
-                var outputDir = Path.GetDirectoryName(outputPath);
-                Directory.CreateDirectory(outputDir);
-                
-                // 🚀 使用基于官方实现的推理脚本
-                var contentRoot = _pathManager.GetContentRootPath();
-                var pythonPath = await GetCachedPythonPathAsync();
-                var projectRoot = Path.Combine(contentRoot, "..");
-                var museTalkDir = Path.Combine(projectRoot, "MuseTalk");
-                
-                // 优先使用官方实现的推理脚本
-                var inferenceScript = Path.Combine(projectRoot, "MuseTalkEngine", "official_realtime_inference.py");
+                // 使用新的持久化推理脚本
+                var inferenceScript = Path.Combine(projectRoot, "MuseTalkEngine", "persistent_musetalk_service.py");
                 
                 if (!File.Exists(inferenceScript))
                 {
-                    throw new FileNotFoundException($"找不到官方推理脚本: {inferenceScript}");
+                    throw new FileNotFoundException($"持久化推理脚本不存在: {inferenceScript}");
                 }
-                
-                _logger.LogInformation("📄 使用官方实现推理脚本: {ScriptPath}", inferenceScript);
-                
-                // 构建推理命令 - 使用官方脚本参数
-                var arguments = $"\"{inferenceScript}\" " +
-                              $"--template_id \"{templateId}\" " +
-                              $"--audio_path \"{audioPath}\" " +
-                              $"--output_path \"{outputPath}\" " +
-                              $"--cache_dir \"{modelStateDir}\" " +
-                              $"--device cuda:{gpuId} " +
-                              $"--batch_size 8 " +
-                              $"--fps 25 " +
-                              $"--unet_config \"models/musetalk/musetalk.json\" " +
-                              $"--unet_model_path \"models/musetalk/pytorch_model.bin\" " +
-                              $"--whisper_dir \"models/whisper\" " +
-                              $"--vae_type \"sd-vae\"";
-                
-                _logger.LogInformation("🔧 官方推理参数:");
+
+                _logger.LogInformation("📄 使用持久化MuseTalk服务: {ScriptPath}", inferenceScript);
+                _logger.LogInformation("🔧 持久化推理参数:");
                 _logger.LogInformation("   模板ID: {TemplateId}", templateId);
-                _logger.LogInformation("   音频文件: {AudioPath}", audioPath);
+                _logger.LogInformation("   音频文件: {AudioPath}", fixedAudioPath);
                 _logger.LogInformation("   输出路径: {OutputPath}", outputPath);
-                _logger.LogInformation("   缓存目录: {CacheDir}", modelStateDir);
-                _logger.LogInformation("   使用GPU: {GPU}", gpuId);
-                
-                // 检查是否有其他进程正在处理同一模板
-                var activeJobKey = $"musetalk_{templateId}";
-                if (_activeJobs.ContainsKey(activeJobKey))
-                {
-                    _logger.LogWarning("⚠️ 模板 {TemplateId} 正在被其他进程处理，跳过重复推理", templateId);
-                    throw new InvalidOperationException($"模板 {templateId} 正在处理中，请稍后再试");
-                }
-                
-                var processingJob = new ProcessingJob
-                {
-                    JobId = activeJobKey,
-                    StartTime = DateTime.Now,
-                    Progress = 0,
-                    CurrentStep = "缓存推理"
-                };
-                _activeJobs.TryAdd(activeJobKey, processingJob);
-                
-                _logger.LogInformation("🎮 执行缓存推理命令: {Command}", $"{pythonPath} {arguments}");
-                
+                _logger.LogInformation("   缓存目录: {CacheDir}", cacheDir);
+                _logger.LogInformation("   使用GPU: {GpuId}", gpuId);
+
                 var processInfo = new ProcessStartInfo
                 {
-                    FileName = pythonPath,
-                    Arguments = arguments,
-                    WorkingDirectory = museTalkDir,  // 工作目录设为MuseTalk，确保能导入musetalk模块
-                    UseShellExecute = false,
+                    FileName = GetPythonPath(),
+                    Arguments = $"\"{inferenceScript}\" " +
+                               $"--template_id \"{templateId}\" " +
+                               $"--audio_path \"{fixedAudioPath}\" " +
+                               $"--output_path \"{outputPath}\" " +
+                               $"--cache_dir \"{cacheDir}\" " +
+                               $"--device cuda:{gpuId} " +
+                               $"--batch_size 8 " +
+                               $"--fps 25",
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
-                    CreateNoWindow = true
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    WorkingDirectory = Path.Combine(projectRoot, "MuseTalk")
                 };
-                
-                // 配置GPU环境
-                ConfigureOptimizedGpuEnvironment(processInfo);
-                processInfo.Environment["CUDA_VISIBLE_DEVICES"] = gpuId.ToString();
-                processInfo.Environment["PYTHONIOENCODING"] = "utf-8";
-                
-                // 🔧 关键修复：设置PYTHONPATH，确保能找到musetalk模块和MuseTalkEngine
+
+                // 设置Python环境变量
                 var museTalkPath = Path.Combine(projectRoot, "MuseTalk");
                 var museTalkEnginePath = Path.Combine(projectRoot, "MuseTalkEngine");
                 var pythonPath_env = $"{museTalkPath};{museTalkEnginePath}";
                 processInfo.EnvironmentVariables["PYTHONPATH"] = pythonPath_env;
-                
+                processInfo.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";
+                processInfo.EnvironmentVariables["CUDA_VISIBLE_DEVICES"] = gpuId.ToString();
+
                 _logger.LogInformation("🔧 Python环境配置:");
                 _logger.LogInformation("   工作目录: {WorkingDir}", processInfo.WorkingDirectory);
                 _logger.LogInformation("   PYTHONPATH: {PythonPath}", pythonPath_env);
-                
-                var outputBuffer = new StringBuilder();
-                var errorBuffer = new StringBuilder();
-                
+                _logger.LogInformation("   CUDA_VISIBLE_DEVICES: {CudaDevices}", gpuId);
+
+                _logger.LogInformation("🎮 执行持久化推理命令: {Command} {Args}", processInfo.FileName, processInfo.Arguments);
+                _logger.LogInformation("🚀 已配置持久化MuseTalk服务 - 避免重复模型加载");
+
                 using var process = new Process { StartInfo = processInfo };
                 
+                var outputBuilder = new StringBuilder();
+                var errorBuilder = new StringBuilder();
+
                 process.OutputDataReceived += (sender, e) =>
                 {
                     if (!string.IsNullOrEmpty(e.Data))
                     {
-                        outputBuffer.AppendLine(e.Data);
-                        _logger.LogInformation("MuseTalk缓存推理: {Output}", e.Data);
+                        outputBuilder.AppendLine(e.Data);
+                        _logger.LogInformation("MuseTalk持久化推理: {Output}", e.Data);
                     }
                 };
-                
+
                 process.ErrorDataReceived += (sender, e) =>
                 {
                     if (!string.IsNullOrEmpty(e.Data))
                     {
-                        errorBuffer.AppendLine(e.Data);
-                        _logger.LogWarning("MuseTalk缓存推理警告: {Error}", e.Data);
+                        errorBuilder.AppendLine(e.Data);
+                        _logger.LogWarning("MuseTalk持久化推理警告: {Error}", e.Data);
                     }
                 };
-                
-                var startTime = DateTime.Now;
-                
-                if (!process.Start())
-                {
-                    throw new InvalidOperationException("无法启动缓存推理进程");
-                }
-                
+
+                process.Start();
                 process.BeginOutputReadLine();
                 process.BeginErrorReadLine();
-                
-                // 等待进程完成，最多等待3分钟
-                using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(3));
-                
-                try
+
+                await process.WaitForExitAsync();
+
+                var output = outputBuilder.ToString();
+                var error = errorBuilder.ToString();
+
+                if (process.ExitCode == 0)
                 {
-                    await process.WaitForExitAsync(cts.Token);
-                }
-                catch (OperationCanceledException)
-                {
-                    _logger.LogError("❌ 缓存推理超时，强制终止进程");
-                    try
+                    if (File.Exists(outputPath))
                     {
-                        process.Kill(true);
+                        var fileInfo = new FileInfo(outputPath);
+                        _logger.LogInformation("✅ 持久化推理完成: {TemplateId}, 输出: {OutputPath}, 大小: {Size}bytes", 
+                            templateId, outputPath, fileInfo.Length);
+                        return outputPath;
                     }
-                    catch (Exception ex)
+                    else
                     {
-                        _logger.LogError(ex, "终止缓存推理进程失败");
+                        throw new InvalidOperationException($"推理完成但输出文件不存在: {outputPath}");
                     }
-                    throw new TimeoutException("缓存推理超时");
                 }
-                finally
+                else
                 {
-                    // 清理活跃任务
-                    _activeJobs.TryRemove(activeJobKey, out _);
-                    _logger.LogDebug("🧹 清理活跃任务: {JobKey}", activeJobKey);
+                    throw new InvalidOperationException($"持久化推理失败，退出码: {process.ExitCode}\n标准输出: {output}\n错误输出: {error}");
                 }
-                
-                var totalTime = DateTime.Now - startTime;
-                var output = outputBuffer.ToString();
-                var error = errorBuffer.ToString();
-                
-                if (process.ExitCode != 0)
-                {
-                    _logger.LogError("❌ 缓存推理失败，退出码: {ExitCode}", process.ExitCode);
-                    _logger.LogError("错误输出: {Error}", error);
-                    throw new InvalidOperationException($"缓存推理失败，退出码: {process.ExitCode}");
-                }
-                
-                _logger.LogInformation("✅ 缓存推理完成: {TemplateId}, 耗时: {Time:F2}秒", 
-                    templateId, totalTime.TotalSeconds);
-                
-                // 验证输出文件
-                if (!File.Exists(outputPath))
-                {
-                    throw new FileNotFoundException($"缓存推理完成但输出文件不存在: {outputPath}");
-                }
-                
-                var fileSize = new FileInfo(outputPath).Length;
-                _logger.LogInformation("📹 输出视频: {OutputPath}, 大小: {Size:F2} MB", 
-                    outputPath, fileSize / 1024.0 / 1024.0);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "❌ GPU:{GPU} MuseTalk缓存推理失败: {TemplateId}", gpuId, templateId);
-                throw new InvalidOperationException($"MuseTalk推理失败: {ex.Message}", ex);
+                _logger.LogError(ex, "持久化推理执行失败: {TemplateId}", templateId);
+                throw;
             }
         }
 
