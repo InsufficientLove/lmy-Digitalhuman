@@ -184,11 +184,25 @@ class EnhancedMuseTalkPreprocessor:
         
         # 加载并预处理图片
         print(f"📸 加载模板图片: {template_image_path}")
+        
+        # 检查文件是否存在
+        if not os.path.exists(template_image_path):
+            raise ValueError(f"模板图片文件不存在: {template_image_path}")
+        
+        # 检查文件大小
+        file_size = os.path.getsize(template_image_path)
+        print(f"📊 图片文件大小: {file_size} bytes")
+        
+        if file_size == 0:
+            raise ValueError(f"模板图片文件为空: {template_image_path}")
+        
         img_np = cv2.imread(template_image_path)
         if img_np is None:
             raise ValueError(f"无法加载图片: {template_image_path}")
         
+        print(f"✅ 图片加载成功，原始尺寸: {img_np.shape}")
         img_np = cv2.cvtColor(img_np, cv2.COLOR_BGR2RGB)
+        print(f"✅ 图片格式转换完成: BGR -> RGB")
         
         # 面部检测和关键点提取
         print("🔍 检测面部特征...")
@@ -286,25 +300,60 @@ class EnhancedMuseTalkPreprocessor:
     def _detect_face(self, img_np):
         """检测面部并提取关键点"""
         try:
-            # 使用MuseTalk的面部检测功能
-            from musetalk.utils.utils import get_landmark_and_bbox
+            print(f"🔍 开始面部检测，图片尺寸: {img_np.shape}")
             
+            # 使用已经导入的MuseTalk面部检测功能
             # 临时保存图片用于检测
             import tempfile
             with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as tmp_file:
-                cv2.imwrite(tmp_file.name, cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR))
+                # 确保图片格式正确
+                img_bgr = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
+                success = cv2.imwrite(tmp_file.name, img_bgr)
+                if not success:
+                    print(f"❌ 图片保存失败: {tmp_file.name}")
+                    return None, None
+                
+                print(f"📁 临时图片已保存: {tmp_file.name}")
+                
+                # 验证临时图片可以读取
+                test_img = cv2.imread(tmp_file.name)
+                if test_img is None:
+                    print(f"❌ 无法读取临时图片: {tmp_file.name}")
+                    os.unlink(tmp_file.name)
+                    return None, None
+                
+                print(f"✅ 临时图片验证成功，尺寸: {test_img.shape}")
+                
+                # 调用面部检测
+                print("🎯 调用get_landmark_and_bbox进行面部检测...")
                 coord_list, frame_list = get_landmark_and_bbox([tmp_file.name], 0)
+                print(f"📊 检测结果 - coord_list长度: {len(coord_list) if coord_list else 0}, frame_list长度: {len(frame_list) if frame_list else 0}")
+                
+                # 清理临时文件
                 os.unlink(tmp_file.name)
             
-            if coord_list and coord_list[0] != (0.0, 0.0, 0.0, 0.0):
+            # 验证检测结果
+            if coord_list and len(coord_list) > 0:
                 bbox = coord_list[0]
-                landmarks = None  # 暂时不提取详细关键点
-                return bbox, landmarks
+                x1, y1, x2, y2 = bbox
+                print(f"🔍 检测到边界框: ({x1:.1f}, {y1:.1f}, {x2:.1f}, {y2:.1f})")
+                
+                # 检查边界框是否有效
+                if x1 < x2 and y1 < y2 and bbox != (0.0, 0.0, 0.0, 0.0):
+                    landmarks = None  # 暂时不提取详细关键点
+                    print(f"✅ 面部检测成功: 边界框 ({x1:.1f}, {y1:.1f}, {x2:.1f}, {y2:.1f})")
+                    return bbox, landmarks
+                else:
+                    print(f"⚠️ 检测到无效的面部边界框: {bbox}")
+                    return None, None
             else:
+                print("⚠️ 未检测到面部区域")
                 return None, None
                 
         except Exception as e:
             print(f"⚠️ 面部检测失败: {e}")
+            import traceback
+            traceback.print_exc()
             return None, None
     
     def _apply_bbox_shift(self, bbox, shift, img_shape):
@@ -360,7 +409,7 @@ class EnhancedMuseTalkPreprocessor:
     
     def _generate_masks(self, coord_list):
         """生成掩码列表"""
-        from musetalk.utils.utils import get_image_prepare_material
+        # 使用已经导入的MuseTalk掩码生成功能
         
         mask_list = []
         for coord in coord_list:
