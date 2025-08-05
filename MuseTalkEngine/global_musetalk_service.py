@@ -505,6 +505,20 @@ global_service = GlobalMuseTalkService()
 def main():
     """命令行接口"""
     print("🚀 Python全局服务main函数启动...")
+    print(f"🐍 Python版本: {sys.version}")
+    print(f"🐍 工作目录: {os.getcwd()}")
+    
+    # 测试关键模块导入
+    try:
+        import torch
+        print(f"✅ torch版本: {torch.__version__}")
+        print(f"✅ CUDA可用: {torch.cuda.is_available()}")
+        if torch.cuda.is_available():
+            print(f"✅ GPU数量: {torch.cuda.device_count()}")
+    except Exception as e:
+        print(f"❌ torch导入失败: {str(e)}")
+        sys.exit(1)
+    
     parser = argparse.ArgumentParser(description='全局持久化MuseTalk服务 - 4GPU并行')
     parser.add_argument('--mode', choices=['server', 'client'], default='server', help='运行模式')
     parser.add_argument('--port', type=int, default=9999, help='IPC端口')

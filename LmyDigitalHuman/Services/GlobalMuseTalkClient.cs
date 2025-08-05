@@ -164,6 +164,7 @@ namespace LmyDigitalHuman.Services
                 // 获取Python路径
                 var pythonPath = GetPythonPath();
                 
+                var workingDir = Path.Combine(projectRoot, "MuseTalk");
                 var processInfo = new System.Diagnostics.ProcessStartInfo
                 {
                     FileName = pythonPath,
@@ -172,8 +173,10 @@ namespace LmyDigitalHuman.Services
                     RedirectStandardError = true,
                     UseShellExecute = false,
                     CreateNoWindow = true,
-                    WorkingDirectory = Path.Combine(projectRoot, "MuseTalk")
+                    WorkingDirectory = workingDir
                 };
+                
+                _logger.LogInformation("🔧 工作目录: {WorkingDirectory}", workingDir);
 
                 // 🚀 关键：设置4GPU环境变量，让Python服务使用所有GPU
                 var museTalkPath = Path.Combine(projectRoot, "MuseTalk");
@@ -195,7 +198,7 @@ namespace LmyDigitalHuman.Services
                 {
                     if (!string.IsNullOrEmpty(e.Data))
                     {
-                        _logger.LogInformation("全局MuseTalk服务: {Output}", e.Data);
+                        _logger.LogInformation("🐍Python输出: {Output}", e.Data);
                     }
                 };
 
@@ -203,7 +206,7 @@ namespace LmyDigitalHuman.Services
                 {
                     if (!string.IsNullOrEmpty(e.Data))
                     {
-                        _logger.LogWarning("全局MuseTalk服务警告: {Error}", e.Data);
+                        _logger.LogError("🐍Python错误: {Error}", e.Data);
                     }
                 };
 
