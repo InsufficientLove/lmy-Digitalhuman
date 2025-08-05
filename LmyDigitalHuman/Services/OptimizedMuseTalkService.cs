@@ -1529,9 +1529,13 @@ namespace LmyDigitalHuman.Services
             process.BeginErrorReadLine();
             
             // 等待进程完成，最多等待5分钟
-            var completed = await process.WaitForExitAsync(TimeSpan.FromMinutes(5));
+            using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(5));
             
-            if (!completed)
+            try
+            {
+                await process.WaitForExitAsync(cts.Token);
+            }
+            catch (OperationCanceledException)
             {
                 _logger.LogError("❌ 预处理超时，强制终止进程");
                 try
