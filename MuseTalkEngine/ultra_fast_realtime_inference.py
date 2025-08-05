@@ -48,7 +48,7 @@ class UltraFastRealtimeInference:
     - 实时音频流处理
     """
     
-        def __init__(self, 
+    def __init__(self, 
                  model_config_path="../MuseTalk/models/musetalk/musetalk.json",
                  model_weights_path="../MuseTalk/models/musetalk/pytorch_model.bin",
                  vae_type="sd-vae",
