@@ -52,16 +52,17 @@ namespace LmyDigitalHuman.Services
             ILogger<OptimizedMuseTalkService> logger,
             IPathManager pathManager,
             IPythonEnvironmentService pythonEnvironmentService,
-            IConfiguration configuration)
+            IConfiguration configuration,
+            ILoggerFactory loggerFactory)
         {
             _logger = logger;
             _pathManager = pathManager;
             _pythonEnvironmentService = pythonEnvironmentService;
             _configuration = configuration;
-            _globalClient = new GlobalMuseTalkClient(logger);
             
-            // 初始化并发控制
-            InitializeConcurrencyControl();
+            // 创建GlobalMuseTalkClient，使用正确类型的logger
+            var globalClientLogger = loggerFactory.CreateLogger<GlobalMuseTalkClient>();
+            _globalClient = new GlobalMuseTalkClient(globalClientLogger);
             
             _logger.LogInformation("🚀 OptimizedMuseTalkService 已初始化 - 4GPU极速并行架构");
             
