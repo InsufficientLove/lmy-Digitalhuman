@@ -119,20 +119,20 @@ Directory.CreateDirectory(imagesPath);
 var globalServiceManager = app.Services.GetRequiredService<GlobalMuseTalkServiceManager>();
 try
 {
-    app.Logger.LogInformation("🚀 正在启动全局MuseTalk服务...");
-    var startSuccess = await globalServiceManager.StartGlobalServiceAsync(gpuId: 0, port: 9999);
+    app.Logger.LogInformation("🚀 正在启动4GPU共享全局MuseTalk服务...");
+    var startSuccess = await globalServiceManager.StartGlobalServiceAsync(port: 9999);
     if (startSuccess)
     {
-        app.Logger.LogInformation("✅ 全局MuseTalk服务启动成功");
+        app.Logger.LogInformation("✅ 4GPU共享全局MuseTalk服务启动成功");
     }
     else
     {
-        app.Logger.LogError("❌ 全局MuseTalk服务启动失败");
+        app.Logger.LogError("❌ 4GPU共享全局MuseTalk服务启动失败");
     }
 }
 catch (Exception ex)
 {
-    app.Logger.LogError(ex, "❌ 启动全局MuseTalk服务时发生异常");
+    app.Logger.LogError(ex, "❌ 启动4GPU共享全局MuseTalk服务时发生异常");
 }
 
 // 静态文件服务

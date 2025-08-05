@@ -78,14 +78,28 @@ class GlobalMuseTalkService:
         self._initialized = True
         print("🚀 全局MuseTalk服务实例已创建")
     
-    def initialize_models_once(self, gpu_id=0):
+    def initialize_models_once(self, gpu_id=0, multi_gpu=False):
         """全局初始化所有模型（整个程序生命周期只执行一次）"""
         if self.is_initialized:
             print("✅ 模型已全局初始化，直接复用")
             return True
             
         try:
-            print(f"🔧 全局初始化MuseTalk模型 (GPU:{gpu_id})...")
+            # 🚀 4GPU并行配置
+            if multi_gpu and torch.cuda.device_count() >= 4:
+                print(f"🔧 全局初始化MuseTalk模型 (4GPU并行)...")
+                print(f"🎮 检测到GPU数量: {torch.cuda.device_count()}")
+                print(f"🚀 启用4GPU并行算力: cuda:0,1,2,3")
+                self.device = f'cuda:{gpu_id}'
+                self.multi_gpu = True
+                self.gpu_devices = [f'cuda:{i}' for i in range(4)]
+            else:
+                print(f"🔧 全局初始化MuseTalk模型 (GPU:{gpu_id})...")
+                self.device = f'cuda:{gpu_id}'
+                self.multi_gpu = False
+                self.gpu_devices = [f'cuda:{gpu_id}']
+                
+            print(f"🎮 使用设备: {self.device}")
             start_time = time.time()
             
             # 设置设备
@@ -224,15 +238,51 @@ class GlobalMuseTalkService:
                 )
                 
                 res_frame_list = []
-                for i, (whisper_batch, latent_batch) in enumerate(tqdm(gen, total=int(np.ceil(float(video_num)/batch_size)), desc="推理进度")):
-                    audio_feature_batch = self.pe(whisper_batch)
-                    latent_batch = latent_batch.to(dtype=self.weight_dtype)
+                
+                if self.multi_gpu and len(self.gpu_devices) >= 4:
+                    # 🚀 4GPU并行推理
+                    print("🚀 使用4GPU并行推理...")
+                    from concurrent.futures import ThreadPoolExecutor
                     
-                    # 🔥 核心推理 - 复用全局模型
-                    pred_latents = self.unet.model(latent_batch, self.timesteps, encoder_hidden_states=audio_feature_batch).sample
-                    recon = self.vae.decode_latents(pred_latents)
-                    for res_frame in recon:
-                        res_frame_list.append(res_frame)
+                    def process_batch_on_gpu(args):
+                        i, (whisper_batch, latent_batch), gpu_device = args
+                        with torch.cuda.device(gpu_device):
+                            audio_feature_batch = self.pe(whisper_batch)
+                            latent_batch = latent_batch.to(dtype=self.weight_dtype, device=gpu_device)
+                            
+                            # 核心推理
+                            pred_latents = self.unet.model(latent_batch, self.timesteps, encoder_hidden_states=audio_feature_batch).sample
+                            recon = self.vae.decode_latents(pred_latents)
+                            return list(recon)
+                    
+                    # 将批次分配到4个GPU
+                    batch_args = []
+                    gpu_idx = 0
+                    for i, (whisper_batch, latent_batch) in enumerate(gen):
+                        gpu_device = self.gpu_devices[gpu_idx % len(self.gpu_devices)]
+                        batch_args.append((i, (whisper_batch, latent_batch), gpu_device))
+                        gpu_idx += 1
+                    
+                    # 并行执行
+                    with ThreadPoolExecutor(max_workers=4) as executor:
+                        batch_results = list(tqdm(executor.map(process_batch_on_gpu, batch_args), 
+                                                total=len(batch_args), desc="4GPU并行推理"))
+                    
+                    # 合并结果
+                    for batch_frames in batch_results:
+                        res_frame_list.extend(batch_frames)
+                        
+                else:
+                    # 单GPU推理（原逻辑）
+                    for i, (whisper_batch, latent_batch) in enumerate(tqdm(gen, total=int(np.ceil(float(video_num)/batch_size)), desc="推理进度")):
+                        audio_feature_batch = self.pe(whisper_batch)
+                        latent_batch = latent_batch.to(dtype=self.weight_dtype)
+                        
+                        # 🔥 核心推理 - 复用全局模型
+                        pred_latents = self.unet.model(latent_batch, self.timesteps, encoder_hidden_states=audio_feature_batch).sample
+                        recon = self.vae.decode_latents(pred_latents)
+                        for res_frame in recon:
+                            res_frame_list.append(res_frame)
                 
                 inference_time = time.time() - inference_start
                 print(f"✅ 推理完成: {len(res_frame_list)} 帧, 耗时: {inference_time:.2f}秒")
@@ -411,10 +461,11 @@ global_service = GlobalMuseTalkService()
 
 def main():
     """命令行接口"""
-    parser = argparse.ArgumentParser(description='全局持久化MuseTalk服务')
+    parser = argparse.ArgumentParser(description='全局持久化MuseTalk服务 - 4GPU并行')
     parser.add_argument('--mode', choices=['server', 'client'], default='server', help='运行模式')
     parser.add_argument('--port', type=int, default=9999, help='IPC端口')
-    parser.add_argument('--gpu_id', type=int, default=0, help='GPU ID')
+    parser.add_argument('--gpu_id', type=int, default=0, help='主GPU ID')
+    parser.add_argument('--multi_gpu', action='store_true', help='启用4GPU并行模式')
     
     # 客户端模式参数
     parser.add_argument('--template_id', type=str, help='模板ID')
@@ -428,10 +479,13 @@ def main():
     
     if args.mode == 'server':
         # 服务器模式：启动时初始化所有模型，然后监听请求
-        print("🚀 启动全局MuseTalk服务器...")
+        if args.multi_gpu:
+            print("🚀 启动4GPU并行全局MuseTalk服务器...")
+        else:
+            print("🚀 启动全局MuseTalk服务器...")
         
         # 全局初始化模型（只执行一次）
-        if not global_service.initialize_models_once(args.gpu_id):
+        if not global_service.initialize_models_once(args.gpu_id, multi_gpu=args.multi_gpu):
             print("❌ 模型初始化失败")
             sys.exit(1)
         
