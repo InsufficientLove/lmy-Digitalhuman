@@ -436,7 +436,19 @@ class GlobalMuseTalkService:
     def _handle_client(self, client_socket):
         """处理客户端请求"""
         try:
+            print("🔗 开始处理客户端请求...")
+            
+            # 🔧 关键检查：确保模型已初始化
+            if not self.is_initialized:
+                print("❌ 模型未初始化，无法处理推理请求")
+                error_response = {'Success': False, 'OutputPath': None}
+                response_data = json.dumps(error_response).encode('utf-8')
+                client_socket.send(struct.pack('I', len(response_data)))
+                client_socket.send(response_data)
+                return
+            
             # 接收请求数据
+            print("📥 接收请求数据...")
             data_length = struct.unpack('I', client_socket.recv(4))[0]
             data = client_socket.recv(data_length).decode('utf-8')
             request = json.loads(data)
@@ -444,6 +456,7 @@ class GlobalMuseTalkService:
             print(f"📨 收到推理请求: {request['template_id']}")
             
             # 执行推理
+            print("🚀 开始执行推理...")
             success = self.ultra_fast_inference(
                 template_id=request['template_id'],
                 audio_path=request['audio_path'],
@@ -452,6 +465,7 @@ class GlobalMuseTalkService:
                 batch_size=request.get('batch_size', 8),
                 fps=request.get('fps', 25)
             )
+            print(f"✅ 推理执行完成，结果: {success}")
             
             # 发送响应 - 🔧 修复：使用C#期望的大写字段名
             response = {'Success': success, 'OutputPath': request['output_path'] if success else None}
@@ -490,6 +504,7 @@ global_service = GlobalMuseTalkService()
 
 def main():
     """命令行接口"""
+    print("🚀 Python全局服务main函数启动...")
     parser = argparse.ArgumentParser(description='全局持久化MuseTalk服务 - 4GPU并行')
     parser.add_argument('--mode', choices=['server', 'client'], default='server', help='运行模式')
     parser.add_argument('--port', type=int, default=9999, help='IPC端口')
@@ -505,6 +520,7 @@ def main():
     parser.add_argument('--fps', type=int, default=25, help='视频帧率')
     
     args = parser.parse_args()
+    print(f"📋 解析参数: mode={args.mode}, multi_gpu={args.multi_gpu}, gpu_id={args.gpu_id}, port={args.port}")
     
     if args.mode == 'server':
         # 服务器模式：启动时初始化所有模型，然后监听请求
