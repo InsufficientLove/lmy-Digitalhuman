@@ -1844,7 +1844,7 @@ namespace LmyDigitalHuman.Services
                 {
                     FileName = pythonPath,
                     Arguments = arguments,
-                    WorkingDirectory = Path.Combine(projectRoot, "MuseTalk"),
+                    WorkingDirectory = Path.Combine(projectRoot, "MuseTalk"),  // 工作目录设为MuseTalk，确保能导入musetalk模块
                     UseShellExecute = false,
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
@@ -1854,6 +1854,16 @@ namespace LmyDigitalHuman.Services
                 // 设置环境变量
                 processInfo.EnvironmentVariables["CUDA_VISIBLE_DEVICES"] = gpuId.ToString();
                 processInfo.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";
+                
+                // 🔧 关键修复：设置PYTHONPATH，确保能找到musetalk模块和MuseTalkEngine
+                var museTalkPath = Path.Combine(projectRoot, "MuseTalk");
+                var museTalkEnginePath = Path.Combine(projectRoot, "MuseTalkEngine");
+                var pythonPath_env = $"{museTalkPath};{museTalkEnginePath}";
+                processInfo.EnvironmentVariables["PYTHONPATH"] = pythonPath_env;
+                
+                _logger.LogInformation("🔧 Python环境配置:");
+                _logger.LogInformation("   工作目录: {WorkingDir}", processInfo.WorkingDirectory);
+                _logger.LogInformation("   PYTHONPATH: {PythonPath}", pythonPath_env);
                 
                 var outputBuffer = new StringBuilder();
                 var errorBuffer = new StringBuilder();
