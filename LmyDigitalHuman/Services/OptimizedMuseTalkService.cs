@@ -1480,6 +1480,24 @@ namespace LmyDigitalHuman.Services
                           $"--cache_dir \"{Path.GetDirectoryName(stateFilePath)}\" " +
                           $"--device cuda:0";
             
+            // 设置工作目录为MuseTalk目录，确保能找到musetalk模块
+            var museTalkDir = Path.Combine(_pathManager.GetContentRootPath(), "..", "MuseTalk");
+            var workingDir = Path.Combine(_pathManager.GetContentRootPath(), "..");
+            
+            // 验证MuseTalk目录和关键文件是否存在
+            if (!Directory.Exists(museTalkDir))
+            {
+                throw new DirectoryNotFoundException($"MuseTalk目录不存在: {museTalkDir}");
+            }
+            
+            var museTalkUtilsDir = Path.Combine(museTalkDir, "musetalk", "utils");
+            if (!Directory.Exists(museTalkUtilsDir))
+            {
+                throw new DirectoryNotFoundException($"MuseTalk utils目录不存在: {museTalkUtilsDir}");
+            }
+            
+            _logger.LogInformation("✅ MuseTalk目录验证通过: {MuseTalkDir}", museTalkDir);
+            
             var startInfo = new ProcessStartInfo
             {
                 FileName = pythonPath,
@@ -1488,13 +1506,27 @@ namespace LmyDigitalHuman.Services
                 CreateNoWindow = true,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
-                WorkingDirectory = Path.Combine(_pathManager.GetContentRootPath(), "..")
+                WorkingDirectory = workingDir
             };
             
             // 设置CUDA环境变量
             startInfo.EnvironmentVariables["CUDA_VISIBLE_DEVICES"] = "0,1,2,3";
             
+            // 设置Python路径，确保能找到musetalk模块
+            var pythonPath_env = Environment.GetEnvironmentVariable("PYTHONPATH") ?? "";
+            if (!string.IsNullOrEmpty(pythonPath_env))
+            {
+                startInfo.EnvironmentVariables["PYTHONPATH"] = $"{museTalkDir};{pythonPath_env}";
+            }
+            else
+            {
+                startInfo.EnvironmentVariables["PYTHONPATH"] = museTalkDir;
+            }
+            
             _logger.LogInformation("💻 执行预处理命令: {FileName} {Arguments}", startInfo.FileName, arguments);
+            _logger.LogInformation("📁 工作目录: {WorkingDirectory}", startInfo.WorkingDirectory);
+            _logger.LogInformation("🐍 PYTHONPATH: {PythonPath}", startInfo.EnvironmentVariables.GetValueOrDefault("PYTHONPATH", "未设置"));
+            _logger.LogInformation("🎮 CUDA设备: {CudaDevices}", startInfo.EnvironmentVariables.GetValueOrDefault("CUDA_VISIBLE_DEVICES", "未设置"));
             
             using var process = new Process { StartInfo = startInfo };
             var outputBuffer = new StringBuilder();

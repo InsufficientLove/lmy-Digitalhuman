@@ -13,6 +13,7 @@ Enhanced MuseTalk Preprocessing System
 """
 
 import os
+import sys
 import cv2
 import torch
 import numpy as np
@@ -23,11 +24,29 @@ from tqdm import tqdm
 import time
 from pathlib import Path
 
+# 动态添加MuseTalk路径到Python路径
+current_dir = os.path.dirname(os.path.abspath(__file__))
+musetalk_dir = os.path.join(os.path.dirname(current_dir), "MuseTalk")
+
+if os.path.exists(musetalk_dir) and musetalk_dir not in sys.path:
+    sys.path.insert(0, musetalk_dir)
+    print(f"✅ 添加MuseTalk路径到Python路径: {musetalk_dir}")
+
 # MuseTalk组件导入
-from musetalk.utils.face_parsing import FaceParsing
-from musetalk.utils.preprocessing import get_landmark_and_bbox, read_imgs
-from musetalk.utils.blending import get_image_prepare_material, get_image_blending
-from musetalk.utils.utils import load_all_model
+try:
+    from musetalk.utils.face_parsing import FaceParsing
+    from musetalk.utils.preprocessing import get_landmark_and_bbox, read_imgs
+    from musetalk.utils.blending import get_image_prepare_material, get_image_blending
+    from musetalk.utils.utils import load_all_model
+    print("✅ MuseTalk模块导入成功")
+except ImportError as e:
+    print(f"❌ MuseTalk模块导入失败: {e}")
+    print(f"🔍 当前Python路径: {sys.path}")
+    print(f"🔍 MuseTalk目录: {musetalk_dir}")
+    print(f"🔍 MuseTalk目录存在: {os.path.exists(musetalk_dir)}")
+    if os.path.exists(musetalk_dir):
+        print(f"🔍 MuseTalk目录内容: {os.listdir(musetalk_dir)}")
+    raise
 
 
 class EnhancedMuseTalkPreprocessor:
