@@ -1480,23 +1480,9 @@ namespace LmyDigitalHuman.Services
                           $"--cache_dir \"{Path.GetDirectoryName(stateFilePath)}\" " +
                           $"--device cuda:0";
             
-            // 设置工作目录为MuseTalk目录，确保能找到musetalk模块
+            // 设置路径 - 直接执行，不做额外检查以提升性能
             var museTalkDir = Path.Combine(_pathManager.GetContentRootPath(), "..", "MuseTalk");
             var workingDir = Path.Combine(_pathManager.GetContentRootPath(), "..");
-            
-            // 验证MuseTalk目录和关键文件是否存在
-            if (!Directory.Exists(museTalkDir))
-            {
-                throw new DirectoryNotFoundException($"MuseTalk目录不存在: {museTalkDir}");
-            }
-            
-            var museTalkUtilsDir = Path.Combine(museTalkDir, "musetalk", "utils");
-            if (!Directory.Exists(museTalkUtilsDir))
-            {
-                throw new DirectoryNotFoundException($"MuseTalk utils目录不存在: {museTalkUtilsDir}");
-            }
-            
-            _logger.LogInformation("✅ MuseTalk目录验证通过: {MuseTalkDir}", museTalkDir);
             
             var startInfo = new ProcessStartInfo
             {
@@ -1524,9 +1510,7 @@ namespace LmyDigitalHuman.Services
             }
             
             _logger.LogInformation("💻 执行预处理命令: {FileName} {Arguments}", startInfo.FileName, arguments);
-            _logger.LogInformation("📁 工作目录: {WorkingDirectory}", startInfo.WorkingDirectory);
-            _logger.LogInformation("🐍 PYTHONPATH: {PythonPath}", startInfo.EnvironmentVariables.GetValueOrDefault("PYTHONPATH", "未设置"));
-            _logger.LogInformation("🎮 CUDA设备: {CudaDevices}", startInfo.EnvironmentVariables.GetValueOrDefault("CUDA_VISIBLE_DEVICES", "未设置"));
+            _logger.LogInformation("🐍 PYTHONPATH: {PythonPath}", museTalkDir);
             
             using var process = new Process { StartInfo = startInfo };
             var outputBuffer = new StringBuilder();
