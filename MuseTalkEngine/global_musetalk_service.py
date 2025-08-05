@@ -245,7 +245,12 @@ class GlobalMuseTalkService:
                 temp_frames_dir = os.path.join(os.path.dirname(output_path), "temp_frames")
                 os.makedirs(temp_frames_dir, exist_ok=True)
                 
-                for i, res_frame in enumerate(tqdm(res_frame_list, desc="合成图像")):
+                # 🚀 极速优化：并行处理图像合成
+                from concurrent.futures import ThreadPoolExecutor
+                import functools
+                
+                def process_frame(args):
+                    i, res_frame = args
                     bbox = coord_list_cycle[i % len(coord_list_cycle)]
                     ori_frame = copy.deepcopy(frame_list_cycle[i % len(frame_list_cycle)])
                     
@@ -253,7 +258,7 @@ class GlobalMuseTalkService:
                     try:
                         res_frame = cv2.resize(res_frame.astype(np.uint8), (x2-x1, y2-y1))
                     except:
-                        continue
+                        return None
                     
                     # 🎨 关键修复：使用官方get_image方法，避免阴影
                     combine_frame = get_image(
@@ -269,6 +274,12 @@ class GlobalMuseTalkService:
                     # 保存帧
                     frame_path = os.path.join(temp_frames_dir, f"{i:08d}.png")
                     cv2.imwrite(frame_path, combine_frame)
+                    return i
+                
+                # 使用4线程并行处理
+                with ThreadPoolExecutor(max_workers=4) as executor:
+                    frame_args = list(enumerate(res_frame_list))
+                    list(tqdm(executor.map(process_frame, frame_args), total=len(frame_args), desc="合成图像"))
                 
                 compose_time = time.time() - compose_start
                 print(f"✅ 图像合成完成: 耗时: {compose_time:.2f}秒")
@@ -375,8 +386,8 @@ class GlobalMuseTalkService:
                 fps=request.get('fps', 25)
             )
             
-            # 发送响应
-            response = {'success': success, 'output_path': request['output_path'] if success else None}
+            # 发送响应 - 🔧 修复：使用C#期望的大写字段名
+            response = {'Success': success, 'OutputPath': request['output_path'] if success else None}
             response_data = json.dumps(response).encode('utf-8')
             client_socket.send(struct.pack('I', len(response_data)))
             client_socket.send(response_data)
