@@ -605,14 +605,19 @@ def main():
     parser.add_argument('--fps', type=int, default=25, help='视频帧率')
     
     try:
+        print("📋 开始解析命令行参数...")
+        sys.stdout.flush()
         args = parser.parse_args()
-        print(f"📋 解析参数: mode={args.mode}, multi_gpu={args.multi_gpu}, gpu_id={args.gpu_id}, port={args.port}")
+        print(f"📋 参数解析完成: mode={args.mode}, multi_gpu={args.multi_gpu}, gpu_id={args.gpu_id}, port={args.port}")
+        sys.stdout.flush()
         
         print("🔧 进入服务器模式逻辑...")
+        sys.stdout.flush()
     except Exception as e:
         print(f"❌ 参数解析失败: {str(e)}")
         import traceback
         traceback.print_exc()
+        sys.stdout.flush()
         sys.exit(1)
     
     if args.mode == 'server':
@@ -621,26 +626,44 @@ def main():
             print("🚀 启动4GPU并行全局MuseTalk服务器...")
         else:
             print("🚀 启动全局MuseTalk服务器...")
+        sys.stdout.flush()
         
         # 全局初始化模型（只执行一次）
         print("🔧 准备初始化全局模型...")
+        sys.stdout.flush()
         try:
+            print("🔧 调用initialize_models_once...")
+            sys.stdout.flush()
             if not global_service.initialize_models_once(args.gpu_id, multi_gpu=args.multi_gpu):
                 print("❌ 模型初始化失败")
+                sys.stdout.flush()
                 sys.exit(1)
             print("✅ 模型初始化成功，准备启动IPC服务器...")
+            sys.stdout.flush()
         except Exception as e:
             print(f"❌ 模型初始化异常: {str(e)}")
             import traceback
             traceback.print_exc()
+            sys.stdout.flush()
             sys.exit(1)
         
         # 启动IPC服务器
+        print("🌐 准备启动IPC服务器...")
+        sys.stdout.flush()
         try:
+            print("🌐 调用start_ipc_server...")
+            sys.stdout.flush()
             global_service.start_ipc_server(args.port)
         except KeyboardInterrupt:
             print("\n🛑 收到停止信号")
             global_service.stop_server()
+            sys.stdout.flush()
+        except Exception as e:
+            print(f"❌ IPC服务器启动异常: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            sys.stdout.flush()
+            sys.exit(1)
             
     else:
         # 客户端模式：直接执行推理
