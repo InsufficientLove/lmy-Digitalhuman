@@ -42,12 +42,6 @@ class OfficialMuseTalkAvatar:
         self.batch_size = batch_size
         self.idx = 0
         
-        # 缓存文件路径
-        self.coords_path = os.path.join(cache_dir, f"{template_id}_coords.pkl")
-        self.latents_path = os.path.join(cache_dir, f"{template_id}_latents.pt")
-        self.mask_coords_path = os.path.join(cache_dir, f"{template_id}_mask_coords.pkl")
-        self.metadata_path = os.path.join(cache_dir, f"{template_id}_metadata.json")
-        
         # 加载缓存数据
         self.load_cache()
     
@@ -55,33 +49,33 @@ class OfficialMuseTalkAvatar:
         """加载预处理缓存数据"""
         print(f"🔄 加载模板缓存: {self.template_id}")
         
-        # 检查缓存文件是否存在
-        required_files = [self.coords_path, self.latents_path, self.mask_coords_path, self.metadata_path]
-        for file_path in required_files:
-            if not os.path.exists(file_path):
-                raise FileNotFoundError(f"缓存文件不存在: {file_path}")
+        # 使用现有的预处理缓存文件
+        cache_file = os.path.join(self.cache_dir, f"{self.template_id}_preprocessed.pkl")
+        metadata_file = os.path.join(self.cache_dir, f"{self.template_id}_metadata.json")
         
-        # 加载潜在向量
-        self.input_latent_list_cycle = torch.load(self.latents_path, map_location=self.device)
+        if not os.path.exists(cache_file):
+            raise FileNotFoundError(f"预处理缓存文件不存在: {cache_file}")
+        if not os.path.exists(metadata_file):
+            raise FileNotFoundError(f"元数据文件不存在: {metadata_file}")
+        
+        # 加载预处理缓存数据
+        with open(cache_file, 'rb') as f:
+            cache_data = pickle.load(f)
+        
+        # 提取数据
+        self.input_latent_list_cycle = cache_data['input_latent_list_cycle']
+        self.coord_list_cycle = cache_data['coord_list_cycle']
+        self.frame_list_cycle = cache_data['frame_list_cycle']
+        self.mask_coords_list_cycle = cache_data['mask_coords_list_cycle']
+        self.mask_list_cycle = cache_data['mask_list_cycle']
+        
         print(f"✅ 加载潜在向量: {len(self.input_latent_list_cycle)} 帧")
-        
-        # 加载坐标
-        with open(self.coords_path, 'rb') as f:
-            self.coord_list_cycle = pickle.load(f)
         print(f"✅ 加载面部坐标: {len(self.coord_list_cycle)} 帧")
-        
-        # 加载掩码坐标
-        with open(self.mask_coords_path, 'rb') as f:
-            self.mask_coords_list_cycle = pickle.load(f)
         print(f"✅ 加载掩码坐标: {len(self.mask_coords_list_cycle)} 帧")
         
         # 加载元数据
-        with open(self.metadata_path, 'r', encoding='utf-8') as f:
+        with open(metadata_file, 'r', encoding='utf-8') as f:
             self.metadata = json.load(f)
-        
-        # 从元数据重建frame_list和mask_list
-        self.frame_list_cycle = self.metadata.get('frame_list_cycle', [])
-        self.mask_list_cycle = self.metadata.get('mask_list_cycle', [])
         
         print(f"✅ 缓存加载完成: {self.template_id}")
     
