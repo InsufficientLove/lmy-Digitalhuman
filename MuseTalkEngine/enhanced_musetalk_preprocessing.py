@@ -223,21 +223,20 @@ class EnhancedMuseTalkPreprocessor:
         
         # 生成循环帧列表
         print("🎬 生成循环帧...")
-        frame_list_cycle = self._generate_frame_cycle(face_img)
+        frame_list_cycle = self._generate_frame_cycle(img_np)
         
         # 提取坐标信息
         print("📍 提取坐标信息...")
-        coord_list_cycle = self._extract_coordinates(frame_list_cycle, parsing_mode)
+        coord_list_cycle = self._extract_coordinates(frame_list_cycle, bbox)
         
         # VAE编码
         print("🔧 VAE编码...")
-        input_latent_list_cycle = self._encode_frames(frame_list_cycle)
+        input_latent_list_cycle = self._encode_frames(frame_list_cycle, coord_list_cycle)
         input_latent = input_latent_list_cycle[0]  # 使用第一帧作为参考
         
         # 生成掩码
         print("🎭 生成掩码...")
-        mask_list_cycle = self._generate_masks(coord_list_cycle)
-        mask_coords_list_cycle = self._extract_mask_coordinates(mask_list_cycle)
+        mask_coords_list_cycle, mask_list_cycle = self._generate_masks(frame_list_cycle, coord_list_cycle, parsing_mode)
         
         # 准备缓存数据
         preprocessed_data = {
@@ -305,19 +304,17 @@ class EnhancedMuseTalkPreprocessor:
             'mask_list_cycle': [mask.tolist() if hasattr(mask, 'tolist') else mask for mask in mask_list_cycle]
         }
         
-        # 调试：检查每个字段的类型
-        print("🔍 检查元数据字段类型:")
-        for key, value in metadata.items():
-            print(f"  {key}: {type(value)} = {value}")
+        # 调试：检查每个字段的类型（简化输出）
+        print("🔍 检查元数据字段:")
+        key_fields = ['template_id', 'bbox', 'frame_count', 'processing_time']
+        for key in key_fields:
+            if key in metadata:
+                print(f"   {key}: {metadata[key]}")
         
         # 转换numpy类型为JSON可序列化类型
         print("🔄 转换numpy类型...")
         metadata_serializable = convert_numpy_types(metadata)
-        
-        # 调试：检查转换后的类型
-        print("🔍 检查转换后的字段类型:")
-        for key, value in metadata_serializable.items():
-            print(f"  {key}: {type(value)} = {value}")
+        print("✅ 类型转换完成")
         
         # 安全保存元数据文件
         temp_metadata_path = metadata_path.with_suffix('.tmp')
@@ -469,52 +466,62 @@ class EnhancedMuseTalkPreprocessor:
         face_img = cv2.resize(face_img, (256, 256), interpolation=cv2.INTER_LANCZOS4)
         return face_img
     
-    def _generate_frame_cycle(self, face_img):
-        """生成循环帧列表"""
-        # 简单实现：使用单帧创建循环
-        frame_bgr = cv2.cvtColor(face_img, cv2.COLOR_RGB2BGR)
-        return [frame_bgr, frame_bgr]  # 创建简单的2帧循环
+    def _generate_frame_cycle(self, original_img):
+        """生成循环帧列表 - 使用完整原图"""
+        # 保存完整的原始图像，不是裁剪的面部
+        frame_bgr = cv2.cvtColor(original_img, cv2.COLOR_RGB2BGR)
+        # 创建前向+反向循环（官方实现）
+        forward_frames = [frame_bgr]
+        backward_frames = forward_frames[::-1]
+        return forward_frames + backward_frames  # [frame, frame] 循环
     
-    def _extract_coordinates(self, frame_list, parsing_mode):
-        """提取坐标信息"""
-        # 简化实现：为每帧返回相同的坐标
-        coord = (0, 0, 256, 256)  # 标准化后的坐标
-        return [coord] * len(frame_list)
+    def _extract_coordinates(self, frame_list, bbox):
+        """提取坐标信息 - 使用真实的面部边界框"""
+        # 使用检测到的真实边界框坐标
+        coord = tuple(map(int, bbox))  # (x1, y1, x2, y2)
+        # 为前向+反向循环创建坐标
+        forward_coords = [coord]
+        backward_coords = forward_coords[::-1]
+        return forward_coords + backward_coords
     
-    def _encode_frames(self, frame_list):
-        """VAE编码帧列表"""
+    def _encode_frames(self, frame_list, coord_list_cycle):
+        """VAE编码帧列表 - 只编码面部区域"""
         encoded_list = []
-        for frame in frame_list:
+        for frame, coord in zip(frame_list, coord_list_cycle):
             with torch.no_grad():
-                # 转换为RGB并调整尺寸
-                if frame.shape[2] == 3:  # BGR to RGB
-                    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                # 从完整图像中裁剪面部区域
+                x1, y1, x2, y2 = coord
+                face_region = frame[y1:y2, x1:x2]
+                
+                # 转换为RGB并调整尺寸到256x256
+                if len(face_region.shape) == 3 and face_region.shape[2] == 3:
+                    face_rgb = cv2.cvtColor(face_region, cv2.COLOR_BGR2RGB)
                 else:
-                    frame_rgb = frame
+                    face_rgb = face_region
+                
+                # 调整尺寸到256x256
+                face_resized = cv2.resize(face_rgb, (256, 256), interpolation=cv2.INTER_LANCZOS4)
                 
                 # VAE编码
-                input_latent = self.vae.get_latents_for_unet(frame_rgb)
-                encoded_list.append(input_latent)
+                latents = self.vae.get_latents_for_unet(face_resized)
+                encoded_list.append(latents)
         
         return encoded_list
     
-    def _generate_masks(self, coord_list):
-        """生成掩码列表"""
-        # 使用已经导入的MuseTalk掩码生成功能
+    def _generate_masks(self, frame_list_cycle, coord_list_cycle, parsing_mode='jaw'):
+        """生成掩码和掩码坐标"""
+        mask_coords_list_cycle = []
+        mask_list_cycle = []
         
-        mask_list = []
-        for coord in coord_list:
-            # 创建简单的面部掩码
-            mask = np.ones((256, 256), dtype=np.uint8) * 255
-            mask_list.append(mask)
+        for frame, coord in zip(frame_list_cycle, coord_list_cycle):
+            # 使用官方的掩码生成方法
+            x1, y1, x2, y2 = coord
+            mask, crop_box = get_image_prepare_material(frame, [x1, y1, x2, y2], fp=self.face_parser, mode=parsing_mode)
+            
+            mask_coords_list_cycle.append(crop_box)
+            mask_list_cycle.append(mask)
         
-        return mask_list
-    
-    def _extract_mask_coordinates(self, mask_list):
-        """提取掩码坐标"""
-        # 简化实现：返回标准坐标
-        coords = (0, 0, 256, 256)
-        return [coords] * len(mask_list)
+        return mask_coords_list_cycle, mask_list_cycle
     
     def _validate_cache(self, cache_path, metadata):
         """验证缓存完整性"""
