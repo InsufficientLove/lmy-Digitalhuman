@@ -107,16 +107,19 @@ namespace LmyDigitalHuman.Services
     }
 
     /// <summary>
-    /// 全局MuseTalk服务管理器
-    /// 负责启动和管理Python全局服务进程
+    /// 全局MuseTalk服务管理器 - 4GPU并行架构
+    /// 负责启动和管理4个Python全局服务进程，每个占用一个GPU
     /// </summary>
     public class GlobalMuseTalkServiceManager : IDisposable
     {
         private readonly ILogger<GlobalMuseTalkServiceManager> _logger;
         private readonly IPathManager _pathManager;
-        private System.Diagnostics.Process? _pythonProcess;
+        private readonly List<System.Diagnostics.Process> _pythonProcesses = new();
+        private readonly List<int> _activePorts = new();
         private bool _isServiceRunning = false;
         private readonly object _lock = new object();
+        private const int GPU_COUNT = 4;
+        private const int BASE_PORT = 9999;
 
         public GlobalMuseTalkServiceManager(ILogger<GlobalMuseTalkServiceManager> logger, IPathManager pathManager)
         {
@@ -125,15 +128,15 @@ namespace LmyDigitalHuman.Services
         }
 
         /// <summary>
-        /// 启动全局Python服务（程序启动时调用一次）
+        /// 启动4GPU并行全局Python服务（程序启动时调用一次）
         /// </summary>
-        public async Task<bool> StartGlobalServiceAsync(int gpuId = 0, int port = 9999)
+        public async Task<bool> StartGlobalServiceAsync()
         {
             lock (_lock)
             {
                 if (_isServiceRunning)
                 {
-                    _logger.LogInformation("✅ 全局MuseTalk服务已运行");
+                    _logger.LogInformation("✅ 4GPU并行全局MuseTalk服务已运行");
                     return true;
                 }
             }
@@ -153,6 +156,51 @@ namespace LmyDigitalHuman.Services
                 // 获取Python路径
                 var pythonPath = GetPythonPath();
                 
+                _logger.LogInformation("🚀 启动4GPU并行全局MuseTalk服务...");
+                _logger.LogInformation("   脚本路径: {ScriptPath}", serviceScript);
+                _logger.LogInformation("   Python路径: {PythonPath}", pythonPath);
+
+                // 🚀 启动4个GPU服务
+                var startTasks = new List<Task<bool>>();
+                for (int gpuId = 0; gpuId < GPU_COUNT; gpuId++)
+                {
+                    int currentGpuId = gpuId;
+                    int currentPort = BASE_PORT + gpuId;
+                    
+                    var task = Task.Run(async () => await StartSingleGpuServiceAsync(serviceScript, pythonPath, projectRoot, currentGpuId, currentPort));
+                    startTasks.Add(task);
+                }
+
+                // 等待所有GPU服务启动
+                var results = await Task.WhenAll(startTasks);
+                var successCount = results.Count(r => r);
+                
+                if (successCount > 0)
+                {
+                    _isServiceRunning = true;
+                    _logger.LogInformation("✅ 4GPU并行服务启动完成: {SuccessCount}/{TotalCount}", successCount, GPU_COUNT);
+                    return true;
+                }
+                else
+                {
+                    _logger.LogError("❌ 所有GPU服务启动失败");
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ 启动4GPU并行服务失败");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// 启动单个GPU服务
+        /// </summary>
+        private async Task<bool> StartSingleGpuServiceAsync(string serviceScript, string pythonPath, string projectRoot, int gpuId, int port)
+        {
+            try
+            {
                 var processInfo = new System.Diagnostics.ProcessStartInfo
                 {
                     FileName = pythonPath,
@@ -172,9 +220,7 @@ namespace LmyDigitalHuman.Services
                 processInfo.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";
                 processInfo.EnvironmentVariables["CUDA_VISIBLE_DEVICES"] = gpuId.ToString();
 
-                _logger.LogInformation("🚀 启动全局MuseTalk服务...");
-                _logger.LogInformation("   脚本路径: {ScriptPath}", serviceScript);
-                _logger.LogInformation("   Python路径: {PythonPath}", pythonPath);
+                _logger.LogInformation("🎮 启动GPU{GpuId}服务，端口: {Port}", gpuId, port);
                 _logger.LogInformation("   GPU ID: {GpuId}", gpuId);
                 _logger.LogInformation("   端口: {Port}", port);
 

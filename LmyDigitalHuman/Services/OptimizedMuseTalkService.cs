@@ -1807,40 +1807,17 @@ namespace LmyDigitalHuman.Services
                     fps: 25
                 );
 
-                if (!string.IsNullOrEmpty(resultPath))
+                if (!string.IsNullOrEmpty(resultPath) && File.Exists(resultPath))
                 {
-                    // 🔧 修复：等待文件系统同步，避免时序问题
-                    var maxWaitTime = TimeSpan.FromSeconds(5);
-                    var waitStart = DateTime.Now;
-                    
-                    while (DateTime.Now - waitStart < maxWaitTime)
-                    {
-                        if (File.Exists(resultPath))
-                        {
-                            var fileInfo = new FileInfo(resultPath);
-                            if (fileInfo.Length > 0) // 确保文件不为空
-                            {
-                                _logger.LogInformation("✅ 全局推理完成: {TemplateId}, 输出: {OutputPath}, 大小: {Size}bytes", 
-                                    templateId, resultPath, fileInfo.Length);
-                                return resultPath;
-                            }
-                        }
-                        
-                        // 短暂等待文件系统同步
-                        await Task.Delay(100);
-                    }
-                    
-                    // 最后一次检查
-                    if (File.Exists(resultPath))
-                    {
-                        var fileInfo = new FileInfo(resultPath);
-                        _logger.LogInformation("✅ 全局推理完成: {TemplateId}, 输出: {OutputPath}, 大小: {Size}bytes", 
-                            templateId, resultPath, fileInfo.Length);
-                        return resultPath;
-                    }
+                    var fileInfo = new FileInfo(resultPath);
+                    _logger.LogInformation("✅ 全局推理完成: {TemplateId}, 输出: {OutputPath}, 大小: {Size}bytes", 
+                        templateId, resultPath, fileInfo.Length);
+                    return resultPath;
                 }
-                
-                throw new InvalidOperationException($"全局推理失败或输出文件不存在: {outputPath}");
+                else
+                {
+                    throw new InvalidOperationException($"全局推理失败或输出文件不存在: {outputPath}");
+                }
             }
             catch (Exception ex)
             {
