@@ -87,12 +87,13 @@ class GlobalMuseTalkService:
         try:
             # 🚀 4GPU并行配置
             if multi_gpu and torch.cuda.device_count() >= 4:
-                print(f"🔧 全局初始化MuseTalk模型 (4GPU并行)...")
-                print(f"🎮 检测到GPU数量: {torch.cuda.device_count()}")
-                print(f"🚀 启用4GPU并行算力: cuda:0,1,2,3")
-                self.device = f'cuda:{gpu_id}'
-                self.multi_gpu = True
-                self.gpu_devices = [f'cuda:{i}' for i in range(4)]
+                            print(f"🔧 全局初始化MuseTalk模型 (4GPU并行)...")
+            print(f"🎮 检测到GPU数量: {torch.cuda.device_count()}")
+            print(f"🚀 启用4GPU并行算力: cuda:0,1,2,3")
+            self.device = f'cuda:{gpu_id}'
+            self.multi_gpu = True
+            self.gpu_devices = [f'cuda:{i}' for i in range(4)]
+            print(f"✅ 4GPU设备列表: {self.gpu_devices}")
             else:
                 print(f"🔧 全局初始化MuseTalk模型 (GPU:{gpu_id})...")
                 self.device = f'cuda:{gpu_id}'
@@ -239,29 +240,41 @@ class GlobalMuseTalkService:
                 
                 res_frame_list = []
                 
-                if self.multi_gpu and len(self.gpu_devices) >= 4:
+                # 🔧 修复：先收集所有批次，然后决定是否并行
+                all_batches = list(gen)
+                total_batches = len(all_batches)
+                
+                if self.multi_gpu and len(self.gpu_devices) >= 4 and total_batches > 1:
                     # 🚀 4GPU并行推理
-                    print("🚀 使用4GPU并行推理...")
+                    print(f"🚀 使用4GPU并行推理，总批次: {total_batches}")
                     from concurrent.futures import ThreadPoolExecutor
                     
                     def process_batch_on_gpu(args):
                         i, (whisper_batch, latent_batch), gpu_device = args
-                        with torch.cuda.device(gpu_device):
-                            audio_feature_batch = self.pe(whisper_batch)
+                        try:
+                            # 设置当前GPU
+                            torch.cuda.set_device(gpu_device)
+                            
+                            # 将数据移到指定GPU
+                            whisper_batch = whisper_batch.to(gpu_device)
                             latent_batch = latent_batch.to(dtype=self.weight_dtype, device=gpu_device)
                             
-                            # 核心推理
+                            # 执行推理
+                            audio_feature_batch = self.pe(whisper_batch)
                             pred_latents = self.unet.model(latent_batch, self.timesteps, encoder_hidden_states=audio_feature_batch).sample
                             recon = self.vae.decode_latents(pred_latents)
-                            return list(recon)
+                            
+                            # 将结果移回CPU避免GPU内存冲突
+                            return [frame.cpu().numpy() for frame in recon]
+                        except Exception as e:
+                            print(f"❌ GPU {gpu_device} 批次 {i} 推理失败: {str(e)}")
+                            return []
                     
                     # 将批次分配到4个GPU
                     batch_args = []
-                    gpu_idx = 0
-                    for i, (whisper_batch, latent_batch) in enumerate(gen):
-                        gpu_device = self.gpu_devices[gpu_idx % len(self.gpu_devices)]
-                        batch_args.append((i, (whisper_batch, latent_batch), gpu_device))
-                        gpu_idx += 1
+                    for i, batch_data in enumerate(all_batches):
+                        gpu_device = self.gpu_devices[i % len(self.gpu_devices)]
+                        batch_args.append((i, batch_data, gpu_device))
                     
                     # 并行执行
                     with ThreadPoolExecutor(max_workers=4) as executor:
@@ -274,7 +287,8 @@ class GlobalMuseTalkService:
                         
                 else:
                     # 单GPU推理（原逻辑）
-                    for i, (whisper_batch, latent_batch) in enumerate(tqdm(gen, total=int(np.ceil(float(video_num)/batch_size)), desc="推理进度")):
+                    print(f"🎯 使用单GPU推理，总批次: {total_batches}")
+                    for i, (whisper_batch, latent_batch) in enumerate(tqdm(all_batches, desc="推理进度")):
                         audio_feature_batch = self.pe(whisper_batch)
                         latent_batch = latent_batch.to(dtype=self.weight_dtype)
                         
@@ -446,6 +460,18 @@ class GlobalMuseTalkService:
             
         except Exception as e:
             print(f"❌ 处理客户端请求失败: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            
+            # 🔧 关键修复：即使异常也要发送响应
+            try:
+                error_response = {'Success': False, 'OutputPath': None}
+                response_data = json.dumps(error_response).encode('utf-8')
+                client_socket.send(struct.pack('I', len(response_data)))
+                client_socket.send(response_data)
+                print(f"📤 错误响应已发送")
+            except:
+                pass
         finally:
             client_socket.close()
     
