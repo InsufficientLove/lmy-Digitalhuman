@@ -303,58 +303,100 @@ class EnhancedMuseTalkPreprocessor:
             print(f"🔍 开始面部检测，图片尺寸: {img_np.shape}")
             
             # 使用已经导入的MuseTalk面部检测功能
-            # 临时保存图片用于检测
+            # 创建临时文件用于检测
             import tempfile
-            with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as tmp_file:
+            import time
+            import uuid
+            
+            # 使用更安全的临时文件创建方式
+            temp_dir = tempfile.gettempdir()
+            temp_filename = f"musetalk_temp_{uuid.uuid4().hex[:8]}.jpg"
+            temp_path = os.path.join(temp_dir, temp_filename)
+            
+            try:
                 # 确保图片格式正确
                 img_bgr = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
-                success = cv2.imwrite(tmp_file.name, img_bgr)
+                success = cv2.imwrite(temp_path, img_bgr)
                 if not success:
-                    print(f"❌ 图片保存失败: {tmp_file.name}")
+                    print(f"❌ 图片保存失败: {temp_path}")
                     return None, None
                 
-                print(f"📁 临时图片已保存: {tmp_file.name}")
+                print(f"📁 临时图片已保存: {temp_path}")
                 
                 # 验证临时图片可以读取
-                test_img = cv2.imread(tmp_file.name)
+                test_img = cv2.imread(temp_path)
                 if test_img is None:
-                    print(f"❌ 无法读取临时图片: {tmp_file.name}")
-                    os.unlink(tmp_file.name)
+                    print(f"❌ 无法读取临时图片: {temp_path}")
+                    # 尝试删除文件，但不影响流程
+                    self._safe_remove_file(temp_path)
                     return None, None
                 
                 print(f"✅ 临时图片验证成功，尺寸: {test_img.shape}")
                 
                 # 调用面部检测
                 print("🎯 调用get_landmark_and_bbox进行面部检测...")
-                coord_list, frame_list = get_landmark_and_bbox([tmp_file.name], 0)
+                coord_list, frame_list = get_landmark_and_bbox([temp_path], 0)
                 print(f"📊 检测结果 - coord_list长度: {len(coord_list) if coord_list else 0}, frame_list长度: {len(frame_list) if frame_list else 0}")
                 
-                # 清理临时文件
-                os.unlink(tmp_file.name)
-            
-            # 验证检测结果
-            if coord_list and len(coord_list) > 0:
-                bbox = coord_list[0]
-                x1, y1, x2, y2 = bbox
-                print(f"🔍 检测到边界框: ({x1:.1f}, {y1:.1f}, {x2:.1f}, {y2:.1f})")
+                # 在处理检测结果之前先保存结果，避免文件删除失败影响逻辑
+                detection_success = False
+                bbox_result = None
                 
-                # 检查边界框是否有效
-                if x1 < x2 and y1 < y2 and bbox != (0.0, 0.0, 0.0, 0.0):
-                    landmarks = None  # 暂时不提取详细关键点
-                    print(f"✅ 面部检测成功: 边界框 ({x1:.1f}, {y1:.1f}, {x2:.1f}, {y2:.1f})")
-                    return bbox, landmarks
+                # 验证检测结果
+                if coord_list and len(coord_list) > 0:
+                    bbox = coord_list[0]
+                    x1, y1, x2, y2 = bbox
+                    print(f"🔍 检测到边界框: ({x1:.1f}, {y1:.1f}, {x2:.1f}, {y2:.1f})")
+                    
+                    # 检查边界框是否有效
+                    if x1 < x2 and y1 < y2 and bbox != (0.0, 0.0, 0.0, 0.0):
+                        landmarks = None  # 暂时不提取详细关键点
+                        print(f"✅ 面部检测成功: 边界框 ({x1:.1f}, {y1:.1f}, {x2:.1f}, {y2:.1f})")
+                        detection_success = True
+                        bbox_result = bbox
+                    else:
+                        print(f"⚠️ 检测到无效的面部边界框: {bbox}")
                 else:
-                    print(f"⚠️ 检测到无效的面部边界框: {bbox}")
-                    return None, None
-            else:
-                print("⚠️ 未检测到面部区域")
-                return None, None
+                    print("⚠️ 未检测到面部区域")
+                
+                # 返回检测结果（不受文件清理失败影响）
+                return (bbox_result, None) if detection_success else (None, None)
+                
+            finally:
+                # 确保临时文件被清理（在finally块中）
+                self._safe_remove_file(temp_path)
                 
         except Exception as e:
             print(f"⚠️ 面部检测失败: {e}")
             import traceback
             traceback.print_exc()
             return None, None
+    
+    def _safe_remove_file(self, file_path):
+        """安全删除文件，处理Windows权限问题"""
+        if not os.path.exists(file_path):
+            return
+            
+        import time
+        cleanup_attempts = 0
+        max_attempts = 3
+        
+        while cleanup_attempts < max_attempts:
+            try:
+                os.unlink(file_path)
+                print(f"🗑️ 临时文件已清理: {file_path}")
+                return
+            except PermissionError as e:
+                cleanup_attempts += 1
+                print(f"⚠️ 文件清理尝试 {cleanup_attempts}/{max_attempts} 失败: {e}")
+                if cleanup_attempts < max_attempts:
+                    time.sleep(0.1)  # 等待100ms后重试
+                else:
+                    print(f"⚠️ 无法删除临时文件，系统将自动清理: {file_path}")
+                    # 在Windows上，临时文件通常会被系统自动清理
+            except Exception as e:
+                print(f"⚠️ 清理临时文件时发生其他错误: {e}")
+                break
     
     def _apply_bbox_shift(self, bbox, shift, img_shape):
         """应用边界框偏移"""
