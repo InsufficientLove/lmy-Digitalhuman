@@ -154,7 +154,7 @@ namespace LmyDigitalHuman.Services
                         Success = false,
                         Message = $"模板预处理失败: {ex.Message}",
                         TemplateId = templateId,
-                        ProcessingTime = (DateTime.Now - startTime).TotalMilliseconds
+                        ProcessingTime = (DateTime.Now - startTime).TotalMilliseconds.ToString()
                     };
                 }
 
