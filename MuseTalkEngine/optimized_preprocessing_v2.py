@@ -31,7 +31,7 @@ from musetalk.utils.preprocessing import get_landmark_and_bbox, read_imgs, coord
 from musetalk.utils.blending import get_image_prepare_material
 from musetalk.utils.audio_processor import AudioProcessor
 
-print("🚀 Optimized Preprocessing V2 - 极速预处理引擎")
+print("Optimized Preprocessing V2 - 极速预处理引擎")
 
 class OptimizedPreprocessor:
     """优化的预处理器 - 修复阴影问题，极速处理"""
@@ -56,24 +56,36 @@ class OptimizedPreprocessor:
             return True
             
         try:
-            print(f"🔧 初始化预处理模型 - 设备: {device}")
+            print(f"初始化预处理模型 - 设备: {device}")
             self.device = device
             
-            # 加载模型
-            model_dict = load_all_model()
-            self.vae = model_dict['vae'].to(device).half().eval()
-            self.unet = model_dict['unet'].to(device).half().eval() 
-            self.pe = model_dict['pe'].to(device).half().eval()
+            # 加载模型 - 添加错误处理
+            try:
+                vae, unet, pe = load_all_model()
+                print("预处理模型加载成功")
+            except Exception as e:
+                print(f"预处理模型加载失败: {e}")
+                # 尝试使用备用VAE路径
+                try:
+                    vae, unet, pe = load_all_model(vae_type="sd-vae-ft-mse")
+                    print("预处理使用备用VAE模型加载成功")
+                except Exception as e2:
+                    print(f"预处理备用模型也加载失败: {e2}")
+                    raise e2
+            
+            self.vae = vae.to(device).half().eval()
+            self.unet = unet.to(device).half().eval() 
+            self.pe = pe.to(device).half().eval()
             
             # 面部解析器
             self.fp = FaceParsing()
             
-            print("✅ 预处理模型初始化完成")
+            print("预处理模型初始化完成")
             self.is_initialized = True
             return True
             
         except Exception as e:
-            print(f"❌ 模型初始化失败: {str(e)}")
+            print(f"模型初始化失败: {str(e)}")
             return False
     
     def fix_face_shadows(self, image):
@@ -127,7 +139,7 @@ class OptimizedPreprocessor:
             return image
             
         except Exception as e:
-            print(f"⚠️ 阴影修复失败: {str(e)}")
+            print(f"阴影修复失败: {str(e)}")
             return image
     
     def white_balance_correction(self, image):
@@ -188,19 +200,19 @@ class OptimizedPreprocessor:
         """极速模板预处理"""
         try:
             start_time = time.time()
-            print(f"🚀 开始极速预处理: {template_id}")
+            print(f"开始极速预处理: {template_id}")
             
             # 确保输出目录存在
             os.makedirs(output_dir, exist_ok=True)
             
-            # 🎯 1. 并行读取和处理图像
-            print("📸 读取模板图像...")
+            # 1. 并行读取和处理图像
+            print("读取模板图像...")
             
             # 检查是否是直接的图像文件路径
             template_path_obj = Path(template_path)
             if template_path_obj.is_file() and template_path_obj.suffix.lower() in ['.jpg', '.jpeg', '.png', '.bmp']:
                 input_image_path = str(template_path_obj)
-                print(f"📸 使用直接图像文件: {input_image_path}")
+                print(f"使用直接图像文件: {input_image_path}")
             else:
                 # 在目录中搜索图像文件
                 image_files = []
@@ -212,7 +224,7 @@ class OptimizedPreprocessor:
                 
                 # 选择最佳图像（通常是第一张）
                 input_image_path = str(image_files[0])
-                print(f"📸 使用目录中的图像: {input_image_path}")
+                print(f"使用目录中的图像: {input_image_path}")
             
             # 🎨 2. 图像预处理和阴影修复
             print("🎨 图像预处理和阴影修复...")
@@ -220,18 +232,18 @@ class OptimizedPreprocessor:
             if image is None:
                 raise ValueError(f"无法读取图像: {input_image_path}")
             
-            # 🔥 关键：阴影修复
+            # 关键：阴影修复
             image = self.fix_face_shadows(image)
             
-            # 🎯 3. 面部检测和关键点提取
+            # 3. 面部检测和关键点提取
             print("👤 面部检测和关键点提取...")
             coord_list, frame_list = get_landmark_and_bbox([image])
             
             if not coord_list or not frame_list:
                 raise ValueError("面部检测失败")
             
-            # 🎯 4. 面部解析
-            print("🔍 面部解析...")
+            # 4. 面部解析
+            print("面部解析...")
             mask_coords_list, mask_list = [], []
             
             for frame in frame_list:
@@ -243,8 +255,8 @@ class OptimizedPreprocessor:
                 mask_coords_list.append(mask_coords)
                 mask_list.append(mask_out)
             
-            # 🎯 5. VAE编码 - 并行处理
-            print("🔥 VAE编码...")
+            # 5. VAE编码 - 并行处理
+            print("VAE编码...")
             input_latent_list = []
             
             def encode_frame(frame):
@@ -254,14 +266,14 @@ class OptimizedPreprocessor:
                     latent = self.vae.encode_latents(frame_tensor)
                     return latent.cpu()
             
-            # 🚀 并行编码多帧
+            # 并行编码多帧
             with ThreadPoolExecutor(max_workers=4) as executor:
                 futures = [executor.submit(encode_frame, frame) for frame in frame_list]
                 for future in as_completed(futures):
                     latent = future.result()
                     input_latent_list.append(latent)
             
-            # 🎯 6. 创建循环数据
+            # 6. 创建循环数据
             print("🔄 创建循环数据...")
             
             # 如果只有一帧，复制创建循环
@@ -278,7 +290,7 @@ class OptimizedPreprocessor:
                 mask_coords_list_cycle = mask_coords_list
                 mask_list_cycle = mask_list
             
-            # 🎯 7. 保存预处理缓存
+            # 7. 保存预处理缓存
             print("💾 保存预处理缓存...")
             
             cache_data = {
@@ -315,8 +327,8 @@ class OptimizedPreprocessor:
                 pickle.dump({'status': 'completed', 'template_id': template_id}, f)
             
             total_time = time.time() - start_time
-            print(f"🎉 极速预处理完成！")
-            print(f"📊 处理统计:")
+            print(f"极速预处理完成！")
+            print(f"处理统计:")
             print(f"   - 模板ID: {template_id}")
             print(f"   - 帧数: {len(frame_list_cycle)}")
             print(f"   - 耗时: {total_time:.2f}秒")
@@ -326,7 +338,7 @@ class OptimizedPreprocessor:
             return True
             
         except Exception as e:
-            print(f"❌ 预处理失败: {str(e)}")
+            print(f"预处理失败: {str(e)}")
             import traceback
             traceback.print_exc()
             return False
@@ -358,7 +370,7 @@ def main():
     
     # 初始化模型
     if not preprocessor.initialize_models(args.device):
-        print("❌ 模型初始化失败")
+        print("模型初始化失败")
         return
     
     # 执行预处理
@@ -369,9 +381,9 @@ def main():
     )
     
     if success:
-        print("✅ 预处理成功完成")
+        print("预处理成功完成")
     else:
-        print("❌ 预处理失败")
+        print("预处理失败")
         sys.exit(1)
 
 if __name__ == "__main__":

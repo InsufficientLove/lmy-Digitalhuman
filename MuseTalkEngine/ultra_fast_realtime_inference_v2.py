@@ -53,9 +53,9 @@ except ImportError:
         PERFORMANCE_MONITORING = True
     except ImportError:
         PERFORMANCE_MONITORING = False
-        print("⚠️ 性能监控模块未找到，跳过性能监控")
+        print("性能监控模块未找到，跳过性能监控")
 
-print("🚀 Ultra Fast Realtime Inference V2 - 毫秒级响应引擎")
+print("Ultra Fast Realtime Inference V2 - 毫秒级响应引擎")
 sys.stdout.flush()
 
 class UltraFastMuseTalkService:
@@ -75,15 +75,15 @@ class UltraFastMuseTalkService:
         if hasattr(self, '_initialized'):
             return
             
-        # 🚀 4GPU并行架构
+        # 4GPU并行架构
         self.gpu_count = min(4, torch.cuda.device_count())
         self.devices = [f'cuda:{i}' for i in range(self.gpu_count)]
         
-        # 🔥 每个GPU独立的模型实例
+        # 每个GPU独立的模型实例
         self.gpu_models = {}
         self.gpu_locks = {device: threading.Lock() for device in self.devices}
         
-        # 🎯 全局模型组件（共享权重，避免重复加载）
+        # 全局模型组件（共享权重，避免重复加载）
         self.shared_vae = None
         self.shared_unet = None
         self.shared_pe = None
@@ -93,12 +93,12 @@ class UltraFastMuseTalkService:
         self.weight_dtype = torch.float16  # 使用半精度提速
         self.timesteps = None
         
-        # 🚀 内存池和缓存优化
+        # 内存池和缓存优化
         self.template_cache = {}
         self.audio_feature_cache = {}
         self.frame_buffer_pool = queue.Queue(maxsize=1000)
         
-        # 🔥 极速处理管道
+        # 极速处理管道
         self.inference_executor = ThreadPoolExecutor(max_workers=self.gpu_count)
         self.compose_executor = ThreadPoolExecutor(max_workers=32)  # 32线程并行合成
         self.video_executor = ThreadPoolExecutor(max_workers=4)
@@ -110,7 +110,7 @@ class UltraFastMuseTalkService:
         self.is_initialized = False
         self._initialized = True
         
-        print(f"🚀 Ultra Fast Service 初始化完成 - {self.gpu_count}GPU并行架构")
+        print(f"Ultra Fast Service 初始化完成 - {self.gpu_count}GPU并行架构")
         sys.stdout.flush()
     
     def initialize_models_ultra_fast(self):
@@ -119,32 +119,43 @@ class UltraFastMuseTalkService:
             return True
             
         try:
-            print(f"🚀 开始极速初始化 - {self.gpu_count}GPU并行加载...")
+            print(f"开始极速初始化 - {self.gpu_count}GPU并行加载...")
             start_time = time.time()
             
-            # 🔥 并行初始化所有GPU模型
+            # 并行初始化所有GPU模型
             def init_gpu_model(device_id):
                 device = f'cuda:{device_id}'
                 print(f"🎮 GPU{device_id} 开始初始化...")
                 
                 with torch.cuda.device(device_id):
-                    # 加载模型到指定GPU
-                    model_dict = load_all_model()
+                    # 加载模型到指定GPU - 添加错误处理
+                    try:
+                        vae, unet, pe = load_all_model()
+                        print(f"GPU{device_id} 模型加载成功")
+                    except Exception as e:
+                        print(f"GPU{device_id} 模型加载失败: {e}")
+                        # 尝试使用备用VAE路径
+                        try:
+                            vae, unet, pe = load_all_model(vae_type="sd-vae-ft-mse")
+                            print(f"GPU{device_id} 使用备用VAE模型加载成功")
+                        except Exception as e2:
+                            print(f"GPU{device_id} 备用模型也加载失败: {e2}")
+                            raise e2
                     
                     # 优化模型 - 半精度+编译优化
-                    vae = model_dict['vae'].to(device).half().eval()
-                    unet = model_dict['unet'].to(device).half().eval()
-                    pe = model_dict['pe'].to(device).half().eval()
+                    vae = vae.to(device).half().eval()
+                    unet = unet.to(device).half().eval()
+                    pe = pe.to(device).half().eval()
                     
-                    # 🚀 关键优化：模型编译加速
+                    # 关键优化：模型编译加速
                     if hasattr(torch, 'compile'):
                         try:
                             unet.model = torch.compile(unet.model, mode="reduce-overhead")
                             vae.vae = torch.compile(vae.vae, mode="reduce-overhead")
                             pe = torch.compile(pe, mode="reduce-overhead")
-                            print(f"✅ GPU{device_id} 模型编译优化完成")
+                            print(f"GPU{device_id} 模型编译优化完成")
                         except:
-                            print(f"⚠️ GPU{device_id} 模型编译失败，使用原始模型")
+                            print(f"GPU{device_id} 模型编译失败，使用原始模型")
                     
                     self.gpu_models[device] = {
                         'vae': vae,
@@ -153,25 +164,25 @@ class UltraFastMuseTalkService:
                         'device': device
                     }
                     
-                    print(f"✅ GPU{device_id} 模型加载完成")
+                    print(f"GPU{device_id} 模型加载完成")
                     return device_id
             
-            # 🔥 真正的并行初始化
+            # 真正的并行初始化
             with ThreadPoolExecutor(max_workers=self.gpu_count) as executor:
                 futures = [executor.submit(init_gpu_model, i) for i in range(self.gpu_count)]
                 for future in as_completed(futures):
                     gpu_id = future.result()
-                    print(f"🎯 GPU{gpu_id} 就绪")
+                    print(f"GPU{gpu_id} 就绪")
             
-            # 🎵 共享组件初始化（只需一次）
-            print("🎵 初始化共享组件...")
+            # 共享组件初始化（只需一次）
+            print("初始化共享组件...")
             device0 = self.devices[0]
             
             # Whisper和AudioProcessor在CPU上，所有GPU共享
             whisper_dir = "./models/whisper"
             if os.path.exists(whisper_dir):
                 self.shared_whisper = WhisperModel.from_pretrained(whisper_dir).eval()
-                print("✅ Whisper模型加载完成")
+                print("Whisper模型加载完成")
             
             self.shared_audio_processor = AudioProcessor()
             self.shared_fp = FaceParsing()
@@ -180,14 +191,14 @@ class UltraFastMuseTalkService:
             self.timesteps = torch.tensor([0], device=device0, dtype=torch.long)
             
             init_time = time.time() - start_time
-            print(f"🎉 极速初始化完成！耗时: {init_time:.2f}秒")
-            print(f"🚀 {self.gpu_count}GPU并行引擎就绪 - 毫秒级响应模式")
+            print(f"极速初始化完成！耗时: {init_time:.2f}秒")
+            print(f"{self.gpu_count}GPU并行引擎就绪 - 毫秒级响应模式")
             
             self.is_initialized = True
             return True
             
         except Exception as e:
-            print(f"❌ 极速初始化失败: {str(e)}")
+            print(f"极速初始化失败: {str(e)}")
             import traceback
             traceback.print_exc()
             return False
@@ -207,21 +218,21 @@ class UltraFastMuseTalkService:
     def ultra_fast_inference_parallel(self, template_id, audio_path, output_path, cache_dir, batch_size=16, fps=25):
         """极速并行推理 - 毫秒级响应"""
         if not self.is_initialized:
-            print("❌ 模型未初始化")
+            print("模型未初始化")
             return False
         
         try:
             total_start = time.time()
-            print(f"⚡ 开始极速并行推理: {template_id}")
+            print(f"开始极速并行推理: {template_id}")
             
-            # 🔥 1. 并行加载模板缓存 + 音频特征提取
+            # 1. 并行加载模板缓存 + 音频特征提取
             def load_template_cache_async():
                 return self.load_template_cache_optimized(cache_dir, template_id)
             
             def extract_audio_features_async():
                 return self.extract_audio_features_ultra_fast(audio_path, fps)
             
-            # 🚀 关键优化：并行执行缓存加载和音频处理
+            # 关键优化：并行执行缓存加载和音频处理
             with ThreadPoolExecutor(max_workers=2) as prep_executor:
                 cache_future = prep_executor.submit(load_template_cache_async)
                 audio_future = prep_executor.submit(extract_audio_features_async)
@@ -233,40 +244,40 @@ class UltraFastMuseTalkService:
                 return False
             
             prep_time = time.time() - total_start
-            print(f"⚡ 并行预处理完成: {prep_time:.3f}s")
+            print(f"并行预处理完成: {prep_time:.3f}s")
             
-            # 🔥 2. 极速4GPU并行推理
+            # 2. 极速4GPU并行推理
             inference_start = time.time()
             res_frame_list = self.execute_4gpu_parallel_inference(
                 whisper_chunks, cache_data, batch_size
             )
             inference_time = time.time() - inference_start
-            print(f"🚀 4GPU并行推理完成: {inference_time:.3f}s, {len(res_frame_list)}帧")
+            print(f"4GPU并行推理完成: {inference_time:.3f}s, {len(res_frame_list)}帧")
             
-            # 🔥 3. 极速并行图像合成
+            # 3. 极速并行图像合成
             compose_start = time.time()
             video_frames = self.ultra_fast_compose_frames(res_frame_list, cache_data)
             compose_time = time.time() - compose_start
             print(f"🎨 并行图像合成完成: {compose_time:.3f}s")
             
-            # 🔥 4. 极速视频生成
+            # 4. 极速视频生成
             video_start = time.time()
             success = self.generate_video_ultra_fast(video_frames, audio_path, output_path, fps)
             video_time = time.time() - video_start
-            print(f"🎬 视频生成完成: {video_time:.3f}s")
+            print(f"视频生成完成: {video_time:.3f}s")
             
             total_time = time.time() - total_start
-            print(f"🎉 极速推理完成！总耗时: {total_time:.3f}s")
-            print(f"📊 性能分解: 预处理:{prep_time:.3f}s + 推理:{inference_time:.3f}s + 合成:{compose_time:.3f}s + 视频:{video_time:.3f}s")
+            print(f"极速推理完成！总耗时: {total_time:.3f}s")
+            print(f"性能分解: 预处理:{prep_time:.3f}s + 推理:{inference_time:.3f}s + 合成:{compose_time:.3f}s + 视频:{video_time:.3f}s")
             
-            # 🔍 记录性能数据
+            # 记录性能数据
             if PERFORMANCE_MONITORING:
                 record_performance(inference_time, compose_time, video_time, total_time)
             
             return success
             
         except Exception as e:
-            print(f"❌ 极速推理失败: {str(e)}")
+            print(f"极速推理失败: {str(e)}")
             import traceback
             traceback.print_exc()
             return False
@@ -289,9 +300,9 @@ class UltraFastMuseTalkService:
         all_batches = list(gen)
         total_batches = len(all_batches)
         
-        print(f"🚀 4GPU并行处理 {total_batches} 批次...")
+        print(f"4GPU并行处理 {total_batches} 批次...")
         
-        # 🔥 关键优化：每个GPU处理独立的批次，无需同步
+        # 关键优化：每个GPU处理独立的批次，无需同步
         def process_batch_on_gpu(batch_info):
             batch_idx, (whisper_batch, latent_batch) = batch_info
             
@@ -300,13 +311,13 @@ class UltraFastMuseTalkService:
             gpu_models = self.gpu_models[target_device]
             
             try:
-                # 🚀 关键：数据移动到目标GPU
+                # 关键：数据移动到目标GPU
                 with torch.cuda.device(target_device):
                     whisper_batch = whisper_batch.to(target_device, dtype=self.weight_dtype, non_blocking=True)
                     latent_batch = latent_batch.to(target_device, dtype=self.weight_dtype, non_blocking=True)
                     timesteps = self.timesteps.to(target_device)
                     
-                    # 🔥 核心推理 - 使用独立的GPU模型
+                    # 核心推理 - 使用独立的GPU模型
                     with torch.no_grad():
                         audio_features = gpu_models['pe'](whisper_batch)
                         pred_latents = gpu_models['unet'].model(
@@ -324,10 +335,10 @@ class UltraFastMuseTalkService:
                     return batch_idx, result_frames
                     
             except Exception as e:
-                print(f"❌ 批次 {batch_idx} GPU {target_device} 失败: {str(e)}")
+                print(f"批次 {batch_idx} GPU {target_device} 失败: {str(e)}")
                 return batch_idx, []
         
-        # 🚀 真正的4GPU并行执行
+        # 真正的4GPU并行执行
         res_frame_list = []
         batch_results = {}
         
@@ -368,7 +379,7 @@ class UltraFastMuseTalkService:
                 x1, y1, x2, y2 = bbox
                 res_frame = cv2.resize(res_frame.astype(np.uint8), (x2-x1, y2-y1))
                 
-                # 🚀 使用优化的blending
+                # 使用优化的blending
                 mask_coords = mask_coords_list_cycle[i % len(mask_coords_list_cycle)]
                 mask = mask_list_cycle[i % len(mask_list_cycle)]
                 
@@ -383,10 +394,10 @@ class UltraFastMuseTalkService:
                 return i, combine_frame
                 
             except Exception as e:
-                print(f"❌ 合成第{i}帧失败: {str(e)}")
+                print(f"合成第{i}帧失败: {str(e)}")
                 return i, None
         
-        # 🚀 32线程并行合成
+        # 32线程并行合成
         composed_frames = {}
         with ThreadPoolExecutor(max_workers=32) as executor:
             frame_futures = {
@@ -405,7 +416,7 @@ class UltraFastMuseTalkService:
             if i in composed_frames:
                 video_frames.append(composed_frames[i])
         
-        print(f"✅ 并行合成完成: {len(video_frames)} 帧")
+        print(f"并行合成完成: {len(video_frames)} 帧")
         return video_frames
     
     def extract_audio_features_ultra_fast(self, audio_path, fps):
@@ -424,7 +435,7 @@ class UltraFastMuseTalkService:
             )
             return whisper_chunks
         except Exception as e:
-            print(f"❌ 音频特征提取失败: {str(e)}")
+            print(f"音频特征提取失败: {str(e)}")
             return None
     
     def load_template_cache_optimized(self, cache_dir, template_id):
@@ -440,14 +451,14 @@ class UltraFastMuseTalkService:
             return cache_data
             
         except Exception as e:
-            print(f"❌ 缓存加载失败: {str(e)}")
+            print(f"缓存加载失败: {str(e)}")
             return None
     
     def generate_video_ultra_fast(self, video_frames, audio_path, output_path, fps):
         """极速视频生成"""
         try:
-            # 🚀 直接内存生成，无临时文件
-            print(f"🎬 直接生成视频: {len(video_frames)} 帧")
+            # 直接内存生成，无临时文件
+            print(f"直接生成视频: {len(video_frames)} 帧")
             
             # 生成无音频视频
             temp_video = output_path.replace('.mp4', '_temp.mp4')
@@ -457,7 +468,7 @@ class UltraFastMuseTalkService:
                 output_params=['-preset', 'ultrafast', '-crf', '23']
             )
             
-            # 🚀 并行音频合成
+            # 并行音频合成
             try:
                 from moviepy.editor import VideoFileClip, AudioFileClip
                 video_clip = VideoFileClip(temp_video)
@@ -482,13 +493,13 @@ class UltraFastMuseTalkService:
                 os.remove(temp_video)
                 
             except Exception as e:
-                print(f"⚠️ 音频合成失败，使用无音频版本: {str(e)}")
+                print(f"音频合成失败，使用无音频版本: {str(e)}")
                 os.rename(temp_video, output_path)
             
             return True
             
         except Exception as e:
-            print(f"❌ 视频生成失败: {str(e)}")
+            print(f"视频生成失败: {str(e)}")
             return False
 
 # 全局服务实例
@@ -496,17 +507,17 @@ global_service = UltraFastMuseTalkService()
 
 def start_ultra_fast_service(port=28888):
     """启动极速服务"""
-    print(f"🚀 启动Ultra Fast Service - 端口: {port}")
+    print(f"启动Ultra Fast Service - 端口: {port}")
     
     # 初始化模型
     if not global_service.initialize_models_ultra_fast():
-        print("❌ 模型初始化失败")
+        print("模型初始化失败")
         return
     
-    # 🔍 启动性能监控
+    # 启动性能监控
     if PERFORMANCE_MONITORING:
         start_performance_monitoring()
-        print("🔍 性能监控已启动")
+        print("性能监控已启动")
     
     # 启动IPC服务器
     try:
@@ -515,8 +526,8 @@ def start_ultra_fast_service(port=28888):
         server_socket.bind(('127.0.0.1', port))
         server_socket.listen(5)
         
-        print(f"🌐 Ultra Fast Service 就绪 - 监听端口: {port}")
-        print("⚡ 毫秒级响应模式已启用")
+        print(f"Ultra Fast Service 就绪 - 监听端口: {port}")
+        print("毫秒级响应模式已启用")
         
         while True:
             try:
@@ -530,10 +541,10 @@ def start_ultra_fast_service(port=28888):
                 ).start()
                 
             except Exception as e:
-                print(f"❌ 连接处理失败: {str(e)}")
+                print(f"连接处理失败: {str(e)}")
                 
     except Exception as e:
-        print(f"❌ 服务启动失败: {str(e)}")
+        print(f"服务启动失败: {str(e)}")
 
 def handle_client_ultra_fast(client_socket):
     """处理客户端请求 - 极速版本"""
@@ -545,7 +556,7 @@ def handle_client_ultra_fast(client_socket):
         
         print(f"📨 极速推理请求: {request['template_id']}")
         
-        # 🚀 极速推理
+        # 极速推理
         start_time = time.time()
         success = global_service.ultra_fast_inference_parallel(
             template_id=request['template_id'],
@@ -557,7 +568,7 @@ def handle_client_ultra_fast(client_socket):
         )
         
         process_time = time.time() - start_time
-        print(f"⚡ 极速推理完成: {process_time:.3f}s, 结果: {success}")
+        print(f"极速推理完成: {process_time:.3f}s, 结果: {success}")
         
         # 发送响应
         response = {'Success': success, 'OutputPath': request['output_path'] if success else None}
@@ -566,7 +577,7 @@ def handle_client_ultra_fast(client_socket):
         client_socket.send(response_data)
         
     except Exception as e:
-        print(f"❌ 请求处理失败: {str(e)}")
+        print(f"请求处理失败: {str(e)}")
         import traceback
         traceback.print_exc()
     finally:

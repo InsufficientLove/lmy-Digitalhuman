@@ -116,7 +116,7 @@ namespace LmyDigitalHuman.Services
             if (string.IsNullOrEmpty(imagePath))
                 return _templatesPath;
 
-            // 🎯 快速路径解析 - 直接基于wwwroot/templates构建，避免重复检查
+            // 快速路径解析 - 直接基于wwwroot/templates构建，避免重复检查
             string fileName;
             
             // 处理web路径格式（如 /templates/小哈.jpg）

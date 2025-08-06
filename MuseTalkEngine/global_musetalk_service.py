@@ -36,7 +36,7 @@ from musetalk.utils.preprocessing import get_landmark_and_bbox, read_imgs
 from musetalk.utils.blending import get_image, get_image_blending, get_image_prepare_material
 from musetalk.utils.audio_processor import AudioProcessor
 
-print("🎉 MuseTalk全局服务模块导入完成")
+print("MuseTalk全局服务模块导入完成")
 sys.stdout.flush()
 
 class GlobalMuseTalkService:
@@ -79,26 +79,26 @@ class GlobalMuseTalkService:
         self.is_server_running = False
         
         self._initialized = True
-        print("🚀 全局MuseTalk服务实例已创建")
+        print("全局MuseTalk服务实例已创建")
     
     def initialize_models_once(self, gpu_id=0, multi_gpu=False):
         """全局初始化所有模型（整个程序生命周期只执行一次）"""
         if self.is_initialized:
-            print("✅ 模型已全局初始化，直接复用")
+            print("模型已全局初始化，直接复用")
             return True
             
         try:
-            # 🚀 4GPU并行配置
+            # 4GPU并行配置
             if multi_gpu and torch.cuda.device_count() >= 4:
-                print(f"🔧 全局初始化MuseTalk模型 (4GPU并行)...")
+                print(f"全局初始化MuseTalk模型 (4GPU并行)...")
                 print(f"🎮 检测到GPU数量: {torch.cuda.device_count()}")
-                print(f"🚀 启用4GPU并行算力: cuda:0,1,2,3")
+                print(f"启用4GPU并行算力: cuda:0,1,2,3")
                 self.device = f'cuda:{gpu_id}'
                 self.multi_gpu = True
                 self.gpu_devices = [f'cuda:{i}' for i in range(4)]
-                print(f"✅ 4GPU设备列表: {self.gpu_devices}")
+                print(f"4GPU设备列表: {self.gpu_devices}")
             else:
-                print(f"🔧 全局初始化MuseTalk模型 (GPU:{gpu_id})...")
+                print(f"全局初始化MuseTalk模型 (GPU:{gpu_id})...")
                 self.device = f'cuda:{gpu_id}'
                 self.multi_gpu = False
                 self.gpu_devices = [f'cuda:{gpu_id}']
@@ -110,8 +110,8 @@ class GlobalMuseTalkService:
             self.device = torch.device(f"cuda:{gpu_id}" if torch.cuda.is_available() else "cpu")
             print(f"🎮 使用设备: {self.device}")
             
-            # 🚀 基于官方MuseTalk架构加载模型
-            print("📦 加载VAE, UNet, PE模型...")
+            # 基于官方MuseTalk架构加载模型
+            print("加载VAE, UNet, PE模型...")
             try:
                 self.vae, self.unet, self.pe = load_all_model(
                     unet_model_path=self.unet_model_path,
@@ -119,48 +119,48 @@ class GlobalMuseTalkService:
                     unet_config=self.unet_config,
                     device=self.device
                 )
-                print("✅ VAE, UNet, PE模型加载成功")
+                print("VAE, UNet, PE模型加载成功")
             except Exception as model_error:
-                print(f"⚠️ 模型加载警告: {str(model_error)}")
-                print("🔧 尝试使用备用模型配置...")
+                print(f"模型加载警告: {str(model_error)}")
+                print("尝试使用备用模型配置...")
                 # 如果模型加载失败，先继续其他组件的初始化
                 pass
             
-            # 🔧 官方优化：使用half精度提升性能
+            # 官方优化：使用half精度提升性能
             self.weight_dtype = torch.float16
             if hasattr(self, 'pe') and self.pe is not None:
                 try:
                     self.pe = self.pe.half().to(self.device)
-                    print("✅ PE模型优化完成")
+                    print("PE模型优化完成")
                 except Exception as e:
-                    print(f"⚠️ PE模型优化失败: {str(e)}")
+                    print(f"PE模型优化失败: {str(e)}")
             
             if hasattr(self, 'vae') and self.vae is not None:
                 try:
                     self.vae.vae = self.vae.vae.half().to(self.device)
-                    print("✅ VAE模型优化完成")
+                    print("VAE模型优化完成")
                 except Exception as e:
-                    print(f"⚠️ VAE模型优化失败: {str(e)}")
+                    print(f"VAE模型优化失败: {str(e)}")
             
             if hasattr(self, 'unet') and self.unet is not None:
                 try:
                     self.unet.model = self.unet.model.half().to(self.device)
-                    print("✅ UNet模型优化完成")
+                    print("UNet模型优化完成")
                 except Exception as e:
-                    print(f"⚠️ UNet模型优化失败: {str(e)}")
+                    print(f"UNet模型优化失败: {str(e)}")
             
             self.timesteps = torch.tensor([0], device=self.device)
             
             # 加载Whisper模型
-            print("🎵 加载Whisper模型...")
+            print("加载Whisper模型...")
             try:
                 self.audio_processor = AudioProcessor(feature_extractor_path=self.whisper_dir)
                 self.whisper = WhisperModel.from_pretrained(self.whisper_dir)
                 self.whisper = self.whisper.to(device=self.device, dtype=self.weight_dtype).eval()
                 self.whisper.requires_grad_(False)
-                print("✅ Whisper模型加载成功")
+                print("Whisper模型加载成功")
             except Exception as whisper_error:
-                print(f"⚠️ Whisper模型加载失败: {str(whisper_error)}")
+                print(f"Whisper模型加载失败: {str(whisper_error)}")
                 # 继续初始化其他组件
                 pass
             
@@ -168,9 +168,9 @@ class GlobalMuseTalkService:
             print("👤 初始化面部解析器...")
             try:
                 self.fp = FaceParsing()
-                print("✅ 面部解析器初始化成功")
+                print("面部解析器初始化成功")
             except Exception as fp_error:
-                print(f"⚠️ 面部解析器初始化失败: {str(fp_error)}")
+                print(f"面部解析器初始化失败: {str(fp_error)}")
                 pass
             
             # 检查关键组件是否加载成功
@@ -188,18 +188,18 @@ class GlobalMuseTalkService:
             
             self.is_initialized = True
             init_time = time.time() - start_time
-            print(f"✅ 全局模型初始化完成，耗时: {init_time:.2f}秒")
-            print(f"📦 成功加载组件: {', '.join(critical_components)}")
+            print(f"全局模型初始化完成，耗时: {init_time:.2f}秒")
+            print(f"成功加载组件: {', '.join(critical_components)}")
             
             if len(critical_components) >= 3:  # 至少需要3个核心组件
-                print("🎉 核心模型已加载到GPU内存，后续推理将极速执行")
+                print("核心模型已加载到GPU内存，后续推理将极速执行")
                 return True
             else:
-                print("⚠️ 部分关键组件加载失败，但服务仍可启动")
+                print("部分关键组件加载失败，但服务仍可启动")
                 return True  # 仍然返回True，让服务启动
             
         except Exception as e:
-            print(f"❌ 全局模型初始化失败: {str(e)}")
+            print(f"全局模型初始化失败: {str(e)}")
             import traceback
             traceback.print_exc()
             return False
@@ -230,7 +230,7 @@ class GlobalMuseTalkService:
             mask_coords_list_cycle = cache_data['mask_coords_list_cycle']
             mask_list_cycle = cache_data['mask_list_cycle']
             
-            print(f"✅ 模板缓存加载成功: {template_id}")
+            print(f"模板缓存加载成功: {template_id}")
             print(f"   - 潜在向量: {len(input_latent_list_cycle)} 帧")
             print(f"   - 面部坐标: {len(coord_list_cycle)} 帧")
             
@@ -244,20 +244,20 @@ class GlobalMuseTalkService:
             }
             
         except Exception as e:
-            print(f"❌ 加载模板缓存失败: {str(e)}")
+            print(f"加载模板缓存失败: {str(e)}")
             return None
     
     def ultra_fast_inference(self, template_id, audio_path, output_path, cache_dir, batch_size=8, fps=25):
         """超快速推理 - 复用全局模型，无需重复加载"""
         if not self.is_initialized:
-            print("❌ 全局模型未初始化")
+            print("全局模型未初始化")
             return False
         
-        # 🔒 推理锁，确保线程安全
+        # 推理锁，确保线程安全
         with self.inference_lock:
             try:
                 start_time = time.time()
-                print(f"⚡ 开始超快速推理: {template_id}")
+                print(f"开始超快速推理: {template_id}")
                 
                 # 1. 加载模板缓存
                 cache_data = self.load_template_cache(cache_dir, template_id)
@@ -269,7 +269,7 @@ class GlobalMuseTalkService:
                 frame_list_cycle = cache_data['frame_list_cycle']
                 
                 # 2. 音频特征提取
-                print("🎵 提取音频特征...")
+                print("提取音频特征...")
                 audio_start = time.time()
                 whisper_input_features, librosa_length = self.audio_processor.get_audio_feature(audio_path)
                 whisper_chunks = self.audio_processor.get_whisper_chunk(
@@ -283,10 +283,10 @@ class GlobalMuseTalkService:
                     audio_padding_length_right=2,
                 )
                 audio_time = time.time() - audio_start
-                print(f"✅ 音频特征提取完成: {audio_time:.2f}秒, 音频块数: {len(whisper_chunks)}")
+                print(f"音频特征提取完成: {audio_time:.2f}秒, 音频块数: {len(whisper_chunks)}")
                 
-                # 3. 批量推理 - 🚀 复用全局模型，极速执行
-                print("⚡ 开始批量推理...")
+                # 3. 批量推理 - 复用全局模型，极速执行
+                print("开始批量推理...")
                 inference_start = time.time()
                 video_num = len(whisper_chunks)
                 gen = datagen(
@@ -299,14 +299,14 @@ class GlobalMuseTalkService:
                 
                 res_frame_list = []
                 
-                # 🔧 修复：先收集所有批次，然后决定是否并行
+                # 修复：先收集所有批次，然后决定是否并行
                 all_batches = list(gen)
                 total_batches = len(all_batches)
                 
-                # 🔧 临时禁用4GPU并行，避免模型冲突 - 等稳定后再优化
+                # 临时禁用4GPU并行，避免模型冲突 - 等稳定后再优化
                 if False and self.multi_gpu and len(self.gpu_devices) >= 4 and total_batches > 1:
-                    # 🚀 真正的4GPU并行推理 - 修复模型冲突问题
-                    print(f"🚀 使用真正4GPU并行推理，总批次: {total_batches}")
+                    # 真正的4GPU并行推理 - 修复模型冲突问题
+                    print(f"使用真正4GPU并行推理，总批次: {total_batches}")
                     sys.stdout.flush()
                     from concurrent.futures import ThreadPoolExecutor, as_completed
                     import copy
@@ -314,7 +314,7 @@ class GlobalMuseTalkService:
                     def process_batch_on_gpu(args):
                         i, (whisper_batch, latent_batch), target_gpu = args
                         try:
-                            # 🔧 关键：每个线程使用不同的GPU
+                            # 关键：每个线程使用不同的GPU
                             device = torch.device(target_gpu)
                             torch.cuda.set_device(device)
                             
@@ -325,7 +325,7 @@ class GlobalMuseTalkService:
                             whisper_batch = whisper_batch.to(device)
                             latent_batch = latent_batch.to(dtype=self.weight_dtype, device=device)
                             
-                            # 🔧 关键修复：为每个GPU创建独立的模型副本
+                            # 关键修复：为每个GPU创建独立的模型副本
                             with torch.no_grad():
                                 # 创建模型的深度副本并移到目标GPU
                                 pe_gpu = copy.deepcopy(self.pe).to(device)
@@ -345,7 +345,7 @@ class GlobalMuseTalkService:
                             # 将结果移回CPU
                             return i, [frame.cpu().numpy() for frame in recon]
                         except Exception as e:
-                            print(f"❌ 批次 {i} GPU {target_gpu} 推理失败: {str(e)}")
+                            print(f"批次 {i} GPU {target_gpu} 推理失败: {str(e)}")
                             sys.stdout.flush()
                             # 清理GPU内存
                             torch.cuda.empty_cache()
@@ -369,34 +369,34 @@ class GlobalMuseTalkService:
                         
                 else:
                     # 单GPU推理（原逻辑）
-                    print(f"🎯 使用单GPU推理，总批次: {total_batches}")
+                    print(f"使用单GPU推理，总批次: {total_batches}")
                     for i, (whisper_batch, latent_batch) in enumerate(tqdm(all_batches, desc="推理进度")):
                         audio_feature_batch = self.pe(whisper_batch)
                         latent_batch = latent_batch.to(dtype=self.weight_dtype)
                         
-                        # 🔥 核心推理 - 复用全局模型
+                        # 核心推理 - 复用全局模型
                         pred_latents = self.unet.model(latent_batch, self.timesteps, encoder_hidden_states=audio_feature_batch).sample
                         recon = self.vae.decode_latents(pred_latents)
                         for res_frame in recon:
                             res_frame_list.append(res_frame)
                 
                 inference_time = time.time() - inference_start
-                print(f"✅ 推理完成: {len(res_frame_list)} 帧, 耗时: {inference_time:.2f}秒")
+                print(f"推理完成: {len(res_frame_list)} 帧, 耗时: {inference_time:.2f}秒")
                 
                 # 4. 图像合成 - 🎨 使用官方get_image方法避免阴影
-                print("🖼️ 合成完整图像...")
+                print("合成完整图像...")
                 compose_start = time.time()
                 
                 # 创建临时帧目录
                 temp_frames_dir = os.path.join(os.path.dirname(output_path), "temp_frames")
                 os.makedirs(temp_frames_dir, exist_ok=True)
                 
-                # 🚀 极速优化：并行处理图像合成
+                # 极速优化：并行处理图像合成
                 from concurrent.futures import ThreadPoolExecutor
                 import functools
-                import copy  # 🔧 关键修复：在正确位置导入copy模块
+                import copy  # 关键修复：在正确位置导入copy模块
                 
-                # 🔧 关键修复：将模板缓存数据提取到局部变量，解决作用域问题
+                # 关键修复：将模板缓存数据提取到局部变量，解决作用域问题
                 coord_list_cycle = cache_data['coord_list_cycle']
                 frame_list_cycle = cache_data['frame_list_cycle']
                 mask_coords_list_cycle = cache_data['mask_coords_list_cycle']
@@ -413,7 +413,7 @@ class GlobalMuseTalkService:
                     except:
                         return None
                     
-                    # 🚀 关键优化：使用官方get_image_blending，比get_image快10倍！
+                    # 关键优化：使用官方get_image_blending，比get_image快10倍！
                     mask_coords = mask_coords_list_cycle[i % len(mask_coords_list_cycle)]
                     mask = mask_list_cycle[i % len(mask_list_cycle)]
                     
@@ -430,8 +430,8 @@ class GlobalMuseTalkService:
                     cv2.imwrite(frame_path, combine_frame)
                     return i
                 
-                # 🚀 关键优化：使用官方MuseTalk的多线程并行方案
-                print(f"🖼️ 开始极速合成{len(res_frame_list)}帧图像...")
+                # 关键优化：使用官方MuseTalk的多线程并行方案
+                print(f"开始极速合成{len(res_frame_list)}帧图像...")
                 sys.stdout.flush()
                 
                 import queue
@@ -455,7 +455,7 @@ class GlobalMuseTalkService:
                         except queue.Empty:
                             continue
                         except Exception as e:
-                            print(f"❌ 合成第{i}帧失败: {str(e)}")
+                            print(f"合成第{i}帧失败: {str(e)}")
                             sys.stdout.flush()
                             frame_queue.task_done()
                 
@@ -474,21 +474,21 @@ class GlobalMuseTalkService:
                 frame_queue.put(None)
                 worker_thread.join()
                 
-                print(f"✅ 极速合成完成: {len(compose_results)}帧")
+                print(f"极速合成完成: {len(compose_results)}帧")
                 sys.stdout.flush()
                 
                 compose_time = time.time() - compose_start
-                print(f"✅ 图像合成完成: 耗时: {compose_time:.2f}秒")
+                print(f"图像合成完成: 耗时: {compose_time:.2f}秒")
                 
-                # 5. 🚀 极速视频生成 - 使用官方MuseTalk优化方法
-                print("🎬 极速生成视频...")
+                # 5. 极速视频生成 - 使用官方MuseTalk优化方法
+                print("极速生成视频...")
                 video_start = time.time()
                 
-                # 🔧 关键优化：直接从内存生成视频，避免磁盘I/O
+                # 关键优化：直接从内存生成视频，避免磁盘I/O
                 import imageio
                 
                 # 收集所有合成的图像帧
-                print(f"📦 收集{len(res_frame_list)}帧图像...")
+                print(f"收集{len(res_frame_list)}帧图像...")
                 video_frames = []
                 for i in range(len(res_frame_list)):
                     frame_path = os.path.join(temp_frames_dir, f"{i:08d}.png")
@@ -499,16 +499,16 @@ class GlobalMuseTalkService:
                 if len(video_frames) == 0:
                     raise Exception("没有找到合成的图像帧")
                 
-                # 🚀 关键优化：使用imageio直接生成视频，比FFmpeg更快
+                # 关键优化：使用imageio直接生成视频，比FFmpeg更快
                 temp_video = output_path.replace('.mp4', '_temp.mp4')
-                print(f"🎬 使用imageio生成视频: {len(video_frames)}帧")
+                print(f"使用imageio生成视频: {len(video_frames)}帧")
                 imageio.mimwrite(temp_video, video_frames, 'FFMPEG', fps=fps, codec='libx264', pixelformat='yuv420p')
                 
                 video_time = time.time() - video_start
-                print(f"✅ 视频生成完成: 耗时: {video_time:.2f}秒")
+                print(f"视频生成完成: 耗时: {video_time:.2f}秒")
                 
                 # 6. 合成音频
-                print("🔊 合成音频...")
+                print("合成音频...")
                 audio_merge_start = time.time()
                 
                 try:
@@ -524,20 +524,20 @@ class GlobalMuseTalkService:
                     shutil.rmtree(temp_frames_dir)
                     
                 except Exception as e:
-                    print(f"⚠️ 音频合成失败，使用无音频版本: {str(e)}")
+                    print(f"音频合成失败，使用无音频版本: {str(e)}")
                     shutil.move(temp_video, output_path)
                 
                 audio_merge_time = time.time() - audio_merge_start
-                print(f"✅ 音频合成完成: 耗时: {audio_merge_time:.2f}秒")
+                print(f"音频合成完成: 耗时: {audio_merge_time:.2f}秒")
                 
                 total_time = time.time() - start_time
-                print(f"🎉 超快速推理完成: {output_path}")
-                print(f"📊 总耗时: {total_time:.2f}秒 (音频:{audio_time:.1f}s + 推理:{inference_time:.1f}s + 合成:{compose_time:.1f}s + 视频:{video_time:.1f}s + 音频:{audio_merge_time:.1f}s)")
+                print(f"超快速推理完成: {output_path}")
+                print(f"总耗时: {total_time:.2f}秒 (音频:{audio_time:.1f}s + 推理:{inference_time:.1f}s + 合成:{compose_time:.1f}s + 视频:{video_time:.1f}s + 音频:{audio_merge_time:.1f}s)")
                 
                 return True
                 
             except Exception as e:
-                print(f"❌ 超快速推理失败: {str(e)}")
+                print(f"超快速推理失败: {str(e)}")
                 import traceback
                 traceback.print_exc()
                 return False
@@ -545,59 +545,59 @@ class GlobalMuseTalkService:
     def start_ipc_server(self, port=9999):
         """启动IPC服务器，接收推理请求"""
         try:
-            print(f"🔧 创建socket对象...")
+            print(f"创建socket对象...")
             sys.stdout.flush()
             self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             
-            print(f"🔧 设置socket选项...")
+            print(f"设置socket选项...")
             sys.stdout.flush()
             self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             
-            print(f"🔧 绑定端口 {port}... (地址: 127.0.0.1)")
+            print(f"绑定端口 {port}... (地址: 127.0.0.1)")
             sys.stdout.flush()
             self.server_socket.bind(('127.0.0.1', port))
             
-            print(f"🔧 开始监听连接...")
+            print(f"开始监听连接...")
             sys.stdout.flush()
             self.server_socket.listen(5)
             
-            print(f"🔧 设置服务器运行状态...")
+            print(f"设置服务器运行状态...")
             sys.stdout.flush()
             self.is_server_running = True
             
-            print(f"🌐 IPC服务器启动成功，监听端口: {port}")
+            print(f"IPC服务器启动成功，监听端口: {port}")
             print("📡 等待C#客户端连接...")
-            print("✅ 全局MuseTalk服务完全就绪！")
+            print("全局MuseTalk服务完全就绪！")
             sys.stdout.flush()
             
-            print(f"🔧 进入主循环，等待客户端连接...")
+            print(f"进入主循环，等待客户端连接...")
             sys.stdout.flush()
             
-            print(f"🔧 开始接受连接... (绑定: 127.0.0.1:{port})")
+            print(f"开始接受连接... (绑定: 127.0.0.1:{port})")
             sys.stdout.flush()
             
             while self.is_server_running:
                 try:
-                    # 🔧 关键修复：移除超时，直接阻塞等待连接
+                    # 关键修复：移除超时，直接阻塞等待连接
                     client_socket, addr = self.server_socket.accept()
                     
                     print(f"🔗 客户端连接成功! 来源: {addr}")
                     sys.stdout.flush()
                     
                     # 处理客户端请求
-                    print(f"🔧 启动处理线程...")
+                    print(f"启动处理线程...")
                     sys.stdout.flush()
                     threading.Thread(target=self._handle_client, args=(client_socket,)).start()
                     
                 except Exception as e:
                     if self.is_server_running:
-                        print(f"❌ 接受连接失败: {str(e)}")
+                        print(f"接受连接失败: {str(e)}")
                         import traceback
                         traceback.print_exc()
                         sys.stdout.flush()
                     
         except Exception as e:
-            print(f"❌ IPC服务器启动失败: {str(e)}")
+            print(f"IPC服务器启动失败: {str(e)}")
     
     def _handle_client(self, client_socket):
         """处理客户端请求"""
@@ -605,11 +605,11 @@ class GlobalMuseTalkService:
             print("🔗 开始处理客户端请求...")
             sys.stdout.flush()
             
-            # 🔧 关键检查：确保模型已初始化
-            print(f"🔧 检查模型初始化状态: {self.is_initialized}")
+            # 关键检查：确保模型已初始化
+            print(f"检查模型初始化状态: {self.is_initialized}")
             sys.stdout.flush()
             if not self.is_initialized:
-                print("❌ 模型未初始化，无法处理推理请求")
+                print("模型未初始化，无法处理推理请求")
                 error_response = {'Success': False, 'OutputPath': None}
                 response_data = json.dumps(error_response).encode('utf-8')
                 client_socket.send(struct.pack('I', len(response_data)))
@@ -625,7 +625,7 @@ class GlobalMuseTalkService:
             print(f"📨 收到推理请求: {request['template_id']}")
             
             # 执行推理
-            print("🚀 开始执行推理...")
+            print("开始执行推理...")
             success = self.ultra_fast_inference(
                 template_id=request['template_id'],
                 audio_path=request['audio_path'],
@@ -634,9 +634,9 @@ class GlobalMuseTalkService:
                 batch_size=request.get('batch_size', 8),
                 fps=request.get('fps', 25)
             )
-            print(f"✅ 推理执行完成，结果: {success}")
+            print(f"推理执行完成，结果: {success}")
             
-            # 发送响应 - 🔧 修复：使用C#期望的大写字段名
+            # 发送响应 - 修复：使用C#期望的大写字段名
             response = {'Success': success, 'OutputPath': request['output_path'] if success else None}
             response_data = json.dumps(response).encode('utf-8')
             client_socket.send(struct.pack('I', len(response_data)))
@@ -645,11 +645,11 @@ class GlobalMuseTalkService:
             print(f"📤 推理响应已发送: {'成功' if success else '失败'}")
             
         except Exception as e:
-            print(f"❌ 处理客户端请求失败: {str(e)}")
+            print(f"处理客户端请求失败: {str(e)}")
             import traceback
             traceback.print_exc()
             
-            # 🔧 关键修复：即使异常也要发送响应
+            # 关键修复：即使异常也要发送响应
             try:
                 error_response = {'Success': False, 'OutputPath': None}
                 response_data = json.dumps(error_response).encode('utf-8')
@@ -674,29 +674,29 @@ global_service = GlobalMuseTalkService()
 def main():
     """命令行接口"""
     try:
-        print("🚀 Python全局服务main函数启动...")
+        print("Python全局服务main函数启动...")
         sys.stdout.flush()
-        print(f"🐍 Python版本: {sys.version}")
-        print(f"🐍 工作目录: {os.getcwd()}")
+        print(f"Python版本: {sys.version}")
+        print(f"工作目录: {os.getcwd()}")
         sys.stdout.flush()
         
         # 测试关键模块导入
         try:
             import torch
-            print(f"✅ torch版本: {torch.__version__}")
-            print(f"✅ CUDA可用: {torch.cuda.is_available()}")
+            print(f"torch版本: {torch.__version__}")
+            print(f"CUDA可用: {torch.cuda.is_available()}")
             if torch.cuda.is_available():
-                print(f"✅ GPU数量: {torch.cuda.device_count()}")
+                print(f"GPU数量: {torch.cuda.device_count()}")
             sys.stdout.flush()
         except Exception as e:
-            print(f"❌ torch导入失败: {str(e)}")
+            print(f"torch导入失败: {str(e)}")
             sys.stdout.flush()
             sys.exit(1)
         
-        print("🔧 开始解析命令行参数...")
+        print("开始解析命令行参数...")
         sys.stdout.flush()
     except Exception as e:
-        print(f"❌ main函数初始化失败: {str(e)}")
+        print(f"main函数初始化失败: {str(e)}")
         import traceback
         traceback.print_exc()
         sys.stdout.flush()
@@ -717,16 +717,16 @@ def main():
     parser.add_argument('--fps', type=int, default=25, help='视频帧率')
     
     try:
-        print("📋 开始解析命令行参数...")
+        print("开始解析命令行参数...")
         sys.stdout.flush()
         args = parser.parse_args()
-        print(f"📋 参数解析完成: mode={args.mode}, multi_gpu={args.multi_gpu}, gpu_id={args.gpu_id}, port={args.port}")
+        print(f"参数解析完成: mode={args.mode}, multi_gpu={args.multi_gpu}, gpu_id={args.gpu_id}, port={args.port}")
         sys.stdout.flush()
         
-        print("🔧 进入服务器模式逻辑...")
+        print("进入服务器模式逻辑...")
         sys.stdout.flush()
     except Exception as e:
-        print(f"❌ 参数解析失败: {str(e)}")
+        print(f"参数解析失败: {str(e)}")
         import traceback
         traceback.print_exc()
         sys.stdout.flush()
@@ -735,35 +735,35 @@ def main():
     if args.mode == 'server':
         # 服务器模式：启动时初始化所有模型，然后监听请求
         if args.multi_gpu:
-            print("🚀 启动4GPU并行全局MuseTalk服务器...")
+            print("启动4GPU并行全局MuseTalk服务器...")
         else:
-            print("🚀 启动全局MuseTalk服务器...")
+            print("启动全局MuseTalk服务器...")
         sys.stdout.flush()
         
         # 全局初始化模型（只执行一次）
-        print("🔧 准备初始化全局模型...")
+        print("准备初始化全局模型...")
         sys.stdout.flush()
         try:
-            print("🔧 调用initialize_models_once...")
+            print("调用initialize_models_once...")
             sys.stdout.flush()
             if not global_service.initialize_models_once(args.gpu_id, multi_gpu=args.multi_gpu):
-                print("❌ 模型初始化失败")
+                print("模型初始化失败")
                 sys.stdout.flush()
                 sys.exit(1)
-            print("✅ 模型初始化成功，准备启动IPC服务器...")
+            print("模型初始化成功，准备启动IPC服务器...")
             sys.stdout.flush()
         except Exception as e:
-            print(f"❌ 模型初始化异常: {str(e)}")
+            print(f"模型初始化异常: {str(e)}")
             import traceback
             traceback.print_exc()
             sys.stdout.flush()
             sys.exit(1)
         
         # 启动IPC服务器
-        print("🌐 准备启动IPC服务器...")
+        print("准备启动IPC服务器...")
         sys.stdout.flush()
         try:
-            print("🌐 调用start_ipc_server...")
+            print("调用start_ipc_server...")
             sys.stdout.flush()
             global_service.start_ipc_server(args.port)
         except KeyboardInterrupt:
@@ -771,7 +771,7 @@ def main():
             global_service.stop_server()
             sys.stdout.flush()
         except Exception as e:
-            print(f"❌ IPC服务器启动异常: {str(e)}")
+            print(f"IPC服务器启动异常: {str(e)}")
             import traceback
             traceback.print_exc()
             sys.stdout.flush()
@@ -780,12 +780,12 @@ def main():
     else:
         # 客户端模式：直接执行推理
         if not all([args.template_id, args.audio_path, args.output_path, args.cache_dir]):
-            print("❌ 客户端模式需要提供所有推理参数")
+            print("客户端模式需要提供所有推理参数")
             sys.exit(1)
         
         # 初始化模型
         if not global_service.initialize_models_once(args.gpu_id):
-            print("❌ 模型初始化失败")
+            print("模型初始化失败")
             sys.exit(1)
         
         # 执行推理

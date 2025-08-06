@@ -39,7 +39,7 @@ namespace LmyDigitalHuman.Services
             _connectionTimeout = _configuration.GetValue<int>("PersistentMuseTalk:ConnectionTimeout", 5000);
             _responseTimeout = _configuration.GetValue<int>("PersistentMuseTalk:ResponseTimeout", 30000);
             
-            _logger.LogInformation("🚀 初始化持久化MuseTalk客户端");
+            _logger.LogInformation("初始化持久化MuseTalk客户端");
             _logger.LogInformation("📡 目标地址: {Host}:{Port}", _host, _port);
         }
 
@@ -89,11 +89,11 @@ namespace LmyDigitalHuman.Services
                 _isConnected = true;
                 _lastPingTime = DateTime.Now;
                 
-                _logger.LogInformation("✅ 持久化MuseTalk服务连接成功");
+                _logger.LogInformation("持久化MuseTalk服务连接成功");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "❌ 连接持久化MuseTalk服务失败");
+                _logger.LogError(ex, "连接持久化MuseTalk服务失败");
                 Disconnect();
                 throw;
             }
@@ -184,7 +184,7 @@ namespace LmyDigitalHuman.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "❌ 发送请求失败");
+                _logger.LogError(ex, "发送请求失败");
                 Disconnect(); // 连接可能已损坏，断开重连
                 throw;
             }
@@ -209,14 +209,14 @@ namespace LmyDigitalHuman.Services
                 }
                 else
                 {
-                    _logger.LogWarning("⚠️ Ping失败");
+                    _logger.LogWarning("Ping失败");
                 }
                 
                 return success;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "❌ Ping失败");
+                _logger.LogError(ex, "Ping失败");
                 return false;
             }
         }
@@ -233,7 +233,7 @@ namespace LmyDigitalHuman.Services
             int bboxShift = 0,
             string parsingMode = "jaw")
         {
-            _logger.LogInformation("⚡ 开始持久化推理: TemplateId={TemplateId}", templateId);
+            _logger.LogInformation("开始持久化推理: TemplateId={TemplateId}", templateId);
             
             var startTime = DateTime.Now;
             
@@ -257,12 +257,12 @@ namespace LmyDigitalHuman.Services
                 
                 if (response?.Success == true)
                 {
-                    _logger.LogInformation("✅ 持久化推理完成: TemplateId={TemplateId}, 总耗时={TotalTime:F2}秒, 推理耗时={InferenceTime:F2}秒", 
+                    _logger.LogInformation("持久化推理完成: TemplateId={TemplateId}, 总耗时={TotalTime:F2}秒, 推理耗时={InferenceTime:F2}秒", 
                         templateId, totalTime.TotalSeconds, response.InferenceTime);
                 }
                 else
                 {
-                    _logger.LogError("❌ 持久化推理失败: TemplateId={TemplateId}, 错误={Error}", 
+                    _logger.LogError("持久化推理失败: TemplateId={TemplateId}, 错误={Error}", 
                         templateId, response?.Error);
                 }
                 
@@ -271,7 +271,7 @@ namespace LmyDigitalHuman.Services
             catch (Exception ex)
             {
                 var totalTime = DateTime.Now - startTime;
-                _logger.LogError(ex, "❌ 持久化推理异常: TemplateId={TemplateId}, 总耗时={TotalTime:F2}秒", 
+                _logger.LogError(ex, "持久化推理异常: TemplateId={TemplateId}, 总耗时={TotalTime:F2}秒", 
                     templateId, totalTime.TotalSeconds);
                 throw;
             }
@@ -286,7 +286,7 @@ namespace LmyDigitalHuman.Services
             int bboxShift = 0,
             string parsingMode = "jaw")
         {
-            _logger.LogInformation("🎯 开始预处理: TemplateId={TemplateId}", templateId);
+            _logger.LogInformation("开始预处理: TemplateId={TemplateId}", templateId);
             
             try
             {
@@ -303,12 +303,12 @@ namespace LmyDigitalHuman.Services
                 
                 if (response?.Success == true)
                 {
-                    _logger.LogInformation("✅ 预处理完成: TemplateId={TemplateId}, 耗时={ProcessTime:F2}秒", 
+                    _logger.LogInformation("预处理完成: TemplateId={TemplateId}, 耗时={ProcessTime:F2}秒", 
                         templateId, response.ProcessTime);
                 }
                 else
                 {
-                    _logger.LogError("❌ 预处理失败: TemplateId={TemplateId}, 错误={Error}", 
+                    _logger.LogError("预处理失败: TemplateId={TemplateId}, 错误={Error}", 
                         templateId, response?.Error);
                 }
                 
@@ -316,7 +316,7 @@ namespace LmyDigitalHuman.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "❌ 预处理异常: TemplateId={TemplateId}", templateId);
+                _logger.LogError(ex, "预处理异常: TemplateId={TemplateId}", templateId);
                 throw;
             }
         }
@@ -331,14 +331,14 @@ namespace LmyDigitalHuman.Services
                 var request = new { command = "check_cache", template_id = templateId };
                 var response = await SendRequestAsync<CheckCacheResponse>(request);
                 
-                _logger.LogDebug("🔍 缓存检查: TemplateId={TemplateId}, 存在={CacheExists}", 
+                _logger.LogDebug("缓存检查: TemplateId={TemplateId}, 存在={CacheExists}", 
                     templateId, response?.CacheExists);
                 
                 return response;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "❌ 检查缓存异常: TemplateId={TemplateId}", templateId);
+                _logger.LogError(ex, "检查缓存异常: TemplateId={TemplateId}", templateId);
                 throw;
             }
         }
@@ -355,7 +355,7 @@ namespace LmyDigitalHuman.Services
                 
                 if (response?.Success == true)
                 {
-                    _logger.LogDebug("📊 服务状态: {Status}, 模型已加载={ModelLoaded}", 
+                    _logger.LogDebug("服务状态: {Status}, 模型已加载={ModelLoaded}", 
                         response.Status, response.ModelLoaded);
                 }
                 
@@ -363,7 +363,7 @@ namespace LmyDigitalHuman.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "❌ 获取状态异常");
+                _logger.LogError(ex, "获取状态异常");
                 throw;
             }
         }

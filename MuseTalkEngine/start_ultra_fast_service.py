@@ -35,13 +35,13 @@ def setup_environment():
     if os.path.exists(musetalk_path):
         os.chdir(musetalk_path)
         current_dir = musetalk_path
-        print(f"🔧 工作目录设置为: {current_dir} (MuseTalk模型目录)")
+        print(f"工作目录设置为: {current_dir} (MuseTalk模型目录)")
     else:
         os.chdir(script_dir)
         current_dir = script_dir
-        print(f"🔧 工作目录设置为: {current_dir} (MuseTalkEngine目录)")
+        print(f"工作目录设置为: {current_dir} (MuseTalkEngine目录)")
     
-    print(f"🔧 Python路径已添加: {[p for p in paths_to_add if os.path.exists(p)]}")
+    print(f"Python路径已添加: {[p for p in paths_to_add if os.path.exists(p)]}")
 
 def main():
     """主函数"""
@@ -56,8 +56,8 @@ def main():
     # 设置环境
     setup_environment()
     
-    print("🚀 启动Ultra Fast MuseTalk服务...")
-    print(f"📊 配置参数:")
+    print("启动Ultra Fast MuseTalk服务...")
+    print(f"配置参数:")
     print(f"   - 端口: {args.port}")
     print(f"   - 模式: {args.mode}")
     print(f"   - 多GPU: {args.multi_gpu}")
@@ -65,12 +65,12 @@ def main():
     
     # 导入并启动Ultra Fast服务
     try:
-        print("🔍 尝试启动Ultra Fast V2推理引擎...")
+        print("尝试启动Ultra Fast V2推理引擎...")
         from ultra_fast_realtime_inference_v2 import start_ultra_fast_service
         start_ultra_fast_service(args.port)
     except ImportError as e:
-        print(f"❌ Ultra Fast V2服务导入失败: {str(e)}")
-        print("🔧 尝试使用备用全局服务...")
+        print(f"Ultra Fast V2服务导入失败: {str(e)}")
+        print("尝试使用备用全局服务...")
         try:
             from global_musetalk_service import main as global_main
             # 设置参数兼容全局服务
@@ -85,14 +85,14 @@ def main():
             global_main()
             sys.argv = original_argv
         except ImportError as e2:
-            print(f"❌ 备用服务也无法启动: {str(e2)}")
-            print("💡 请检查:")
+            print(f"备用服务也无法启动: {str(e2)}")
+            print("请检查:")
             print("   1. MuseTalk模型文件是否在 MuseTalk/ 目录中")
             print("   2. 虚拟环境是否正确激活")
             print("   3. 依赖包是否完整安装")
             sys.exit(1)
     except Exception as e:
-        print(f"❌ Ultra Fast服务启动失败: {str(e)}")
+        print(f"Ultra Fast服务启动失败: {str(e)}")
         import traceback
         traceback.print_exc()
         sys.exit(1)

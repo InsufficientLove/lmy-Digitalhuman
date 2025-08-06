@@ -39,10 +39,10 @@ builder.Services.AddSwaggerGen(c =>
 // Register services
 builder.Services.AddSingleton<IPathManager, PathManager>();  // 路径管理服务 - 必须最先注册
 builder.Services.AddSingleton<IPythonEnvironmentService, PythonEnvironmentService>();  // Python环境检测服务
-builder.Services.AddSingleton<GlobalMuseTalkServiceManager>();  // 🚀 全局MuseTalk服务管理器
+builder.Services.AddSingleton<GlobalMuseTalkServiceManager>();  // 全局MuseTalk服务管理器
 builder.Services.AddSingleton<IWhisperNetService, WhisperNetService>();
 builder.Services.AddSingleton<IStreamingTTSService, StreamingTTSService>();
-// 🚀 使用极致优化MuseTalk服务 - 专门针对固定模板的4x RTX 4090优化
+// 使用极致优化MuseTalk服务 - 专门针对固定模板的4x RTX 4090优化
 builder.Services.AddSingleton<IMuseTalkService, OptimizedMuseTalkService>();
 builder.Services.AddSingleton<IMuseTalkCommercialService, MuseTalkCommercialService>();
 builder.Services.AddSingleton<ILocalLLMService, OllamaService>();
@@ -86,9 +86,9 @@ builder.Services.AddCors(options =>
 var app = builder.Build();
 
 // 启动时显示环境信息
-app.Logger.LogInformation("🌍 当前运行环境: {Environment}", app.Environment.EnvironmentName);
-app.Logger.LogInformation("📁 内容根目录: {ContentRoot}", app.Environment.ContentRootPath);
-app.Logger.LogInformation("🌐 Web根目录: {WebRoot}", app.Environment.WebRootPath);
+app.Logger.LogInformation("当前运行环境: {Environment}", app.Environment.EnvironmentName);
+app.Logger.LogInformation("内容根目录: {ContentRoot}", app.Environment.ContentRootPath);
+app.Logger.LogInformation("Web根目录: {WebRoot}", app.Environment.WebRootPath);
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -115,24 +115,24 @@ Directory.CreateDirectory(tempPath);
 Directory.CreateDirectory(templatesPath);
 Directory.CreateDirectory(imagesPath);
 
-// 🚀 启动全局MuseTalk服务
+// 启动全局MuseTalk服务
 var globalServiceManager = app.Services.GetRequiredService<GlobalMuseTalkServiceManager>();
 try
 {
-    app.Logger.LogInformation("🚀 正在启动4GPU共享全局MuseTalk服务...");
+    app.Logger.LogInformation("正在启动4GPU共享全局MuseTalk服务...");
     var startSuccess = await globalServiceManager.StartGlobalServiceAsync(port: 28888);
     if (startSuccess)
     {
-        app.Logger.LogInformation("✅ 4GPU共享全局MuseTalk服务启动成功");
+        app.Logger.LogInformation("4GPU共享全局MuseTalk服务启动成功");
     }
     else
     {
-        app.Logger.LogError("❌ 4GPU共享全局MuseTalk服务启动失败");
+        app.Logger.LogError("4GPU共享全局MuseTalk服务启动失败");
     }
 }
 catch (Exception ex)
 {
-    app.Logger.LogError(ex, "❌ 启动4GPU共享全局MuseTalk服务时发生异常");
+    app.Logger.LogError(ex, "启动4GPU共享全局MuseTalk服务时发生异常");
 }
 
 // 静态文件服务
@@ -176,39 +176,39 @@ app.MapHealthChecks("/health", new HealthCheckOptions
 app.MapGet("/", () => Results.Redirect("/digital-human-test.html"));
 
 // 记录启动信息
-app.Logger.LogInformation("🚀 数字人API服务启动成功");
-app.Logger.LogInformation("📱 HTTP访问地址: http://localhost:5000");
-app.Logger.LogInformation("📊 健康检查: http://localhost:5000/health");
-app.Logger.LogInformation("📖 API文档: http://localhost:5000/swagger");
+app.Logger.LogInformation("数字人API服务启动成功");
+app.Logger.LogInformation("HTTP访问地址: http://localhost:5000");
+app.Logger.LogInformation("健康检查: http://localhost:5000/health");
+app.Logger.LogInformation("API文档: http://localhost:5000/swagger");
 
-// 🔧 关键修复：注册程序退出时的进程清理（复用已有的globalServiceManager变量）
-// 🔧 强化清理：处理Ctrl+C
+// 关键修复：注册程序退出时的进程清理（复用已有的globalServiceManager变量）
+// 强化清理：处理Ctrl+C
 Console.CancelKeyPress += (sender, e) =>
 {
     app.Logger.LogInformation("🛑 检测到Ctrl+C，执行终极清理...");
     globalServiceManager.EmergencyCleanupPortOccupyingProcesses(); // 紧急清理
     globalServiceManager.ForceCleanupAllPythonProcesses();
-    app.Logger.LogInformation("✅ 终极清理完成");
+    app.Logger.LogInformation("终极清理完成");
     e.Cancel = false; // 允许程序退出
 };
 
-// 🔧 强化清理：处理应用程序退出
+// 强化清理：处理应用程序退出
 AppDomain.CurrentDomain.ProcessExit += (sender, e) =>
 {
     app.Logger.LogInformation("🛑 应用程序退出，执行终极清理...");
     globalServiceManager.EmergencyCleanupPortOccupyingProcesses(); // 紧急清理
     globalServiceManager.ForceCleanupAllPythonProcesses();
-    app.Logger.LogInformation("✅ 终极清理完成");
+    app.Logger.LogInformation("终极清理完成");
 };
 
-// 🔧 强化清理：处理应用程序生命周期
+// 强化清理：处理应用程序生命周期
 var lifetime = app.Services.GetRequiredService<IHostApplicationLifetime>();
 lifetime.ApplicationStopping.Register(() =>
 {
     app.Logger.LogInformation("🛑 应用程序停止中，执行终极清理...");
     globalServiceManager.EmergencyCleanupPortOccupyingProcesses(); // 紧急清理
     globalServiceManager.ForceCleanupAllPythonProcesses();
-    app.Logger.LogInformation("✅ 终极清理完成");
+    app.Logger.LogInformation("终极清理完成");
 });
 
 try

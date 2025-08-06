@@ -62,7 +62,7 @@ class PerformanceMonitor:
             daemon=True
         )
         self.monitoring_thread.start()
-        print("🔍 性能监控已启动")
+        print("性能监控已启动")
     
     def stop_monitoring(self):
         """停止性能监控"""
@@ -95,7 +95,7 @@ class PerformanceMonitor:
                 time.sleep(interval)
                 
             except Exception as e:
-                print(f"⚠️ 监控异常: {str(e)}")
+                print(f"监控异常: {str(e)}")
                 time.sleep(interval)
     
     def record_inference_time(self, inference_time, compose_time, video_time, total_time):
@@ -121,16 +121,16 @@ class PerformanceMonitor:
         
         # 性能分析
         if avg_time > self.critical_total_time:
-            self.optimization_suggestions.append("🚨 严重性能问题：平均处理时间超过10秒")
+            self.optimization_suggestions.append("严重性能问题：平均处理时间超过10秒")
             self._generate_critical_optimizations()
         elif avg_time > self.warning_total_time:
-            self.optimization_suggestions.append("⚠️ 性能警告：平均处理时间超过5秒")
+            self.optimization_suggestions.append("性能警告：平均处理时间超过5秒")
             self._generate_warning_optimizations()
         elif avg_time > self.target_total_time:
-            self.optimization_suggestions.append("📊 性能提示：处理时间超过目标3秒")
+            self.optimization_suggestions.append("性能提示：处理时间超过目标3秒")
             self._generate_target_optimizations()
         else:
-            self.optimization_suggestions.append("✅ 性能良好：处理时间在目标范围内")
+            self.optimization_suggestions.append("性能良好：处理时间在目标范围内")
         
         # GPU使用率分析
         self._analyze_gpu_usage()
@@ -141,28 +141,28 @@ class PerformanceMonitor:
     def _generate_critical_optimizations(self):
         """生成严重性能问题的优化建议"""
         self.optimization_suggestions.extend([
-            "🔧 建议1: 减少批次大小到8或更小",
-            "🔧 建议2: 启用模型量化（FP16）",
-            "🔧 建议3: 增加GPU内存清理频率",
-            "🔧 建议4: 检查是否有其他程序占用GPU",
-            "🔧 建议5: 考虑降低视频分辨率或帧率"
+            "建议1: 减少批次大小到8或更小",
+            "建议2: 启用模型量化（FP16）",
+            "建议3: 增加GPU内存清理频率",
+            "建议4: 检查是否有其他程序占用GPU",
+            "建议5: 考虑降低视频分辨率或帧率"
         ])
     
     def _generate_warning_optimizations(self):
         """生成性能警告的优化建议"""
         self.optimization_suggestions.extend([
-            "🔧 建议1: 优化批次大小到12-16",
-            "🔧 建议2: 启用并行图像合成",
-            "🔧 建议3: 使用更快的视频编码器",
-            "🔧 建议4: 检查GPU负载均衡"
+            "建议1: 优化批次大小到12-16",
+            "建议2: 启用并行图像合成",
+            "建议3: 使用更快的视频编码器",
+            "建议4: 检查GPU负载均衡"
         ])
     
     def _generate_target_optimizations(self):
         """生成目标性能的优化建议"""
         self.optimization_suggestions.extend([
-            "🔧 建议1: 可以尝试增加批次大小到20-24",
-            "🔧 建议2: 启用模型编译优化",
-            "🔧 建议3: 优化内存缓存策略"
+            "建议1: 可以尝试增加批次大小到20-24",
+            "建议2: 启用模型编译优化",
+            "建议3: 优化内存缓存策略"
         ])
     
     def _analyze_gpu_usage(self):
@@ -175,11 +175,11 @@ class PerformanceMonitor:
                     
                     if avg_usage < 50:
                         self.optimization_suggestions.append(
-                            f"📊 GPU{gpu_id}使用率偏低({avg_usage:.1f}%)，可以增加负载"
+                            f"GPU{gpu_id}使用率偏低({avg_usage:.1f}%)，可以增加负载"
                         )
                     elif avg_usage > 95:
                         self.optimization_suggestions.append(
-                            f"⚠️ GPU{gpu_id}使用率过高({avg_usage:.1f}%)，可能需要负载均衡"
+                            f"GPU{gpu_id}使用率过高({avg_usage:.1f}%)，可能需要负载均衡"
                         )
         except:
             pass
@@ -192,17 +192,17 @@ class PerformanceMonitor:
             
             if avg_memory > 90:
                 self.optimization_suggestions.append(
-                    f"⚠️ 系统内存使用率过高({avg_memory:.1f}%)，建议增加内存或优化缓存"
+                    f"系统内存使用率过高({avg_memory:.1f}%)，建议增加内存或优化缓存"
                 )
             elif avg_memory > 80:
                 self.optimization_suggestions.append(
-                    f"📊 系统内存使用率较高({avg_memory:.1f}%)，注意内存管理"
+                    f"系统内存使用率较高({avg_memory:.1f}%)，注意内存管理"
                 )
     
     def get_performance_report(self):
         """获取性能报告"""
         if not self.total_times:
-            return "📊 暂无性能数据"
+            return "暂无性能数据"
         
         # 基本统计
         recent_times = list(self.total_times)[-10:] if len(self.total_times) >= 10 else list(self.total_times)
@@ -220,19 +220,19 @@ class PerformanceMonitor:
             gpu_info = "GPU信息获取失败\n"
         
         report = f"""
-📊 性能报告 (最近{len(recent_times)}次推理)
+性能报告 (最近{len(recent_times)}次推理)
 {'='*50}
 ⏱️  平均处理时间: {avg_time:.3f}秒
-⚡ 最快处理时间: {min_time:.3f}秒
+最快处理时间: {min_time:.3f}秒
 🐌 最慢处理时间: {max_time:.3f}秒
-🎯 目标时间: {self.target_total_time:.1f}秒
+目标时间: {self.target_total_time:.1f}秒
 
-📈 系统资源使用率:
+系统资源使用率:
 💻 CPU使用率: {list(self.cpu_usage_history)[-1] if self.cpu_usage_history else 0:.1f}%
 🧠 内存使用率: {list(self.memory_usage_history)[-1] if self.memory_usage_history else 0:.1f}%
 {gpu_info}
 
-🔧 优化建议:
+优化建议:
 """
         
         for i, suggestion in enumerate(self.optimization_suggestions, 1):
@@ -292,10 +292,10 @@ class PerformanceMonitor:
             with open(filename, 'w', encoding='utf-8') as f:
                 json.dump(log_data, f, indent=2, ensure_ascii=False)
             
-            print(f"📊 性能日志已保存: {filename}")
+            print(f"性能日志已保存: {filename}")
             
         except Exception as e:
-            print(f"❌ 保存性能日志失败: {str(e)}")
+            print(f"保存性能日志失败: {str(e)}")
 
 # 全局性能监控器实例
 global_monitor = PerformanceMonitor()

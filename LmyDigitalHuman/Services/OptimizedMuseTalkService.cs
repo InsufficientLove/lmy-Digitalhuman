@@ -13,7 +13,7 @@ using System.Linq;
 namespace LmyDigitalHuman.Services
 {
     /// <summary>
-    /// 🚀 优化版MuseTalk服务 - 配合极致优化Python脚本
+    /// 优化版MuseTalk服务 - 配合极致优化Python脚本
     /// 专门针对固定模板场景的性能优化
     /// </summary>
     public class OptimizedMuseTalkService : IMuseTalkService
@@ -24,7 +24,7 @@ namespace LmyDigitalHuman.Services
         private readonly IPythonEnvironmentService _pythonEnvironmentService;
         private readonly GlobalMuseTalkClient _globalClient;
         
-        // 📊 模型永久化缓存管理 - 基于MuseTalk realtime_inference.py架构
+        // 模型永久化缓存管理 - 基于MuseTalk realtime_inference.py架构
         private readonly ConcurrentDictionary<string, PersistentModelInfo> _persistentModels = new();
         private readonly ConcurrentDictionary<string, QueuedJob> _jobQueue = new();
         private readonly ConcurrentDictionary<string, DigitalHumanResponse> _videoCache = new();
@@ -39,12 +39,12 @@ namespace LmyDigitalHuman.Services
         private static readonly object _initLock = new object();
         private static bool _isInitialized = false;
         
-        // 📈 性能统计
+        // 性能统计
         private long _totalRequests = 0;
         private long _completedRequests = 0;
         private readonly ConcurrentDictionary<string, long> _templateUsageCount = new();
         
-        // 🚀 性能优化缓存
+        // 性能优化缓存
         private string? _cachedPythonPath = null;
         private readonly object _pythonPathLock = new object();
         
@@ -64,7 +64,7 @@ namespace LmyDigitalHuman.Services
             var globalClientLogger = loggerFactory.CreateLogger<GlobalMuseTalkClient>();
             _globalClient = new GlobalMuseTalkClient(globalClientLogger);
             
-            _logger.LogInformation("🚀 OptimizedMuseTalkService 已初始化 - 4GPU极速并行架构");
+            _logger.LogInformation("OptimizedMuseTalkService 已初始化 - 4GPU极速并行架构");
             
             // 加载已有的模板信息
             LoadTemplateInfoFromFileSystem();
@@ -129,7 +129,7 @@ namespace LmyDigitalHuman.Services
             };
             
             _jobQueue.TryAdd(jobId, job);
-            _logger.LogInformation("🎯 任务已加入队列: {JobId}", jobId);
+            _logger.LogInformation("任务已加入队列: {JobId}", jobId);
             
             // 异步处理任务
             _ = Task.Run(async () => await ProcessQueuedJobAsync(jobId));
@@ -165,7 +165,7 @@ namespace LmyDigitalHuman.Services
             if (_jobQueue.TryGetValue(jobId, out var job) && job.Status == JobStatus.Pending)
             {
                 job.Status = JobStatus.Cancelled;
-                _logger.LogInformation("❌ 任务已取消: {JobId}", jobId);
+                _logger.LogInformation("任务已取消: {JobId}", jobId);
                 return true;
             }
             return false;
@@ -247,7 +247,7 @@ namespace LmyDigitalHuman.Services
                 Status = "ready"
             };
 
-            _logger.LogInformation("✅ 模板创建成功: {TemplateId} - {TemplateName}", templateId, request.TemplateName);
+            _logger.LogInformation("模板创建成功: {TemplateId} - {TemplateName}", templateId, request.TemplateName);
             return template;
         }
 
@@ -293,10 +293,10 @@ namespace LmyDigitalHuman.Services
         /// </summary>
         public async Task<PreprocessingResult> PreprocessTemplateAsync(string templateId)
         {
-            // 🔧 检查是否已经预处理过，避免重复预处理
+            // 检查是否已经预处理过，避免重复预处理
             if (_persistentModels.ContainsKey(templateId))
             {
-                _logger.LogInformation("✅ 模板 {TemplateId} 已预处理完成，跳过重复预处理", templateId);
+                _logger.LogInformation("模板 {TemplateId} 已预处理完成，跳过重复预处理", templateId);
                 return new PreprocessingResult
                 {
                     Success = true,
@@ -315,7 +315,7 @@ namespace LmyDigitalHuman.Services
             
             try
             {
-                _logger.LogInformation("🚀 开始永久化模板预处理: {TemplateId}", templateId);
+                _logger.LogInformation("开始永久化模板预处理: {TemplateId}", templateId);
                 
                 // 1. 初始化全局模型组件（只执行一次）
                 await EnsureGlobalModelsInitializedAsync();
@@ -342,7 +342,7 @@ namespace LmyDigitalHuman.Services
                 
                 stopwatch.Stop();
                 
-                _logger.LogInformation("✅ 模板永久化完成: {TemplateId}, 耗时: {Time}ms, GPU: {GPU}", 
+                _logger.LogInformation("模板永久化完成: {TemplateId}, 耗时: {Time}ms, GPU: {GPU}", 
                     templateId, stopwatch.ElapsedMilliseconds, assignedGPU);
                 
                 return new PreprocessingResult
@@ -397,16 +397,16 @@ namespace LmyDigitalHuman.Services
             
             try
             {
-                // 🎯 提取模板ID（优先使用TemplateId，否则从路径提取）
+                // 提取模板ID（优先使用TemplateId，否则从路径提取）
                 var templateId = request.TemplateId ?? ExtractTemplateIdFromPath(request.AvatarImagePath);
                 
-                _logger.LogInformation("⚡ 开始4GPU实时推理: TemplateId={TemplateId}, TotalRequests={TotalRequests}", 
+                _logger.LogInformation("开始4GPU实时推理: TemplateId={TemplateId}, TotalRequests={TotalRequests}", 
                     templateId, _activeJobs.Count + 1);
                 
                 // 检查模板是否已预处理
                 if (!_persistentModels.TryGetValue(templateId, out var modelInfo))
                 {
-                    _logger.LogWarning("⚠️ 模板 {TemplateId} 未预处理，开始动态预处理...", templateId);
+                    _logger.LogWarning("模板 {TemplateId} 未预处理，开始动态预处理...", templateId);
                     await PreprocessTemplateAsync(templateId);
                     
                     if (!_persistentModels.TryGetValue(templateId, out modelInfo))
@@ -415,7 +415,7 @@ namespace LmyDigitalHuman.Services
                     }
                 }
                 
-                _logger.LogInformation("⚡ 模板 {TemplateId} 已预处理完成，使用永久化模型进行极速推理", templateId);
+                _logger.LogInformation("模板 {TemplateId} 已预处理完成，使用永久化模型进行极速推理", templateId);
                 
                 // 生成唯一输出路径
                 var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
@@ -426,7 +426,7 @@ namespace LmyDigitalHuman.Services
                 // 确保输出目录存在
                 Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
                 
-                _logger.LogInformation("⚡ 执行实时推理: {TemplateId} (GPU:{GPU})", templateId, modelInfo.AssignedGPU);
+                _logger.LogInformation("执行实时推理: {TemplateId} (GPU:{GPU})", templateId, modelInfo.AssignedGPU);
                 
                 // 调用私有方法执行实际推理
                 var resultPath = await ExecuteRealtimeInferenceInternal(templateId, request.AudioPath, outputPath, modelInfo.AssignedGPU);
@@ -440,7 +440,7 @@ namespace LmyDigitalHuman.Services
                 }
                 
                 var fileInfo = new FileInfo(outputPath);
-                _logger.LogInformation("✅ GPU:{GPU} MuseTalk推理完成: {TemplateId}, 输出: {OutputPath}, 大小: {Size}bytes", 
+                _logger.LogInformation("GPU:{GPU} MuseTalk推理完成: {TemplateId}, 输出: {OutputPath}, 大小: {Size}bytes", 
                     modelInfo.AssignedGPU, templateId, outputPath, fileInfo.Length);
                 
                 // 更新模型使用时间
@@ -449,10 +449,10 @@ namespace LmyDigitalHuman.Services
                 // 计算视频时长
                 var duration = await GetVideoDurationAsync(outputPath);
                 
-                _logger.LogInformation("✅ 4GPU实时推理完成: TemplateId={TemplateId}, 耗时={ElapsedMs}ms, 完成率={CompletionRate:F2} %", 
+                _logger.LogInformation("4GPU实时推理完成: TemplateId={TemplateId}, 耗时={ElapsedMs}ms, 完成率={CompletionRate:F2} %", 
                     templateId, stopwatch.ElapsedMilliseconds, 100.0);
                 
-                // 🌐 转换物理路径为前端可访问的URL
+                // 转换物理路径为前端可访问的URL
                 var videoUrl = ConvertToWebUrl(outputPath);
                 
                 return new DigitalHumanResponse
@@ -461,13 +461,13 @@ namespace LmyDigitalHuman.Services
                     VideoPath = outputPath,  // 物理路径（服务器内部使用）
                     VideoUrl = videoUrl,     // Web URL（前端使用）
                     Duration = duration,
-                    Message = $"⚡ 4GPU实时推理完成 (模板: {templateId}, 耗时: {stopwatch.ElapsedMilliseconds}ms)"
+                    Message = $"4GPU实时推理完成 (模板: {templateId}, 耗时: {stopwatch.ElapsedMilliseconds}ms)"
                 };
             }
             catch (Exception ex)
             {
                 stopwatch.Stop();
-                _logger.LogError(ex, "❌ 4GPU实时推理失败: TemplateId={TemplateId}, 耗时={ElapsedMs}ms", 
+                _logger.LogError(ex, "4GPU实时推理失败: TemplateId={TemplateId}, 耗时={ElapsedMs}ms", 
                     request.TemplateId ?? "unknown", stopwatch.ElapsedMilliseconds);
                 
                 return new DigitalHumanResponse
@@ -551,7 +551,7 @@ namespace LmyDigitalHuman.Services
             try
             {
                 _videoCache.AddOrUpdate(cacheKey, response, (key, old) => response);
-                _logger.LogDebug("📦 视频结果已缓存: {CacheKey}", cacheKey);
+                _logger.LogDebug("视频结果已缓存: {CacheKey}", cacheKey);
                 return true;
             }
             catch (Exception ex)
@@ -570,7 +570,7 @@ namespace LmyDigitalHuman.Services
             if (response != null)
             {
                 response.FromCache = true;
-                _logger.LogDebug("🎯 命中视频缓存: {CacheKey}", cacheKey);
+                _logger.LogDebug("命中视频缓存: {CacheKey}", cacheKey);
             }
             return response;
         }
@@ -585,7 +585,7 @@ namespace LmyDigitalHuman.Services
                 if (string.IsNullOrEmpty(templateId))
                 {
                     _videoCache.Clear();
-                    _logger.LogInformation("🧹 已清除所有视频缓存");
+                    _logger.LogInformation("已清除所有视频缓存");
                 }
                 else
                 {
@@ -594,7 +594,7 @@ namespace LmyDigitalHuman.Services
                     {
                         _videoCache.TryRemove(key, out _);
                     }
-                    _logger.LogInformation("🧹 已清除模板缓存: {TemplateId}", templateId);
+                    _logger.LogInformation("已清除模板缓存: {TemplateId}", templateId);
                 }
                 return true;
             }
@@ -687,7 +687,7 @@ namespace LmyDigitalHuman.Services
         public async Task<bool> ScaleWorkersAsync(int workerCount)
         {
             // 这是一个优化版本，主要依赖GPU并行，所以工作线程扩展有限
-            _logger.LogInformation("🔧 工作线程扩展请求: {WorkerCount} (当前为GPU并行优化版本)", workerCount);
+            _logger.LogInformation("工作线程扩展请求: {WorkerCount} (当前为GPU并行优化版本)", workerCount);
             return true;
         }
 
@@ -749,7 +749,7 @@ namespace LmyDigitalHuman.Services
         public async Task<string> StartStreamingGenerationAsync(StreamingGenerationRequest request)
         {
             var sessionId = Guid.NewGuid().ToString();
-            _logger.LogInformation("🎬 开始流式生成会话: {SessionId}", sessionId);
+            _logger.LogInformation("开始流式生成会话: {SessionId}", sessionId);
             
             // 对于优化版本，流式生成转换为常规生成
             var digitalRequest = new DigitalHumanRequest
@@ -800,28 +800,28 @@ namespace LmyDigitalHuman.Services
             
             try
             {
-                // 🎯 获取模板ID
+                // 获取模板ID
                 var templateId = GetTemplateId(request.AvatarImagePath);
                 
-                _logger.LogInformation("⚡ 开始4GPU实时推理: TemplateId={TemplateId}, TotalRequests={TotalRequests}", 
+                _logger.LogInformation("开始4GPU实时推理: TemplateId={TemplateId}, TotalRequests={TotalRequests}", 
                     templateId, _totalRequests);
                 
-                // 📊 更新模板使用统计
+                // 更新模板使用统计
                 _templateUsageCount.AddOrUpdate(templateId, 1, (key, oldValue) => oldValue + 1);
                 
-                // 🎯 检查模板是否已永久化（优先使用预处理好的模板）
+                // 检查模板是否已永久化（优先使用预处理好的模板）
                 if (!_persistentModels.ContainsKey(templateId))
                 {
-                    _logger.LogWarning("⚠️ 模板 {TemplateId} 未进行预处理，这通常表示模板创建时预处理失败", templateId);
-                    _logger.LogInformation("🔧 正在进行紧急预处理，建议重新创建模板以获得最佳性能...", templateId);
+                    _logger.LogWarning("模板 {TemplateId} 未进行预处理，这通常表示模板创建时预处理失败", templateId);
+                    _logger.LogInformation("正在进行紧急预处理，建议重新创建模板以获得最佳性能...", templateId);
                     await PreprocessTemplateAsync(templateId);
                 }
                 else
                 {
-                    _logger.LogInformation("⚡ 模板 {TemplateId} 已预处理完成，使用永久化模型进行极速推理", templateId);
+                    _logger.LogInformation("模板 {TemplateId} 已预处理完成，使用永久化模型进行极速推理", templateId);
                 }
                 
-                // 🚀 执行实时推理（使用永久化模型）
+                // 执行实时推理（使用永久化模型）
                 var outputPath = await ExecuteRealtimeInferenceAsync(templateId, request.AudioPath);
                 
                 stopwatch.Stop();
@@ -829,10 +829,10 @@ namespace LmyDigitalHuman.Services
                 
                 var duration = GetAudioDuration(request.AudioPath);
                 
-                _logger.LogInformation("✅ 4GPU实时推理完成: TemplateId={TemplateId}, 耗时={ElapsedMs}ms, 完成率={CompletionRate:P2}", 
+                _logger.LogInformation("4GPU实时推理完成: TemplateId={TemplateId}, 耗时={ElapsedMs}ms, 完成率={CompletionRate:P2}", 
                     templateId, stopwatch.ElapsedMilliseconds, (double)_completedRequests / _totalRequests);
                 
-                // 🌐 转换物理路径为前端可访问的URL
+                // 转换物理路径为前端可访问的URL
                 var videoUrl = ConvertToWebUrl(outputPath);
                 
                 return new DigitalHumanResponse
@@ -841,12 +841,12 @@ namespace LmyDigitalHuman.Services
                     VideoPath = outputPath,  // 物理路径（服务器内部使用）
                     VideoUrl = videoUrl,     // Web URL（前端使用）
                     Duration = duration,
-                    Message = $"⚡ 4GPU实时推理完成 (模板: {templateId}, 耗时: {stopwatch.ElapsedMilliseconds}ms)"
+                    Message = $"4GPU实时推理完成 (模板: {templateId}, 耗时: {stopwatch.ElapsedMilliseconds}ms)"
                 };
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "❌ 4GPU实时推理失败");
+                _logger.LogError(ex, "4GPU实时推理失败");
                 return new DigitalHumanResponse
                 {
                     Success = false,
@@ -866,7 +866,7 @@ namespace LmyDigitalHuman.Services
             {
                 if (_isInitialized) return;
                 
-                _logger.LogInformation("🔧 开始初始化Python推理器...");
+                _logger.LogInformation("开始初始化Python推理器...");
                 
                 try
                 {
@@ -876,18 +876,18 @@ namespace LmyDigitalHuman.Services
                     if (dummyResult)
                     {
                         _isInitialized = true;
-                        _logger.LogInformation("✅ Python推理器初始化完成 - 所有模板已预处理");
+                        _logger.LogInformation("Python推理器初始化完成 - 所有模板已预处理");
                     }
                     else
                     {
-                        _logger.LogWarning("⚠️ Python推理器初始化失败，启用降级模式");
+                        _logger.LogWarning("Python推理器初始化失败，启用降级模式");
                         // 即使初始化失败也标记为已初始化，让系统能够继续运行
                         _isInitialized = true;
                     }
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "❌ Python推理器初始化失败，启用降级模式");
+                    _logger.LogError(ex, "Python推理器初始化失败，启用降级模式");
                     // 即使出现异常也标记为已初始化，让系统能够继续运行
                     _isInitialized = true;
                 }
@@ -901,7 +901,7 @@ namespace LmyDigitalHuman.Services
         {
             if (!_isInitialized)
             {
-                _logger.LogInformation("🔧 首次使用，正在初始化Python推理器...");
+                _logger.LogInformation("首次使用，正在初始化Python推理器...");
                 
                 lock (_initLock)
                 {
@@ -909,7 +909,7 @@ namespace LmyDigitalHuman.Services
                     {
                         // 直接标记为已初始化，跳过复杂的预初始化
                         _isInitialized = true;
-                        _logger.LogInformation("✅ Python推理器已准备就绪（按需模式）");
+                        _logger.LogInformation("Python推理器已准备就绪（按需模式）");
                     }
                 }
             }
@@ -949,7 +949,7 @@ namespace LmyDigitalHuman.Services
                 arguments.Append($"right_cheek_width=90");
                 arguments.Append($"); ");
                 arguments.Append($"engine = OptimizedMuseTalkInference(args); ");
-                arguments.Append($"print('🚀 Python推理器初始化完成，支持动态模板预处理')");
+                arguments.Append($"print('Python推理器初始化完成，支持动态模板预处理')");
                 arguments.Append($"\"");
                 
                 var processInfo = new ProcessStartInfo
@@ -1002,7 +1002,7 @@ namespace LmyDigitalHuman.Services
                 
                 if (process.ExitCode == 0)
                 {
-                    _logger.LogInformation("✅ Python推理器初始化成功");
+                    _logger.LogInformation("Python推理器初始化成功");
                     return true;
                 }
                 else
@@ -1101,7 +1101,7 @@ namespace LmyDigitalHuman.Services
             process.BeginOutputReadLine();
             process.BeginErrorReadLine();
             
-            // 🚀 4GPU并行推理超时设置（5分钟，确保有足够时间完成）
+            // 4GPU并行推理超时设置（5分钟，确保有足够时间完成）
             var timeoutMs = 300000;
             var completed = await Task.Run(() => process.WaitForExit(timeoutMs));
             
@@ -1131,7 +1131,7 @@ namespace LmyDigitalHuman.Services
         /// </summary>
         private void ConfigureOptimizedGpuEnvironment(ProcessStartInfo processInfo)
         {
-            // 🚀 4GPU极速并行配置 - 基于MuseTalk官方实时推理优化
+            // 4GPU极速并行配置 - 基于MuseTalk官方实时推理优化
             processInfo.Environment["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"; // 使用所有4个GPU
             
             // 4GPU并行内存分配优化
@@ -1165,7 +1165,7 @@ namespace LmyDigitalHuman.Services
             processInfo.Environment["TOKENIZERS_PARALLELISM"] = "true"; // 启用并行tokenization
             processInfo.Environment["CUBLAS_WORKSPACE_CONFIG"] = ":16:8"; // 更大的工作空间
             
-            _logger.LogInformation("🚀 已配置4GPU极速并行环境 - 基于MuseTalk官方实时推理优化");
+            _logger.LogInformation("已配置4GPU极速并行环境 - 基于MuseTalk官方实时推理优化");
         }
         
         /// <summary>
@@ -1173,7 +1173,7 @@ namespace LmyDigitalHuman.Services
         /// </summary>
         private string GetTemplateId(string avatarPath)
         {
-            // 🎯 统一处理：直接提取文件名（不含扩展名）作为模板ID
+            // 统一处理：直接提取文件名（不含扩展名）作为模板ID
             var templateId = Path.GetFileNameWithoutExtension(avatarPath);
             _logger.LogDebug("提取模板ID: {AvatarPath} → {TemplateId}", avatarPath, templateId);
             return templateId;
@@ -1210,7 +1210,7 @@ namespace LmyDigitalHuman.Services
         public string GetOptimizedPerformanceStats()
         {
             var stats = new StringBuilder();
-            stats.AppendLine("🚀 极致优化MuseTalk性能统计:");
+            stats.AppendLine("极致优化MuseTalk性能统计:");
             stats.AppendLine($"总请求: {_totalRequests}, 已完成: {_completedRequests}");
             stats.AppendLine($"完成率: {(double)_completedRequests / Math.Max(_totalRequests, 1):P2}");
             stats.AppendLine($"Python推理器状态: {(_isInitialized ? "已初始化" : "初始化中")}");
@@ -1241,9 +1241,9 @@ namespace LmyDigitalHuman.Services
                     return _cachedPythonPath;
                 }
                 
-                _logger.LogInformation("🔍 首次检测Python路径...");
+                _logger.LogInformation("首次检测Python路径...");
                 _cachedPythonPath = Task.Run(async () => await _pythonEnvironmentService.GetRecommendedPythonPathAsync()).Result;
-                _logger.LogInformation("✅ Python路径已缓存: {PythonPath}", _cachedPythonPath);
+                _logger.LogInformation("Python路径已缓存: {PythonPath}", _cachedPythonPath);
                 
                 return _cachedPythonPath;
             }
@@ -1266,9 +1266,9 @@ namespace LmyDigitalHuman.Services
                     return _cachedPythonPath;
                 }
                 
-                _logger.LogInformation("🔍 首次检测Python路径...");
+                _logger.LogInformation("首次检测Python路径...");
                 _cachedPythonPath = Task.Run(async () => await _pythonEnvironmentService.GetRecommendedPythonPathAsync()).Result;
-                _logger.LogInformation("✅ Python路径已缓存: {PythonPath}", _cachedPythonPath);
+                _logger.LogInformation("Python路径已缓存: {PythonPath}", _cachedPythonPath);
                 
                 return _cachedPythonPath;
             }
@@ -1386,13 +1386,13 @@ namespace LmyDigitalHuman.Services
             {
                 if (_globalModelsInitialized) return;
 
-                _logger.LogInformation("🔧 初始化全局MuseTalk模型组件...");
+                _logger.LogInformation("初始化全局MuseTalk模型组件...");
 
                 // 不再启动自己的进程，依赖GlobalMuseTalkServiceManager启动的全局服务
                 // 只需要设置初始化标志，表示我们准备好使用全局服务了
                 _globalModelsInitialized = true;
                     
-                _logger.LogInformation("✅ 全局MuseTalk服务连接准备完成");
+                _logger.LogInformation("全局MuseTalk服务连接准备完成");
             }
         }
 
@@ -1410,7 +1410,7 @@ namespace LmyDigitalHuman.Services
             var templateImagePath = Path.Combine(_pathManager.GetContentRootPath(), "wwwroot", "templates", $"{templateId}.jpg");
             var stateFilePath = Path.Combine(modelStateDir, "model_state.pkl");
             
-            _logger.LogInformation("📁 创建模板永久化状态: {TemplateId} -> {StatePath}", templateId, stateFilePath);
+            _logger.LogInformation("创建模板永久化状态: {TemplateId} -> {StatePath}", templateId, stateFilePath);
             
             // 检查模板图片是否存在
             if (!File.Exists(templateImagePath))
@@ -1421,7 +1421,7 @@ namespace LmyDigitalHuman.Services
             // 检查是否已经预处理过
             if (File.Exists(stateFilePath))
             {
-                _logger.LogInformation("📦 发现已存在的预处理状态文件: {TemplateId}", templateId);
+                _logger.LogInformation("发现已存在的预处理状态文件: {TemplateId}", templateId);
                 return stateFilePath;
             }
             
@@ -1436,10 +1436,10 @@ namespace LmyDigitalHuman.Services
         /// </summary>
         private async Task ExecuteTemplatePreprocessingAsync(string templateId, string templateImagePath, string stateFilePath)
         {
-            _logger.LogInformation("🎯 开始执行模板预处理: {TemplateId}", templateId);
+            _logger.LogInformation("开始执行模板预处理: {TemplateId}", templateId);
             
             var pythonPath = await GetCachedPythonPathAsync();
-            // 🚀 使用极速优化版预处理脚本
+            // 使用极速优化版预处理脚本
             var preprocessingScript = Path.GetFullPath(Path.Combine(_pathManager.GetContentRootPath(), "..", "MuseTalkEngine", "optimized_preprocessing_v2.py"));
             if (!File.Exists(preprocessingScript))
             {
@@ -1485,7 +1485,7 @@ namespace LmyDigitalHuman.Services
             startInfo.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";
             
             _logger.LogInformation("💻 执行预处理命令: {FileName} {Arguments}", startInfo.FileName, arguments);
-            _logger.LogInformation("🐍 PYTHONPATH: {PythonPath}", museTalkDir);
+            _logger.LogInformation("PYTHONPATH: {PythonPath}", museTalkDir);
             
             using var process = new Process { StartInfo = startInfo };
             var outputBuffer = new StringBuilder();
@@ -1505,7 +1505,7 @@ namespace LmyDigitalHuman.Services
                 if (!string.IsNullOrEmpty(e.Data))
                 {
                     errorBuffer.AppendLine(e.Data);
-                    _logger.LogWarning("⚠️ 预处理错误: {Error}", e.Data);
+                    _logger.LogWarning("预处理错误: {Error}", e.Data);
                 }
             };
             
@@ -1528,7 +1528,7 @@ namespace LmyDigitalHuman.Services
             }
             catch (OperationCanceledException)
             {
-                _logger.LogError("❌ 预处理超时，强制终止进程");
+                _logger.LogError("预处理超时，强制终止进程");
                 try
                 {
                     process.Kill(true);
@@ -1546,7 +1546,7 @@ namespace LmyDigitalHuman.Services
             
             if (process.ExitCode != 0)
             {
-                _logger.LogError("❌ 预处理失败，退出码: {ExitCode}", process.ExitCode);
+                _logger.LogError("预处理失败，退出码: {ExitCode}", process.ExitCode);
                 _logger.LogError("错误输出: {Error}", error);
                 
                 // 清理可能损坏的缓存文件
@@ -1558,7 +1558,7 @@ namespace LmyDigitalHuman.Services
             // 验证预处理结果
             if (!File.Exists(stateFilePath))
             {
-                _logger.LogError("❌ 预处理完成但状态文件未生成: {StatePath}", stateFilePath);
+                _logger.LogError("预处理完成但状态文件未生成: {StatePath}", stateFilePath);
                 
                 // 清理可能损坏的缓存文件
                 await CleanupCorruptedCacheFiles(templateId);
@@ -1566,9 +1566,9 @@ namespace LmyDigitalHuman.Services
                 throw new InvalidOperationException($"预处理完成但状态文件未生成: {stateFilePath}");
             }
             
-            _logger.LogInformation("✅ 模板预处理完成: {TemplateId}, 耗时: {Time:F2}秒", 
+            _logger.LogInformation("模板预处理完成: {TemplateId}, 耗时: {Time:F2}秒", 
                 templateId, totalTime.TotalSeconds);
-            _logger.LogInformation("📊 预处理输出: {Output}", output.Trim());
+            _logger.LogInformation("预处理输出: {Output}", output.Trim());
         }
 
         /// <summary>
@@ -1578,7 +1578,7 @@ namespace LmyDigitalHuman.Services
         {
             try
             {
-                _logger.LogInformation("🧹 开始清理损坏的缓存文件: {TemplateId}", templateId);
+                _logger.LogInformation("开始清理损坏的缓存文件: {TemplateId}", templateId);
                 
                 var modelStateDir = Path.Combine(_pathManager.GetContentRootPath(), "model_states", templateId);
                 
@@ -1605,16 +1605,16 @@ namespace LmyDigitalHuman.Services
                         }
                         catch (Exception ex)
                         {
-                            _logger.LogWarning(ex, "⚠️ 删除缓存文件失败: {File}", file);
+                            _logger.LogWarning(ex, "删除缓存文件失败: {File}", file);
                         }
                     }
                 }
                 
-                _logger.LogInformation("✅ 缓存清理完成: {TemplateId}", templateId);
+                _logger.LogInformation("缓存清理完成: {TemplateId}", templateId);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "❌ 清理缓存文件失败: {TemplateId}", templateId);
+                _logger.LogError(ex, "清理缓存文件失败: {TemplateId}", templateId);
             }
         }
 
@@ -1653,7 +1653,7 @@ namespace LmyDigitalHuman.Services
         /// </summary>
         private async Task LoadModelToGPUAsync(string templateId, int gpuId)
         {
-            _logger.LogInformation("⚡ 加载模板模型到GPU内存: {TemplateId} -> GPU:{GPU}", templateId, gpuId);
+            _logger.LogInformation("加载模板模型到GPU内存: {TemplateId} -> GPU:{GPU}", templateId, gpuId);
             
             // 验证预处理状态文件是否存在
             var stateFilePath = Path.Combine(_pathManager.GetContentRootPath(), "model_states", templateId, "model_state.pkl");
@@ -1669,8 +1669,8 @@ namespace LmyDigitalHuman.Services
             
             if (!File.Exists(cacheFile))
             {
-                _logger.LogError("❌ 预处理缓存文件不存在: {CacheFile}", cacheFile);
-                _logger.LogInformation("🔍 检查model_states目录结构:");
+                _logger.LogError("预处理缓存文件不存在: {CacheFile}", cacheFile);
+                _logger.LogInformation("检查model_states目录结构:");
                 
                 var modelStatesDir = Path.Combine(_pathManager.GetContentRootPath(), "model_states");
                 if (Directory.Exists(modelStatesDir))
@@ -1680,10 +1680,10 @@ namespace LmyDigitalHuman.Services
                     {
                         var dirName = Path.GetFileName(dir);
                         var files = Directory.GetFiles(dir, "*.pkl");
-                        _logger.LogInformation("  📁 {DirName}: {FileCount} pkl files", dirName, files.Length);
+                        _logger.LogInformation("  {DirName}: {FileCount} pkl files", dirName, files.Length);
                         foreach (var file in files)
                         {
-                            _logger.LogInformation("    📄 {FileName}", Path.GetFileName(file));
+                            _logger.LogInformation("    {FileName}", Path.GetFileName(file));
                         }
                     }
                 }
@@ -1691,9 +1691,9 @@ namespace LmyDigitalHuman.Services
                 throw new InvalidOperationException($"预处理缓存文件不存在: {cacheFile}");
             }
             
-            _logger.LogInformation("📊 预处理状态文件大小: {Size:F2} MB", new FileInfo(stateFilePath).Length / 1024.0 / 1024.0);
+            _logger.LogInformation("预处理状态文件大小: {Size:F2} MB", new FileInfo(stateFilePath).Length / 1024.0 / 1024.0);
             
-            _logger.LogInformation("✅ 模型已加载到GPU内存: {TemplateId} -> GPU:{GPU}", templateId, gpuId);
+            _logger.LogInformation("模型已加载到GPU内存: {TemplateId} -> GPU:{GPU}", templateId, gpuId);
         }
 
         /// <summary>
@@ -1714,7 +1714,7 @@ namespace LmyDigitalHuman.Services
             var outputFileName = $"realtime_{templateId}_{DateTime.Now:yyyyMMdd_HHmmss}_{Guid.NewGuid().ToString("N")[..8]}.mp4";
             var outputPath = Path.Combine(_pathManager.GetContentRootPath(), "wwwroot", "videos", outputFileName);
 
-            _logger.LogInformation("⚡ 执行实时推理: {TemplateId} (GPU:{GPU})", templateId, modelInfo.AssignedGPU);
+            _logger.LogInformation("执行实时推理: {TemplateId} (GPU:{GPU})", templateId, modelInfo.AssignedGPU);
 
             // 这里应该通过IPC与持久化进程通信
             // 发送推理请求到指定GPU上的模型
@@ -1736,7 +1736,7 @@ namespace LmyDigitalHuman.Services
                 var contentRoot = _pathManager.GetContentRootPath();
                 var cacheDir = Path.Combine(contentRoot, "model_states", templateId);
                 
-                // 🔧 修复音频路径问题 - 确保音频在项目temp目录
+                // 修复音频路径问题 - 确保音频在项目temp目录
                 var projectTempDir = Path.Combine(contentRoot, "temp");
                 Directory.CreateDirectory(projectTempDir);
                 
@@ -1750,36 +1750,36 @@ namespace LmyDigitalHuman.Services
                     if (File.Exists(audioPath))
                     {
                         File.Copy(audioPath, fixedAudioPath, true);
-                        _logger.LogInformation("🔧 音频路径修复: {OldPath} -> {NewPath}", audioPath, fixedAudioPath);
+                        _logger.LogInformation("音频路径修复: {OldPath} -> {NewPath}", audioPath, fixedAudioPath);
                     }
                     else
                     {
-                        _logger.LogWarning("⚠️ 原音频文件不存在: {AudioPath}", audioPath);
+                        _logger.LogWarning("原音频文件不存在: {AudioPath}", audioPath);
                     }
                 }
 
-                _logger.LogInformation("⚡ 使用Ultra Fast推理引擎");
-                _logger.LogInformation("🔧 推理参数:");
+                _logger.LogInformation("使用Ultra Fast推理引擎");
+                _logger.LogInformation("推理参数:");
                 _logger.LogInformation("   模板ID: {TemplateId}", templateId);
                 _logger.LogInformation("   音频文件: {AudioPath}", fixedAudioPath);
                 _logger.LogInformation("   输出路径: {OutputPath}", outputPath);
                 _logger.LogInformation("   缓存目录: {CacheDir}", cacheDir);
                 _logger.LogInformation("   使用GPU: {GpuId}", gpuId);
 
-                // 🚀 使用极速IPC客户端进行推理 - 优化参数
+                // 使用极速IPC客户端进行推理 - 优化参数
                 var resultPath = await _globalClient.SendInferenceRequestAsync(
                     templateId: templateId,
                     audioPath: fixedAudioPath,
                     outputPath: outputPath,
                     cacheDir: cacheDir,
-                    batchSize: 16,  // 🔥 增加批次大小提升并行度
+                    batchSize: 16,  // 增加批次大小提升并行度
                     fps: 25
                 );
 
                 if (!string.IsNullOrEmpty(resultPath) && File.Exists(resultPath))
                 {
                     var fileInfo = new FileInfo(resultPath);
-                    _logger.LogInformation("⚡ Ultra Fast推理完成: {TemplateId}, 输出: {OutputPath}, 大小: {Size}bytes", 
+                    _logger.LogInformation("Ultra Fast推理完成: {TemplateId}, 输出: {OutputPath}, 大小: {Size}bytes", 
                         templateId, resultPath, fileInfo.Length);
                     return resultPath;
                 }
@@ -1820,11 +1820,11 @@ namespace LmyDigitalHuman.Services
                 _isInitialized = false;
                 _cachedPythonPath = null;
                 
-                _logger.LogInformation("🧹 内存已清理，模板信息已保存");
+                _logger.LogInformation("内存已清理，模板信息已保存");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "❌ 服务清理过程中出现错误");
+                _logger.LogError(ex, "服务清理过程中出现错误");
             }
         }
         
@@ -1853,18 +1853,18 @@ namespace LmyDigitalHuman.Services
                     // 转换为Web URL格式（使用/而不是\）
                     var webUrl = "/" + relativePath.Replace(Path.DirectorySeparatorChar, '/');
                     
-                    _logger.LogInformation("🌐 路径转换: {PhysicalPath} -> {WebUrl}", physicalPath, webUrl);
+                    _logger.LogInformation("路径转换: {PhysicalPath} -> {WebUrl}", physicalPath, webUrl);
                     return webUrl;
                 }
                 else
                 {
-                    _logger.LogWarning("⚠️ 视频文件不在wwwroot目录下: {PhysicalPath}", physicalPath);
+                    _logger.LogWarning("视频文件不在wwwroot目录下: {PhysicalPath}", physicalPath);
                     return string.Empty;
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "❌ 路径转换失败: {PhysicalPath}", physicalPath);
+                _logger.LogError(ex, "路径转换失败: {PhysicalPath}", physicalPath);
                 return string.Empty;
             }
         }
@@ -1928,7 +1928,7 @@ namespace LmyDigitalHuman.Services
                 
                 if (!File.Exists(templateInfoFile))
                 {
-                    _logger.LogInformation("🔍 未找到模板信息文件，将从头开始");
+                    _logger.LogInformation("未找到模板信息文件，将从头开始");
                     return;
                 }
                 
@@ -1964,7 +1964,7 @@ namespace LmyDigitalHuman.Services
                         }
                     }
                     
-                    _logger.LogInformation("📂 已加载 {Count} 个模板信息", _persistentModels.Count);
+                    _logger.LogInformation("已加载 {Count} 个模板信息", _persistentModels.Count);
                 }
             }
             catch (Exception ex)
@@ -1980,13 +1980,13 @@ namespace LmyDigitalHuman.Services
         {
             try
             {
-                _logger.LogInformation("🧹 开始清理所有损坏的缓存文件...");
+                _logger.LogInformation("开始清理所有损坏的缓存文件...");
                 
                 var modelStatesDir = Path.Combine(_pathManager.GetContentRootPath(), "model_states");
                 
                 if (!Directory.Exists(modelStatesDir))
                 {
-                    _logger.LogInformation("📁 缓存目录不存在，跳过清理: {Dir}", modelStatesDir);
+                    _logger.LogInformation("缓存目录不存在，跳过清理: {Dir}", modelStatesDir);
                     return;
                 }
                 
@@ -2010,7 +2010,7 @@ namespace LmyDigitalHuman.Services
                                 var content = await File.ReadAllTextAsync(metadataFile);
                                 if (string.IsNullOrWhiteSpace(content))
                                 {
-                                    _logger.LogWarning("⚠️ 发现空的元数据文件: {File}", metadataFile);
+                                    _logger.LogWarning("发现空的元数据文件: {File}", metadataFile);
                                     hasCorruptedMetadata = true;
                                     break;
                                 }
@@ -2021,7 +2021,7 @@ namespace LmyDigitalHuman.Services
                             }
                             catch (System.Text.Json.JsonException ex)
                             {
-                                _logger.LogWarning("⚠️ 发现损坏的JSON元数据文件: {File} - {Error}", metadataFile, ex.Message);
+                                _logger.LogWarning("发现损坏的JSON元数据文件: {File} - {Error}", metadataFile, ex.Message);
                                 hasCorruptedMetadata = true;
                                 break;
                             }
@@ -2037,22 +2037,22 @@ namespace LmyDigitalHuman.Services
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogWarning(ex, "⚠️ 检查模板缓存时出错: {TemplateId}", templateId);
+                        _logger.LogWarning(ex, "检查模板缓存时出错: {TemplateId}", templateId);
                     }
                 }
                 
                 if (cleanedCount > 0)
                 {
-                    _logger.LogInformation("✅ 清理完成，共清理了 {Count} 个损坏的模板缓存", cleanedCount);
+                    _logger.LogInformation("清理完成，共清理了 {Count} 个损坏的模板缓存", cleanedCount);
                 }
                 else
                 {
-                    _logger.LogInformation("✅ 缓存检查完成，未发现损坏的文件");
+                    _logger.LogInformation("缓存检查完成，未发现损坏的文件");
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "❌ 清理所有损坏缓存文件失败");
+                _logger.LogError(ex, "清理所有损坏缓存文件失败");
             }
         }
     }

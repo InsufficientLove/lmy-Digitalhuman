@@ -1,10 +1,10 @@
 # 数字人项目结构说明
 
-## 📁 项目目录结构
+## 项目目录结构
 
 ```
 C:\Users\Administrator\Desktop\digitalhuman\lmy-Digitalhuman\
-├── LmyDigitalHuman/                    # 🎭 C# 数字人API服务 (主服务)
+├── LmyDigitalHuman/                    # C# 数字人API服务 (主服务)
 │   ├── Controllers/                    # API控制器
 │   ├── Services/                       # 业务服务层
 │   ├── Models/                         # 数据模型
@@ -22,7 +22,7 @@ C:\Users\Administrator\Desktop\digitalhuman\lmy-Digitalhuman\
 │   │   └── sd-vae/                    # VAE模型
 │   └── musetalk/                      # MuseTalk核心代码
 │
-├── MuseTalkEngine/                    # 🚀 Ultra Fast推理引擎
+├── MuseTalkEngine/                    # Ultra Fast推理引擎
 │   ├── ultra_fast_realtime_inference_v2.py  # 极速推理引擎
 │   ├── optimized_preprocessing_v2.py         # 优化预处理
 │   ├── performance_monitor.py                # 性能监控
@@ -32,17 +32,17 @@ C:\Users\Administrator\Desktop\digitalhuman\lmy-Digitalhuman\
 ├── MuseTalk_official/                 # 📚 MuseTalk官方源码 (参考)
 │   └── [官方MuseTalk完整源码]
 │
-├── venv_musetalk/                     # 🐍 Python虚拟环境
+├── venv_musetalk/                     # Python虚拟环境
 │   ├── Scripts/                       # Python执行文件
 │   └── Lib/site-packages/             # 依赖包
 │
-├── deploy_ultra_fast_system.py       # 🚀 一键部署脚本
-├── start_ultra_fast_system.bat       # 🎯 启动脚本
-├── test_ultra_fast_performance.py    # 📊 性能测试
-└── ULTRA_FAST_README.md              # 📖 Ultra Fast系统文档
+├── deploy_ultra_fast_system.py       # 一键部署脚本
+├── start_ultra_fast_system.bat       # 启动脚本
+├── test_ultra_fast_performance.py    # 性能测试
+└── ULTRA_FAST_README.md              # Ultra Fast系统文档
 ```
 
-## 🎯 核心组件说明
+## 核心组件说明
 
 ### 1. **LmyDigitalHuman** - 主服务
 - **作用**: C# Web API服务，提供数字人交互接口
@@ -69,7 +69,7 @@ C:\Users\Administrator\Desktop\digitalhuman\lmy-Digitalhuman\
 - **重要**: 必须激活此环境才能运行Python服务
 - **依赖**: PyTorch, OpenCV, transformers等
 
-## 🚀 Ultra Fast系统特性
+## Ultra Fast系统特性
 
 ### 性能优化
 - **4GPU真并行**: 每个GPU独立处理批次
@@ -84,7 +84,7 @@ C:\Users\Administrator\Desktop\digitalhuman\lmy-Digitalhuman\
 - **图像合成**: ≤1秒 (原12.46秒)
 - **视频生成**: ≤1秒 (原4.46秒)
 
-## 🔧 启动方式
+## 启动方式
 
 ### 方式1: 一键启动 (推荐)
 ```bash
@@ -109,13 +109,13 @@ cd MuseTalkEngine
 python ultra_fast_realtime_inference_v2.py --port 28888
 ```
 
-## 📊 性能测试
+## 性能测试
 
 ```bash
 python test_ultra_fast_performance.py
 ```
 
-## 🛠️ 故障排除
+## 故障排除
 
 ### 常见问题
 1. **端口28888被占用**: 检查Python进程
@@ -128,7 +128,7 @@ python test_ultra_fast_performance.py
 - **Python服务日志**: 控制台输出  
 - **性能监控**: performance_log.json
 
-## 📈 监控指标
+## 监控指标
 
 - **GPU使用率**: 目标>80%
 - **响应时间**: 目标≤3秒

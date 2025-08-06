@@ -66,7 +66,7 @@ namespace LmyDigitalHuman.Services
                 // 生成模板ID
                 var templateId = Guid.NewGuid().ToString("N");
                 
-                // 🎯 使用英文SystemName作为文件名，解决中文路径问题
+                // 使用英文SystemName作为文件名，解决中文路径问题
                 var imageFileName = $"{request.SystemName}.jpg";
                 
                 // 确保使用完整的绝对路径
@@ -104,7 +104,7 @@ namespace LmyDigitalHuman.Services
                     AgeRange = request.AgeRange,
                     Style = request.Style,
                     EnableEmotion = request.EnableEmotion,
-                    ImagePath = imagePath, // 🎯 使用实际物理路径，便于Python直接访问
+                    ImagePath = imagePath, // 使用实际物理路径，便于Python直接访问
                     ImageUrl = $"/templates/{imageFileName}", // Web访问路径
                     DefaultVoiceSettings = request.DefaultVoiceSettings ?? new VoiceSettings(),
                     CustomParameters = request.CustomParameters ?? new Dictionary<string, object>(),
@@ -121,28 +121,28 @@ namespace LmyDigitalHuman.Services
                 // 🔄 改为同步执行预处理，确保预处理完成后再返回响应
                 try
                 {
-                    _logger.LogInformation("🔧 开始MuseTalk模板预处理: DisplayName={DisplayName}, SystemName={SystemName}", 
+                    _logger.LogInformation("开始MuseTalk模板预处理: DisplayName={DisplayName}, SystemName={SystemName}", 
                         template.DisplayName, template.SystemName);
                     
-                    // 🎯 进行MuseTalk预处理（永久化模型）
+                    // 进行MuseTalk预处理（永久化模型）
                     // 使用SystemName（英文名）作为文件标识，避免中文路径问题
                     await _museTalkService.PreprocessTemplateAsync(template.SystemName);
-                    _logger.LogInformation("✅ MuseTalk预处理完成: SystemName={SystemName}", template.SystemName);
+                    _logger.LogInformation("MuseTalk预处理完成: SystemName={SystemName}", template.SystemName);
                     
-                    // ✅ 预处理完成，模板就绪
-                    _logger.LogInformation("✅ 模板预处理完成，已就绪: DisplayName={DisplayName}", template.DisplayName);
+                    // 预处理完成，模板就绪
+                    _logger.LogInformation("模板预处理完成，已就绪: DisplayName={DisplayName}", template.DisplayName);
                     
                     // 更新模板状态为就绪
                     template.Status = "ready";
                     template.UpdatedAt = DateTime.Now;
                     
                     await SaveTemplateToFileAsync(template); // 更新模板信息
-                    _logger.LogInformation("✅ 模板创建完成: DisplayName={DisplayName}, SystemName={SystemName}, 预处理已就绪", 
+                    _logger.LogInformation("模板创建完成: DisplayName={DisplayName}, SystemName={SystemName}, 预处理已就绪", 
                         template.DisplayName, template.SystemName);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "❌ 模板预处理失败: DisplayName={DisplayName}, SystemName={SystemName}", 
+                    _logger.LogError(ex, "模板预处理失败: DisplayName={DisplayName}, SystemName={SystemName}", 
                         template.DisplayName, template.SystemName);
                     template.Status = "error";
                     template.UpdatedAt = DateTime.Now;
@@ -158,17 +158,17 @@ namespace LmyDigitalHuman.Services
                     };
                 }
 
-                // 🎯 异步进行预览视频生成（可选，不影响模板就绪状态）
+                // 异步进行预览视频生成（可选，不影响模板就绪状态）
                 _ = Task.Run(async () =>
                 {
                     try
                     {
                         // 这里可以添加预览视频生成逻辑，但不是必需的
-                        _logger.LogInformation("🎬 可选：生成预览视频...");
+                        _logger.LogInformation("可选：生成预览视频...");
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogWarning(ex, "⚠️ 预览视频生成失败，但不影响模板使用");
+                        _logger.LogWarning(ex, "预览视频生成失败，但不影响模板使用");
                     }
                 });
 
@@ -1001,7 +1001,7 @@ namespace LmyDigitalHuman.Services
         {
             try
             {
-                _logger.LogInformation("🚀 使用MuseTalk生成视频: 模板={TemplateName}, 音频={AudioPath}", templateName, audioPath);
+                _logger.LogInformation("使用MuseTalk生成视频: 模板={TemplateName}, 音频={AudioPath}", templateName, audioPath);
                 
                 // 构建模板图片路径
                 var imagePath = Path.Combine(_templatesPath, $"{templateName}.jpg");
@@ -1036,7 +1036,7 @@ namespace LmyDigitalHuman.Services
                     throw new Exception($"MuseTalk视频生成失败: {response.Message}");
                 }
                 
-                _logger.LogInformation("✅ MuseTalk视频生成成功: {VideoPath}", response.VideoPath);
+                _logger.LogInformation("MuseTalk视频生成成功: {VideoPath}", response.VideoPath);
                 
                 // 返回web访问路径
                 var fileName = Path.GetFileName(response.VideoPath);

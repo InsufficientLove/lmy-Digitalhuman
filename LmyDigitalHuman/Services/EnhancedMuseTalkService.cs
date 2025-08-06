@@ -49,8 +49,8 @@ namespace LmyDigitalHuman.Services
             _enablePersistentMode = _configuration.GetValue<bool>("PersistentMuseTalk:EnablePersistentMode", true);
             _autoStartService = _configuration.GetValue<bool>("PersistentMuseTalk:AutoStartService", true);
             
-            _logger.LogInformation("🚀 初始化增强MuseTalk服务");
-            _logger.LogInformation("⚡ 持久化模式: {EnablePersistentMode}", _enablePersistentMode);
+            _logger.LogInformation("初始化增强MuseTalk服务");
+            _logger.LogInformation("持久化模式: {EnablePersistentMode}", _enablePersistentMode);
             _logger.LogInformation("🔄 自动启动服务: {AutoStartService}", _autoStartService);
             
             // 如果启用持久化模式，尝试初始化
@@ -75,7 +75,7 @@ namespace LmyDigitalHuman.Services
                 if (pingSuccess)
                 {
                     _persistentModeAvailable = true;
-                    _logger.LogInformation("✅ 持久化服务已可用");
+                    _logger.LogInformation("持久化服务已可用");
                     return;
                 }
                 
@@ -83,7 +83,7 @@ namespace LmyDigitalHuman.Services
                 if (!pingSuccess && _autoStartService && !_serviceStartAttempted)
                 {
                     _serviceStartAttempted = true;
-                    _logger.LogInformation("🚀 尝试自动启动持久化服务...");
+                    _logger.LogInformation("尝试自动启动持久化服务...");
                     
                     await StartPersistentServiceAsync();
                     
@@ -92,17 +92,17 @@ namespace LmyDigitalHuman.Services
                     if (pingSuccess)
                     {
                         _persistentModeAvailable = true;
-                        _logger.LogInformation("✅ 持久化服务自动启动成功");
+                        _logger.LogInformation("持久化服务自动启动成功");
                     }
                     else
                     {
-                        _logger.LogWarning("⚠️ 持久化服务自动启动失败，将使用传统模式");
+                        _logger.LogWarning("持久化服务自动启动失败，将使用传统模式");
                     }
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "❌ 初始化持久化模式失败");
+                _logger.LogError(ex, "初始化持久化模式失败");
                 _persistentModeAvailable = false;
             }
         }
@@ -148,7 +148,7 @@ namespace LmyDigitalHuman.Services
                 var process = Process.Start(startInfo);
                 if (process != null)
                 {
-                    _logger.LogInformation("🚀 持久化服务进程已启动，PID: {ProcessId}", process.Id);
+                    _logger.LogInformation("持久化服务进程已启动，PID: {ProcessId}", process.Id);
                     
                     // 不等待进程结束，让它在后台运行
                     _ = Task.Run(async () =>
@@ -161,14 +161,14 @@ namespace LmyDigitalHuman.Services
                         }
                         catch (Exception ex)
                         {
-                            _logger.LogError(ex, "❌ 监控持久化服务进程时发生错误");
+                            _logger.LogError(ex, "监控持久化服务进程时发生错误");
                         }
                     });
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "❌ 启动持久化服务失败");
+                _logger.LogError(ex, "启动持久化服务失败");
                 throw;
             }
         }
@@ -186,7 +186,7 @@ namespace LmyDigitalHuman.Services
                 var pingSuccess = await _persistentClient.PingAsync();
                 if (pingSuccess)
                 {
-                    _logger.LogInformation("✅ 服务启动成功，用时: {Time}ms", attempt * intervalMs);
+                    _logger.LogInformation("服务启动成功，用时: {Time}ms", attempt * intervalMs);
                     return true;
                 }
                 
@@ -196,7 +196,7 @@ namespace LmyDigitalHuman.Services
                 }
             }
             
-            _logger.LogWarning("⚠️ 服务启动超时，已尝试 {Attempts} 次", maxAttempts);
+            _logger.LogWarning("服务启动超时，已尝试 {Attempts} 次", maxAttempts);
             return false;
         }
 
@@ -212,7 +212,7 @@ namespace LmyDigitalHuman.Services
             string parsingMode = "jaw")
         {
             var startTime = DateTime.Now;
-            _logger.LogInformation("🎬 开始生成数字人视频: TemplateId={TemplateId}, Mode={Mode}", 
+            _logger.LogInformation("开始生成数字人视频: TemplateId={TemplateId}, Mode={Mode}", 
                 templateId, _persistentModeAvailable ? "Persistent" : "Traditional");
             
             try
@@ -231,7 +231,7 @@ namespace LmyDigitalHuman.Services
                 }
                 
                 var totalTime = DateTime.Now - startTime;
-                _logger.LogInformation("✅ 视频生成完成: TemplateId={TemplateId}, 总耗时={TotalTime:F2}秒", 
+                _logger.LogInformation("视频生成完成: TemplateId={TemplateId}, 总耗时={TotalTime:F2}秒", 
                     templateId, totalTime.TotalSeconds);
                 
                 return result;
@@ -239,13 +239,13 @@ namespace LmyDigitalHuman.Services
             catch (Exception ex)
             {
                 var totalTime = DateTime.Now - startTime;
-                _logger.LogError(ex, "❌ 视频生成失败: TemplateId={TemplateId}, 总耗时={TotalTime:F2}秒", 
+                _logger.LogError(ex, "视频生成失败: TemplateId={TemplateId}, 总耗时={TotalTime:F2}秒", 
                     templateId, totalTime.TotalSeconds);
                 
                 // 如果持久化模式失败，尝试传统模式
                 if (_persistentModeAvailable && _enablePersistentMode)
                 {
-                    _logger.LogWarning("⚠️ 持久化模式失败，尝试传统模式...");
+                    _logger.LogWarning("持久化模式失败，尝试传统模式...");
                     _persistentModeAvailable = false;
                     
                     return await GenerateVideoViaTraditionalAsync(templateId, audioPath, outputFileName, fps, bboxShift, parsingMode);
@@ -266,7 +266,7 @@ namespace LmyDigitalHuman.Services
             int bboxShift,
             string parsingMode)
         {
-            _logger.LogInformation("⚡ 使用持久化模式生成视频");
+            _logger.LogInformation("使用持久化模式生成视频");
             
             var outputPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "videos", outputFileName);
             var templateDir = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "templates");
@@ -283,7 +283,7 @@ namespace LmyDigitalHuman.Services
             
             if (response?.Success == true)
             {
-                _logger.LogInformation("✅ 持久化推理成功: 推理耗时={InferenceTime:F2}秒", response.InferenceTime);
+                _logger.LogInformation("持久化推理成功: 推理耗时={InferenceTime:F2}秒", response.InferenceTime);
                 return response.ResultPath ?? outputPath;
             }
             else
@@ -337,7 +337,7 @@ namespace LmyDigitalHuman.Services
             int bboxShift = 0,
             string parsingMode = "jaw")
         {
-            _logger.LogInformation("🎯 开始预处理模板: TemplateId={TemplateId}", templateId);
+            _logger.LogInformation("开始预处理模板: TemplateId={TemplateId}", templateId);
             
             try
             {
@@ -352,13 +352,13 @@ namespace LmyDigitalHuman.Services
                     
                     if (response?.Success == true)
                     {
-                        _logger.LogInformation("✅ 预处理完成: TemplateId={TemplateId}, 耗时={ProcessTime:F2}秒", 
+                        _logger.LogInformation("预处理完成: TemplateId={TemplateId}, 耗时={ProcessTime:F2}秒", 
                             templateId, response.ProcessTime);
                         return true;
                     }
                     else
                     {
-                        _logger.LogError("❌ 预处理失败: TemplateId={TemplateId}, 错误={Error}", 
+                        _logger.LogError("预处理失败: TemplateId={TemplateId}, 错误={Error}", 
                             templateId, response?.Error);
                         return false;
                     }
@@ -371,7 +371,7 @@ namespace LmyDigitalHuman.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "❌ 预处理异常: TemplateId={TemplateId}", templateId);
+                _logger.LogError(ex, "预处理异常: TemplateId={TemplateId}", templateId);
                 return false;
             }
         }
@@ -396,7 +396,7 @@ namespace LmyDigitalHuman.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "❌ 检查缓存状态失败: TemplateId={TemplateId}", templateId);
+                _logger.LogError(ex, "检查缓存状态失败: TemplateId={TemplateId}", templateId);
                 return false;
             }
         }
@@ -436,7 +436,7 @@ namespace LmyDigitalHuman.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "❌ 获取服务状态失败");
+                _logger.LogError(ex, "获取服务状态失败");
                 return new ServiceStatus
                 {
                     Mode = "Error",
