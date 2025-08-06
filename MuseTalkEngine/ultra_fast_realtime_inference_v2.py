@@ -137,7 +137,6 @@ class UltraFastMuseTalkService:
                     try:
                         print(f"GPU{device_id} 开始加载模型...")
                         # 检查sd-vae目录是否完整
-                        import os
                         sd_vae_path = "./models/sd-vae"
                         config_file = os.path.join(sd_vae_path, "config.json")
                         
@@ -156,7 +155,6 @@ class UltraFastMuseTalkService:
                             print(f"GPU{device_id} UNet模型文件可能损坏，尝试重新加载...")
                             try:
                                 # 强制清理GPU内存
-                                import torch
                                 torch.cuda.empty_cache()
                                 # 重新尝试加载
                                 vae, unet, pe = load_all_model(vae_type="sd-vae")

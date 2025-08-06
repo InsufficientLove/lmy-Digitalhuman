@@ -114,6 +114,17 @@ def check_model_files():
     """检查所有模型文件"""
     print("\n=== 模型文件完整性检查 ===")
     
+    # 切换到正确的工作目录
+    script_dir = Path(__file__).parent
+    musetalk_path = script_dir / "MuseTalk"
+    
+    if not musetalk_path.exists():
+        print(f"❌ MuseTalk目录不存在: {musetalk_path}")
+        return False
+    
+    os.chdir(musetalk_path)
+    print(f"✅ 工作目录: {os.getcwd()}")
+    
     required_files = {
         "models/sd-vae/config.json": "VAE配置文件",
         "models/sd-vae/diffusion_pytorch_model.bin": "VAE模型文件(.bin)",
