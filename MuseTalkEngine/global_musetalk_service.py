@@ -397,10 +397,10 @@ class GlobalMuseTalkService:
                 import copy  # 🔧 关键修复：在正确位置导入copy模块
                 
                 # 🔧 关键修复：将模板缓存数据提取到局部变量，解决作用域问题
-                coord_list_cycle = template_cache['coord_list_cycle']
-                frame_list_cycle = template_cache['frame_list_cycle']
-                mask_coords_list_cycle = template_cache['mask_coords_list_cycle']
-                mask_list_cycle = template_cache['mask_list_cycle']
+                coord_list_cycle = cache_data['coord_list_cycle']
+                frame_list_cycle = cache_data['frame_list_cycle']
+                mask_coords_list_cycle = cache_data['mask_coords_list_cycle']
+                mask_list_cycle = cache_data['mask_list_cycle']
                 
                 def process_frame(args):
                     i, res_frame = args
