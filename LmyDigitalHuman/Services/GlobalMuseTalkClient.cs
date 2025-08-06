@@ -141,6 +141,9 @@ namespace LmyDigitalHuman.Services
         /// </summary>
         public async Task<bool> StartGlobalServiceAsync(int port = 9999)
         {
+            // 🔧 关键预防：启动前先清理任何残留的Python进程
+            await CleanupAnyRemainingPythonProcesses();
+            
             lock (_lock)
             {
                 if (_isServiceRunning)
@@ -396,9 +399,130 @@ namespace LmyDigitalHuman.Services
             return "python";
         }
 
+        /// <summary>
+        /// 🔧 强力清理方法：杜绝任何Python进程残留
+        /// </summary>
+        private async Task CleanupAnyRemainingPythonProcesses()
+        {
+            try
+            {
+                _logger.LogInformation("🧹 启动前清理：检查并清理任何残留的Python进程...");
+                
+                var pythonProcesses = System.Diagnostics.Process.GetProcessesByName("python");
+                if (pythonProcesses.Length > 0)
+                {
+                    _logger.LogWarning("⚠️ 发现{Count}个残留的Python进程，正在清理...", pythonProcesses.Length);
+                    
+                    foreach (var process in pythonProcesses)
+                    {
+                        try
+                        {
+                            // 检查是否是MuseTalk相关进程（通过命令行参数）
+                            if (IsMuseTalkProcess(process))
+                            {
+                                _logger.LogInformation("🔧 清理MuseTalk残留进程 PID:{Pid}", process.Id);
+                                process.Kill(true); // 强制终止进程树
+                                process.WaitForExit(3000); // 等待3秒
+                                process.Dispose();
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning("⚠️ 清理进程PID:{Pid}失败: {Error}", process.Id, ex.Message);
+                        }
+                    }
+                    
+                    // 等待系统清理完成
+                    await Task.Delay(2000);
+                    _logger.LogInformation("✅ Python进程清理完成");
+                }
+                else
+                {
+                    _logger.LogInformation("✅ 没有发现残留的Python进程");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ 清理残留进程时发生异常");
+            }
+        }
+
+        /// <summary>
+        /// 检查是否是MuseTalk相关的Python进程
+        /// </summary>
+        private bool IsMuseTalkProcess(System.Diagnostics.Process process)
+        {
+            try
+            {
+                var commandLine = GetCommandLine(process);
+                return commandLine.Contains("global_musetalk_service") || 
+                       commandLine.Contains("musetalk") ||
+                       commandLine.Contains("MuseTalkEngine");
+            }
+            catch
+            {
+                // 如果无法获取命令行，为安全起见不清理
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// 获取进程命令行参数
+        /// </summary>
+        private string GetCommandLine(System.Diagnostics.Process process)
+        {
+            try
+            {
+                return process.StartInfo.Arguments ?? "";
+            }
+            catch
+            {
+                return "";
+            }
+        }
+
+        /// <summary>
+        /// 🔧 应用退出时的终极清理
+        /// </summary>
+        public void ForceCleanupAllPythonProcesses()
+        {
+            try
+            {
+                _logger.LogInformation("🛑 执行终极清理：强制终止所有相关Python进程");
+                
+                // 先尝试正常停止
+                StopGlobalService();
+                
+                // 然后强制清理所有可能的残留
+                var pythonProcesses = System.Diagnostics.Process.GetProcessesByName("python");
+                foreach (var process in pythonProcesses)
+                {
+                    try
+                    {
+                        if (IsMuseTalkProcess(process))
+                        {
+                            _logger.LogInformation("🔧 强制终止MuseTalk进程 PID:{Pid}", process.Id);
+                            process.Kill(true);
+                            process.Dispose();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning("⚠️ 强制清理进程失败: {Error}", ex.Message);
+                    }
+                }
+                
+                _logger.LogInformation("✅ 终极清理完成");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ 终极清理失败");
+            }
+        }
+
         public void Dispose()
         {
-            StopGlobalService();
+            ForceCleanupAllPythonProcesses();
         }
     }
 }
