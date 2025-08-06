@@ -396,10 +396,16 @@ class GlobalMuseTalkService:
                 import functools
                 import copy  # 🔧 关键修复：在正确位置导入copy模块
                 
+                # 🔧 关键修复：将模板缓存数据提取到局部变量，解决作用域问题
+                coord_list_cycle = template_cache['coord_list_cycle']
+                frame_list_cycle = template_cache['frame_list_cycle']
+                mask_coords_list_cycle = template_cache['mask_coords_list_cycle']
+                mask_list_cycle = template_cache['mask_list_cycle']
+                
                 def process_frame(args):
                     i, res_frame = args
-                    bbox = template_cache['coord_list_cycle'][i % len(template_cache['coord_list_cycle'])]
-                    ori_frame = copy.deepcopy(template_cache['frame_list_cycle'][i % len(template_cache['frame_list_cycle'])])
+                    bbox = coord_list_cycle[i % len(coord_list_cycle)]
+                    ori_frame = copy.deepcopy(frame_list_cycle[i % len(frame_list_cycle)])
                     
                     x1, y1, x2, y2 = bbox
                     try:
@@ -408,8 +414,8 @@ class GlobalMuseTalkService:
                         return None
                     
                     # 🚀 关键优化：使用官方get_image_blending，比get_image快10倍！
-                    mask_coords = template_cache['mask_coords_list_cycle'][i % len(template_cache['mask_coords_list_cycle'])]
-                    mask = template_cache['mask_list_cycle'][i % len(template_cache['mask_list_cycle'])]
+                    mask_coords = mask_coords_list_cycle[i % len(mask_coords_list_cycle)]
+                    mask = mask_list_cycle[i % len(mask_list_cycle)]
                     
                     combine_frame = get_image_blending(
                         image=ori_frame,
