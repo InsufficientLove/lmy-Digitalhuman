@@ -303,45 +303,47 @@ class GlobalMuseTalkService:
                 all_batches = list(gen)
                 total_batches = len(all_batches)
                 
-                if self.multi_gpu and len(self.gpu_devices) >= 4 and total_batches > 1:
-                    # 🚀 4GPU并行推理
-                    print(f"🚀 使用4GPU并行推理，总批次: {total_batches}")
+                if self.multi_gpu and len(self.gpu_devices) >= 2 and total_batches > 1:
+                    # 🚀 多线程并行推理（在GPU0上）
+                    print(f"🚀 使用多线程并行推理，总批次: {total_batches}")
+                    sys.stdout.flush()
                     from concurrent.futures import ThreadPoolExecutor
                     
-                    def process_batch_on_gpu(args):
-                        i, (whisper_batch, latent_batch), gpu_device = args
+                    def process_batch_parallel(args):
+                        i, (whisper_batch, latent_batch) = args
                         try:
-                            # 设置当前GPU
-                            torch.cuda.set_device(gpu_device)
+                            # 所有操作都在GPU0上，但使用多线程并行处理
+                            device = self.device
                             
-                            # 将数据移到指定GPU
-                            whisper_batch = whisper_batch.to(gpu_device)
-                            latent_batch = latent_batch.to(dtype=self.weight_dtype, device=gpu_device)
+                            # 将数据移到GPU0
+                            whisper_batch = whisper_batch.to(device)
+                            latent_batch = latent_batch.to(dtype=self.weight_dtype, device=device)
+                            timesteps = self.timesteps.to(device)
                             
                             # 执行推理
-                            audio_feature_batch = self.pe(whisper_batch)
-                            pred_latents = self.unet.model(latent_batch, self.timesteps, encoder_hidden_states=audio_feature_batch).sample
-                            recon = self.vae.decode_latents(pred_latents)
+                            with torch.no_grad():
+                                audio_feature_batch = self.pe(whisper_batch)
+                                pred_latents = self.unet.model(latent_batch, timesteps, encoder_hidden_states=audio_feature_batch).sample
+                                recon = self.vae.decode_latents(pred_latents)
                             
-                            # 将结果移回CPU避免GPU内存冲突
-                            return [frame.cpu().numpy() for frame in recon]
+                            # 将结果移回CPU
+                            return i, [frame.cpu().numpy() for frame in recon]
                         except Exception as e:
-                            print(f"❌ GPU {gpu_device} 批次 {i} 推理失败: {str(e)}")
-                            return []
+                            print(f"❌ 批次 {i} 推理失败: {str(e)}")
+                            sys.stdout.flush()
+                            return i, []
                     
-                    # 将批次分配到4个GPU
-                    batch_args = []
-                    for i, batch_data in enumerate(all_batches):
-                        gpu_device = self.gpu_devices[i % len(self.gpu_devices)]
-                        batch_args.append((i, batch_data, gpu_device))
+                    # 准备批次参数
+                    batch_args = [(i, batch_data) for i, batch_data in enumerate(all_batches)]
                     
-                    # 并行执行
+                    # 并行执行（使用4个线程，但都在GPU0上）
                     with ThreadPoolExecutor(max_workers=4) as executor:
-                        batch_results = list(tqdm(executor.map(process_batch_on_gpu, batch_args), 
-                                                total=len(batch_args), desc="4GPU并行推理"))
+                        batch_results = list(tqdm(executor.map(process_batch_parallel, batch_args), 
+                                                total=len(batch_args), desc="并行推理"))
                     
-                    # 合并结果
-                    for batch_frames in batch_results:
+                    # 按顺序合并结果
+                    batch_results.sort(key=lambda x: x[0])  # 按批次索引排序
+                    for _, batch_frames in batch_results:
                         res_frame_list.extend(batch_frames)
                         
                 else:
