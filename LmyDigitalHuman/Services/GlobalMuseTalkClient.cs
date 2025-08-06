@@ -420,13 +420,23 @@ namespace LmyDigitalHuman.Services
                     {
                         try
                         {
-                            // 检查是否是MuseTalk相关进程（通过命令行参数）
-                            if (IsMuseTalkProcess(process))
+                            // 🔧 增强检查：同时检查进程和端口占用
+                            bool isMuseTalkProcess = IsMuseTalkProcess(process);
+                            bool isOccupyingPort = IsProcessListeningOnPort(process, 28888) || 
+                                                  IsProcessListeningOnPort(process, 19999) || 
+                                                  IsProcessListeningOnPort(process, 9999);
+                            
+                            if (isMuseTalkProcess || isOccupyingPort)
                             {
-                                _logger.LogInformation("🔧 清理MuseTalk残留进程 PID:{Pid}", process.Id);
+                                _logger.LogWarning("🔧 清理Python进程 PID:{Pid} (MuseTalk:{IsMuseTalk}, 占用端口:{IsPort})", 
+                                    process.Id, isMuseTalkProcess, isOccupyingPort);
                                 process.Kill(true); // 强制终止进程树
                                 process.WaitForExit(3000); // 等待3秒
                                 process.Dispose();
+                            }
+                            else
+                            {
+                                _logger.LogInformation("✅ 跳过非MuseTalk Python进程 PID:{Pid}", process.Id);
                             }
                         }
                         catch (Exception ex)

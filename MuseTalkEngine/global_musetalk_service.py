@@ -394,6 +394,7 @@ class GlobalMuseTalkService:
                 # 🚀 极速优化：并行处理图像合成
                 from concurrent.futures import ThreadPoolExecutor
                 import functools
+                import copy  # 🔧 关键修复：在正确位置导入copy模块
                 
                 def process_frame(args):
                     i, res_frame = args
