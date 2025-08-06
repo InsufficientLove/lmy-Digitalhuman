@@ -23,7 +23,12 @@ import multiprocessing as mp
 from functools import partial
 import copy
 import gc
-from transformers import WhisperModel
+try:
+    from transformers import WhisperModel
+    WHISPER_AVAILABLE = True
+except ImportError:
+    print("警告: transformers.WhisperModel不可用，将跳过Whisper初始化")
+    WHISPER_AVAILABLE = False
 import imageio
 import warnings
 warnings.filterwarnings("ignore")
@@ -175,12 +180,20 @@ class UltraFastMuseTalkService:
                     print(f"GPU{device_id} 模型加载完成")
                     return device_id
             
-            # 真正的并行初始化
+            # 真正的并行初始化 - 添加超时机制
+            print(f"开始并行初始化{self.gpu_count}个GPU...")
             with ThreadPoolExecutor(max_workers=self.gpu_count) as executor:
                 futures = [executor.submit(init_gpu_model, i) for i in range(self.gpu_count)]
-                for future in as_completed(futures):
-                    gpu_id = future.result()
-                    print(f"GPU{gpu_id} 就绪")
+                completed = 0
+                for future in as_completed(futures, timeout=300):  # 5分钟超时
+                    try:
+                        gpu_id = future.result()
+                        completed += 1
+                        print(f"GPU{gpu_id} 就绪 ({completed}/{self.gpu_count})")
+                    except Exception as e:
+                        print(f"GPU初始化失败: {e}")
+                        raise e
+            print(f"所有{self.gpu_count}个GPU初始化完成")
             
             # 共享组件初始化（只需一次）
             print("初始化共享组件...")
@@ -188,15 +201,41 @@ class UltraFastMuseTalkService:
             
             # Whisper和AudioProcessor在CPU上，所有GPU共享
             whisper_dir = "./models/whisper"
-            if os.path.exists(whisper_dir):
-                self.shared_whisper = WhisperModel.from_pretrained(whisper_dir).eval()
-                print("Whisper模型加载完成")
+            if WHISPER_AVAILABLE and os.path.exists(whisper_dir):
+                print("开始加载Whisper模型...")
+                try:
+                    self.shared_whisper = WhisperModel.from_pretrained(whisper_dir).eval()
+                    print("Whisper模型加载完成")
+                except Exception as e:
+                    print(f"Whisper模型加载失败: {e}")
+                    self.shared_whisper = None
+            else:
+                if not WHISPER_AVAILABLE:
+                    print("跳过Whisper模型加载 - transformers.WhisperModel不可用")
+                else:
+                    print(f"跳过Whisper模型加载 - 目录不存在: {whisper_dir}")
+                self.shared_whisper = None
             
-            self.shared_audio_processor = AudioProcessor()
-            self.shared_fp = FaceParsing()
+            print("初始化AudioProcessor...")
+            try:
+                self.shared_audio_processor = AudioProcessor()
+                print("AudioProcessor初始化完成")
+            except Exception as e:
+                print(f"AudioProcessor初始化失败: {e}")
+                self.shared_audio_processor = None
+            
+            print("初始化FaceParsing...")
+            try:
+                self.shared_fp = FaceParsing()
+                print("FaceParsing初始化完成")
+            except Exception as e:
+                print(f"FaceParsing初始化失败: {e}")
+                self.shared_fp = None
             
             # 时间步长
+            print("设置时间步长...")
             self.timesteps = torch.tensor([0], device=device0, dtype=torch.long)
+            print("时间步长设置完成")
             
             init_time = time.time() - start_time
             print(f"极速初始化完成！耗时: {init_time:.2f}秒")
