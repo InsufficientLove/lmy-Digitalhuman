@@ -306,12 +306,19 @@ namespace LmyDigitalHuman.Services
 
                 try
                 {
-                    _logger.LogInformation("🛑 停止全局MuseTalk服务...");
+                    _logger.LogInformation("🛑 停止全局MuseTalk服务... PID:{Pid}", _pythonProcess.Id);
                     
                     if (!_pythonProcess.HasExited)
                     {
-                        _pythonProcess.Kill(true);
-                        _pythonProcess.WaitForExit(5000);
+                        // 🔧 关键修复：强制终止进程树
+                        _logger.LogInformation("🔧 强制终止Python进程及其子进程...");
+                        _pythonProcess.Kill(true); // true 表示同时终止子进程
+                        
+                        // 给更多时间等待进程退出
+                        if (!_pythonProcess.WaitForExit(10000)) // 10秒
+                        {
+                            _logger.LogWarning("⚠️ Python进程未能在10秒内退出，强制结束");
+                        }
                     }
 
                     _pythonProcess.Dispose();
@@ -323,6 +330,26 @@ namespace LmyDigitalHuman.Services
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "❌ 停止全局MuseTalk服务失败");
+                    
+                    // 🔧 额外清理：如果正常终止失败，尝试强制清理
+                    try
+                    {
+                        if (_pythonProcess != null && !_pythonProcess.HasExited)
+                        {
+                            _logger.LogInformation("🔧 尝试额外强制终止...");
+                            _pythonProcess.Kill(true);
+                        }
+                    }
+                    catch
+                    {
+                        // 忽略额外清理的异常
+                    }
+                    finally
+                    {
+                        _pythonProcess?.Dispose();
+                        _pythonProcess = null;
+                        _isServiceRunning = false;
+                    }
                 }
             }
         }

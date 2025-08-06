@@ -181,7 +181,33 @@ app.Logger.LogInformation("📱 HTTP访问地址: http://localhost:5000");
 app.Logger.LogInformation("📊 健康检查: http://localhost:5000/health");
 app.Logger.LogInformation("📖 API文档: http://localhost:5000/swagger");
 
+// 🔧 关键修复：注册程序退出时的进程清理
+var globalServiceManager = app.Services.GetRequiredService<GlobalMuseTalkServiceManager>();
 
+// 处理Ctrl+C
+Console.CancelKeyPress += (sender, e) =>
+{
+    app.Logger.LogInformation("🛑 检测到Ctrl+C，正在清理Python进程...");
+    globalServiceManager.StopGlobalService();
+    app.Logger.LogInformation("✅ Python进程清理完成");
+};
+
+// 处理应用程序退出
+AppDomain.CurrentDomain.ProcessExit += (sender, e) =>
+{
+    app.Logger.LogInformation("🛑 应用程序退出，正在清理Python进程...");
+    globalServiceManager.StopGlobalService();
+    app.Logger.LogInformation("✅ Python进程清理完成");
+};
+
+// 处理应用程序生命周期
+var lifetime = app.Services.GetRequiredService<IHostApplicationLifetime>();
+lifetime.ApplicationStopping.Register(() =>
+{
+    app.Logger.LogInformation("🛑 应用程序停止中，正在清理Python进程...");
+    globalServiceManager.StopGlobalService();
+    app.Logger.LogInformation("✅ Python进程清理完成");
+});
 
 try
 {
