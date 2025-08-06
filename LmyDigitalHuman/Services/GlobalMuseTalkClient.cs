@@ -182,10 +182,8 @@ namespace LmyDigitalHuman.Services
                 // 获取Python路径
                 var pythonPath = GetPythonPath();
                 
-                // 🚀 Ultra Fast V2脚本在MuseTalkEngine目录中运行
-                var workingDir = serviceScript.Contains("ultra_fast_realtime_inference_v2.py") 
-                    ? Path.Combine(projectRoot, "MuseTalkEngine")
-                    : Path.Combine(projectRoot, "MuseTalk");
+                // 🚀 包装器脚本在MuseTalkEngine目录中运行，会自动设置正确的工作目录
+                var workingDir = Path.Combine(projectRoot, "MuseTalkEngine");
                 var processInfo = new System.Diagnostics.ProcessStartInfo
                 {
                     FileName = pythonPath,
