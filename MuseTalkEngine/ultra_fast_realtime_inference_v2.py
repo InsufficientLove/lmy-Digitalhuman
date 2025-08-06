@@ -133,23 +133,40 @@ class UltraFastMuseTalkService:
                 print(f"🎮 GPU{device_id} 开始初始化...")
                 
                 with torch.cuda.device(device_id):
-                    # 加载模型到指定GPU - 添加详细日志
+                    # 加载模型到指定GPU - 只使用可用的sd-vae
                     try:
-                        print(f"GPU{device_id} 开始加载VAE模型...")
-                        vae, unet, pe = load_all_model()
-                        print(f"GPU{device_id} VAE/UNet/PE模型加载成功")
+                        print(f"GPU{device_id} 开始加载模型...")
+                        # 检查sd-vae目录是否完整
+                        import os
+                        sd_vae_path = "./models/sd-vae"
+                        config_file = os.path.join(sd_vae_path, "config.json")
+                        
+                        if os.path.exists(config_file):
+                            print(f"GPU{device_id} 使用完整的sd-vae模型")
+                            vae, unet, pe = load_all_model(vae_type="sd-vae")
+                            print(f"GPU{device_id} 模型加载成功")
+                        else:
+                            print(f"GPU{device_id} sd-vae配置文件不存在，跳过此GPU")
+                            return None
+                            
                     except Exception as e:
                         print(f"GPU{device_id} 模型加载失败: {e}")
-                        print(f"GPU{device_id} 错误详情: {str(e)}")
-                        # 尝试使用备用VAE路径
-                        try:
-                            print(f"GPU{device_id} 尝试备用VAE路径...")
-                            vae, unet, pe = load_all_model(vae_type="sd-vae-ft-mse")
-                            print(f"GPU{device_id} 使用备用VAE模型加载成功")
-                        except Exception as e2:
-                            print(f"GPU{device_id} 备用模型也加载失败: {e2}")
-                            print(f"GPU{device_id} 备用错误详情: {str(e2)}")
-                            raise e2
+                        # 检查是否是UNet模型问题
+                        if "meta tensor" in str(e) or "Cannot copy out" in str(e):
+                            print(f"GPU{device_id} UNet模型文件可能损坏，尝试重新加载...")
+                            try:
+                                # 强制清理GPU内存
+                                import torch
+                                torch.cuda.empty_cache()
+                                # 重新尝试加载
+                                vae, unet, pe = load_all_model(vae_type="sd-vae")
+                                print(f"GPU{device_id} 重新加载成功")
+                            except Exception as e3:
+                                print(f"GPU{device_id} 重新加载也失败: {e3}")
+                                return None
+                        else:
+                            print(f"GPU{device_id} 其他错误，跳过此GPU")
+                            return None
                     
                     # 优化模型 - 半精度+编译优化
                     print(f"GPU{device_id} 开始模型优化...")
@@ -180,20 +197,35 @@ class UltraFastMuseTalkService:
                     print(f"GPU{device_id} 模型加载完成")
                     return device_id
             
-            # 真正的并行初始化 - 添加超时机制
+            # 真正的并行初始化 - 允许部分GPU失败
             print(f"开始并行初始化{self.gpu_count}个GPU...")
+            successful_gpus = []
             with ThreadPoolExecutor(max_workers=self.gpu_count) as executor:
-                futures = [executor.submit(init_gpu_model, i) for i in range(self.gpu_count)]
-                completed = 0
+                futures = {executor.submit(init_gpu_model, i): i for i in range(self.gpu_count)}
+                
                 for future in as_completed(futures, timeout=300):  # 5分钟超时
+                    gpu_id = futures[future]
                     try:
-                        gpu_id = future.result()
-                        completed += 1
-                        print(f"GPU{gpu_id} 就绪 ({completed}/{self.gpu_count})")
+                        result = future.result()
+                        if result is not None:
+                            successful_gpus.append(gpu_id)
+                            print(f"GPU{gpu_id} 就绪 ({len(successful_gpus)}/{self.gpu_count})")
+                        else:
+                            print(f"GPU{gpu_id} 初始化失败，跳过")
                     except Exception as e:
-                        print(f"GPU初始化失败: {e}")
-                        raise e
-            print(f"所有{self.gpu_count}个GPU初始化完成")
+                        print(f"GPU{gpu_id} 初始化异常: {e}")
+            
+            if len(successful_gpus) == 0:
+                print("所有GPU初始化都失败了")
+                return False
+            elif len(successful_gpus) < self.gpu_count:
+                print(f"部分GPU初始化成功: {successful_gpus}/{list(range(self.gpu_count))}")
+                # 更新可用GPU列表
+                self.devices = [f'cuda:{i}' for i in successful_gpus]
+                self.gpu_count = len(successful_gpus)
+                print(f"调整为使用{self.gpu_count}个GPU: {self.devices}")
+            else:
+                print(f"所有{self.gpu_count}个GPU初始化完成")
             
             # 共享组件初始化（只需一次）
             print("初始化共享组件...")
