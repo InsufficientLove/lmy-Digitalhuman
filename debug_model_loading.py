@@ -26,8 +26,9 @@ def debug_model_loading():
         return
     
     if not musetalk_official_path.exists():
-        print(f"❌ MuseTalk_official目录不存在: {musetalk_official_path}")
-        return
+        print(f"⚠️ MuseTalk_official目录不存在: {musetalk_official_path} (这是正常的，本地不需要)")
+    else:
+        print(f"✅ MuseTalk_official目录存在: {musetalk_official_path}")
     
     # 切换到MuseTalk目录（包含models文件夹）
     os.chdir(musetalk_path)
@@ -35,8 +36,11 @@ def debug_model_loading():
     
     # 添加Python路径
     sys.path.insert(0, str(musetalk_path))
-    sys.path.insert(0, str(musetalk_official_path))
-    print(f"✅ Python路径已添加")
+    if musetalk_official_path.exists():
+        sys.path.insert(0, str(musetalk_official_path))
+        print(f"✅ Python路径已添加: {musetalk_path}, {musetalk_official_path}")
+    else:
+        print(f"✅ Python路径已添加: {musetalk_path}")
     
     # 检查models目录结构
     models_dir = Path("models")
