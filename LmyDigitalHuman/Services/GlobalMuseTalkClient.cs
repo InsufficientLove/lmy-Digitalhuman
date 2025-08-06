@@ -38,12 +38,13 @@ namespace LmyDigitalHuman.Services
                 // 🔧 添加连接超时和重试机制
                 try
                 {
+                    _logger.LogInformation("🔧 尝试连接到 {Host}:{Port}", _serverHost, _serverPort);
                     await client.ConnectAsync(_serverHost, _serverPort);
-                    _logger.LogInformation("✅ TCP连接建立成功");
+                    _logger.LogInformation("✅ TCP连接建立成功 -> {Host}:{Port}", _serverHost, _serverPort);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError("❌ 无法连接到Python服务: {Error}", ex.Message);
+                    _logger.LogError("❌ 无法连接到Python服务 {Host}:{Port}: {Error}", _serverHost, _serverPort, ex.Message);
                     throw new InvalidOperationException($"Python全局服务未运行或端口{_serverPort}不可达", ex);
                 }
                 

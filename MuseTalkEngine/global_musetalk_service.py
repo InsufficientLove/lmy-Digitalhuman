@@ -303,43 +303,61 @@ class GlobalMuseTalkService:
                 all_batches = list(gen)
                 total_batches = len(all_batches)
                 
-                if self.multi_gpu and len(self.gpu_devices) >= 2 and total_batches > 1:
-                    # 🚀 多线程并行推理（在GPU0上）
-                    print(f"🚀 使用多线程并行推理，总批次: {total_batches}")
+                if self.multi_gpu and len(self.gpu_devices) >= 4 and total_batches > 1:
+                    # 🚀 真正的4GPU并行推理
+                    print(f"🚀 使用真正4GPU并行推理，总批次: {total_batches}")
                     sys.stdout.flush()
-                    from concurrent.futures import ThreadPoolExecutor
+                    from concurrent.futures import ThreadPoolExecutor, as_completed
                     
-                    def process_batch_parallel(args):
-                        i, (whisper_batch, latent_batch) = args
+                    def process_batch_on_gpu(args):
+                        i, (whisper_batch, latent_batch), target_gpu = args
                         try:
-                            # 所有操作都在GPU0上，但使用多线程并行处理
-                            device = self.device
+                            # 🔧 关键：每个线程使用不同的GPU
+                            device = torch.device(target_gpu)
+                            torch.cuda.set_device(device)
                             
-                            # 将数据移到GPU0
+                            print(f"🎮 批次{i}使用GPU: {target_gpu}")
+                            sys.stdout.flush()
+                            
+                            # 将数据移到目标GPU
                             whisper_batch = whisper_batch.to(device)
                             latent_batch = latent_batch.to(dtype=self.weight_dtype, device=device)
-                            timesteps = self.timesteps.to(device)
+                            
+                            # 🔧 关键：将模型临时复制到目标GPU
+                            pe_gpu = self.pe.to(device)
+                            unet_gpu = self.unet.model.to(device)
+                            vae_gpu = self.vae.vae.to(device)
+                            timesteps_gpu = self.timesteps.to(device)
                             
                             # 执行推理
                             with torch.no_grad():
-                                audio_feature_batch = self.pe(whisper_batch)
-                                pred_latents = self.unet.model(latent_batch, timesteps, encoder_hidden_states=audio_feature_batch).sample
-                                recon = self.vae.decode_latents(pred_latents)
+                                audio_feature_batch = pe_gpu(whisper_batch)
+                                pred_latents = unet_gpu(latent_batch, timesteps_gpu, encoder_hidden_states=audio_feature_batch).sample
+                                recon = vae_gpu.decode(pred_latents / vae_gpu.config.scaling_factor).sample
+                            
+                            # 清理GPU内存，将模型移回主GPU
+                            pe_gpu.to(self.device)
+                            unet_gpu.to(self.device)  
+                            vae_gpu.to(self.device)
+                            torch.cuda.empty_cache()
                             
                             # 将结果移回CPU
                             return i, [frame.cpu().numpy() for frame in recon]
                         except Exception as e:
-                            print(f"❌ 批次 {i} 推理失败: {str(e)}")
+                            print(f"❌ 批次 {i} GPU {target_gpu} 推理失败: {str(e)}")
                             sys.stdout.flush()
                             return i, []
                     
-                    # 准备批次参数
-                    batch_args = [(i, batch_data) for i, batch_data in enumerate(all_batches)]
+                    # 将批次分配到4个GPU
+                    batch_args = []
+                    for i, batch_data in enumerate(all_batches):
+                        target_gpu = self.gpu_devices[i % len(self.gpu_devices)]
+                        batch_args.append((i, batch_data, target_gpu))
                     
-                    # 并行执行（使用4个线程，但都在GPU0上）
+                    # 真正的4GPU并行执行
                     with ThreadPoolExecutor(max_workers=4) as executor:
-                        batch_results = list(tqdm(executor.map(process_batch_parallel, batch_args), 
-                                                total=len(batch_args), desc="并行推理"))
+                        batch_results = list(tqdm(executor.map(process_batch_on_gpu, batch_args), 
+                                                total=len(batch_args), desc="4GPU并行推理"))
                     
                     # 按顺序合并结果
                     batch_results.sort(key=lambda x: x[0])  # 按批次索引排序
