@@ -120,7 +120,7 @@ var globalServiceManager = app.Services.GetRequiredService<GlobalMuseTalkService
 try
 {
     app.Logger.LogInformation("🚀 正在启动4GPU共享全局MuseTalk服务...");
-    var startSuccess = await globalServiceManager.StartGlobalServiceAsync(port: 9999);
+    var startSuccess = await globalServiceManager.StartGlobalServiceAsync(port: 19999);
     if (startSuccess)
     {
         app.Logger.LogInformation("✅ 4GPU共享全局MuseTalk服务启动成功");

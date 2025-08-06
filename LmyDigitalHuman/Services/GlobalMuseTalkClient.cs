@@ -17,7 +17,7 @@ namespace LmyDigitalHuman.Services
         private readonly string _serverHost;
         private readonly int _serverPort;
 
-        public GlobalMuseTalkClient(ILogger<GlobalMuseTalkClient> logger, string serverHost = "127.0.0.1", int serverPort = 9999)
+        public GlobalMuseTalkClient(ILogger<GlobalMuseTalkClient> logger, string serverHost = "127.0.0.1", int serverPort = 19999)
         {
             _logger = logger;
             _serverHost = serverHost;
@@ -278,7 +278,10 @@ namespace LmyDigitalHuman.Services
             {
                 using var testClient = new TcpClient();
                 await testClient.ConnectAsync("127.0.0.1", port);
-                _logger.LogInformation("✅ 端口{Port}连接测试成功", port);
+                _logger.LogInformation("✅ 端口{Port}连接测试成功 (地址: 127.0.0.1)", port);
+                
+                // 立即断开连接，避免占用
+                testClient.Close();
                 return true;
             }
             catch (Exception ex)
