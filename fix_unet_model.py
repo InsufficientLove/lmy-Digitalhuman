@@ -16,6 +16,13 @@ def fix_unet_model():
     
     if not musetalk_path.exists():
         print(f"❌ MuseTalk目录不存在: {musetalk_path}")
+        print("正在创建MuseTalk目录结构...")
+        musetalk_path.mkdir(parents=True, exist_ok=True)
+        (musetalk_path / "models" / "musetalkV15").mkdir(parents=True, exist_ok=True)
+        (musetalk_path / "models" / "sd-vae").mkdir(parents=True, exist_ok=True)
+        (musetalk_path / "models" / "dwpose").mkdir(parents=True, exist_ok=True)
+        print(f"✅ MuseTalk目录结构已创建: {musetalk_path}")
+        print("⚠️ 注意: 模型文件仍需要下载，请运行 setup_musetalk_models.py")
         return False
     
     os.chdir(musetalk_path)
@@ -26,6 +33,9 @@ def fix_unet_model():
     unet_path = "models/musetalkV15/unet.pth"
     if not os.path.exists(unet_path):
         print(f"❌ UNet模型文件不存在: {unet_path}")
+        print("请运行以下命令下载模型文件:")
+        print("  python setup_musetalk_models.py")
+        print("或手动下载模型文件，详见 MuseTalk/DOWNLOAD_INSTRUCTIONS.md")
         return False
     
     print(f"✅ UNet模型文件存在: {unet_path}")
