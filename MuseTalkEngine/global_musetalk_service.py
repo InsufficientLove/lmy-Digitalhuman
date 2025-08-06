@@ -423,10 +423,16 @@ class GlobalMuseTalkService:
                     cv2.imwrite(frame_path, combine_frame)
                     return i
                 
-                # 使用4线程并行处理
-                with ThreadPoolExecutor(max_workers=4) as executor:
-                    frame_args = list(enumerate(res_frame_list))
-                    list(tqdm(executor.map(process_frame, frame_args), total=len(frame_args), desc="合成图像"))
+                # 🔧 临时改为单线程处理，避免并行死锁
+                print(f"🖼️ 开始合成{len(res_frame_list)}帧图像...")
+                sys.stdout.flush()
+                
+                for i, res_frame in enumerate(tqdm(res_frame_list, desc="合成图像")):
+                    try:
+                        process_frame((i, res_frame))
+                    except Exception as e:
+                        print(f"❌ 合成第{i}帧失败: {str(e)}")
+                        sys.stdout.flush()
                 
                 compose_time = time.time() - compose_start
                 print(f"✅ 图像合成完成: 耗时: {compose_time:.2f}秒")

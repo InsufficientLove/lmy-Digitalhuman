@@ -656,6 +656,7 @@ namespace LmyDigitalHuman.Services
                 _logger.LogWarning("🚨 执行紧急清理：强制清理占用MuseTalk端口的所有进程");
                 
                 var ports = new[] { 28888, 19999, 9999 };
+                var killedProcesses = new List<int>();
                 
                 foreach (var port in ports)
                 {
@@ -685,23 +686,46 @@ namespace LmyDigitalHuman.Services
                                 var parts = line.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
                                 if (parts.Length > 0 && int.TryParse(parts[^1], out int pid))
                                 {
+                                    if (killedProcesses.Contains(pid)) continue; // 避免重复清理
+                                    
                                     try
                                     {
                                         var process = System.Diagnostics.Process.GetProcessById(pid);
                                         _logger.LogWarning("🔧 发现端口{Port}被进程占用: PID={Pid}, 名称={Name}", port, pid, process.ProcessName);
                                         
-                                        // 如果是Python进程，强制终止
-                                        if (process.ProcessName.ToLower() == "python")
-                                        {
-                                            _logger.LogWarning("🚨 强制终止占用端口{Port}的Python进程: PID={Pid}", port, pid);
-                                            process.Kill(true);
-                                            process.WaitForExit(3000);
-                                            process.Dispose();
-                                        }
+                                        // 🔧 强化清理：不管什么进程，只要占用我们的端口就清理
+                                        _logger.LogWarning("🚨 强制终止占用端口{Port}的进程: PID={Pid}, 名称={Name}", port, pid, process.ProcessName);
+                                        process.Kill(true);
+                                        process.WaitForExit(5000); // 增加等待时间到5秒
+                                        process.Dispose();
+                                        killedProcesses.Add(pid);
+                                        
+                                        _logger.LogInformation("✅ 成功清理进程 PID={Pid}", pid);
                                     }
                                     catch (Exception ex)
                                     {
                                         _logger.LogError("❌ 清理端口{Port}占用进程PID={Pid}失败: {Error}", port, pid, ex.Message);
+                                        
+                                        // 🔧 终极手段：使用taskkill命令强制终止
+                                        try
+                                        {
+                                            _logger.LogWarning("🔧 尝试使用taskkill强制终止PID={Pid}", pid);
+                                            var killInfo = new System.Diagnostics.ProcessStartInfo
+                                            {
+                                                FileName = "taskkill",
+                                                Arguments = $"/PID {pid} /T /F",
+                                                UseShellExecute = false,
+                                                CreateNoWindow = true
+                                            };
+                                            using var killProcess = System.Diagnostics.Process.Start(killInfo);
+                                            killProcess?.WaitForExit(3000);
+                                            killedProcesses.Add(pid);
+                                            _logger.LogInformation("✅ taskkill成功清理进程 PID={Pid}", pid);
+                                        }
+                                        catch (Exception killEx)
+                                        {
+                                            _logger.LogError("❌ taskkill也失败: {Error}", killEx.Message);
+                                        }
                                     }
                                 }
                             }
@@ -713,7 +737,10 @@ namespace LmyDigitalHuman.Services
                     }
                 }
                 
-                _logger.LogInformation("✅ 紧急清理完成");
+                // 等待系统完成清理
+                System.Threading.Thread.Sleep(2000);
+                
+                _logger.LogInformation("✅ 紧急清理完成，已清理{Count}个进程", killedProcesses.Count);
             }
             catch (Exception ex)
             {
