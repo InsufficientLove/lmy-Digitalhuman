@@ -160,7 +160,13 @@ namespace LmyDigitalHuman.Services
             {
                 var contentRoot = _pathManager.GetContentRootPath();
                 var projectRoot = Path.Combine(contentRoot, "..");
-                var serviceScript = Path.Combine(projectRoot, "MuseTalkEngine", "global_musetalk_service.py");
+                // 🚀 优先使用Ultra Fast推理引擎
+                var serviceScript = Path.Combine(projectRoot, "MuseTalkEngine", "ultra_fast_realtime_inference_v2.py");
+                if (!File.Exists(serviceScript))
+                {
+                    // 备用使用全局服务
+                    serviceScript = Path.Combine(projectRoot, "MuseTalkEngine", "global_musetalk_service.py");
+                }
 
                 if (!File.Exists(serviceScript))
                 {

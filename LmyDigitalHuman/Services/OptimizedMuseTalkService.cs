@@ -1439,7 +1439,13 @@ namespace LmyDigitalHuman.Services
             _logger.LogInformation("🎯 开始执行模板预处理: {TemplateId}", templateId);
             
             var pythonPath = await GetCachedPythonPathAsync();
-            var preprocessingScript = Path.GetFullPath(Path.Combine(_pathManager.GetContentRootPath(), "..", "MuseTalkEngine", "enhanced_musetalk_preprocessing.py"));
+            // 🚀 使用极速优化版预处理脚本
+            var preprocessingScript = Path.GetFullPath(Path.Combine(_pathManager.GetContentRootPath(), "..", "MuseTalkEngine", "optimized_preprocessing_v2.py"));
+            if (!File.Exists(preprocessingScript))
+            {
+                // 备用脚本
+                preprocessingScript = Path.GetFullPath(Path.Combine(_pathManager.GetContentRootPath(), "..", "MuseTalkEngine", "enhanced_musetalk_preprocessing.py"));
+            }
             
             var arguments = $"\"{preprocessingScript}\" " +
                           $"--template_id \"{templateId}\" " +
@@ -1722,7 +1728,7 @@ namespace LmyDigitalHuman.Services
         }
 
         /// <summary>
-        /// 执行实时推理内部方法 - 使用预处理缓存数据
+        /// 执行实时推理内部方法 - 使用极速推理引擎
         /// </summary>
         private async Task<string> ExecuteRealtimeInferenceInternal(string templateId, string audioPath, string outputPath, int gpuId = 0)
         {
@@ -1753,7 +1759,7 @@ namespace LmyDigitalHuman.Services
                     }
                 }
 
-                _logger.LogInformation("🌐 使用全局MuseTalk服务进行推理");
+                _logger.LogInformation("⚡ 使用Ultra Fast推理引擎");
                 _logger.LogInformation("🔧 推理参数:");
                 _logger.LogInformation("   模板ID: {TemplateId}", templateId);
                 _logger.LogInformation("   音频文件: {AudioPath}", fixedAudioPath);
@@ -1761,31 +1767,31 @@ namespace LmyDigitalHuman.Services
                 _logger.LogInformation("   缓存目录: {CacheDir}", cacheDir);
                 _logger.LogInformation("   使用GPU: {GpuId}", gpuId);
 
-                // 🚀 使用全局IPC客户端进行推理
+                // 🚀 使用极速IPC客户端进行推理 - 优化参数
                 var resultPath = await _globalClient.SendInferenceRequestAsync(
                     templateId: templateId,
                     audioPath: fixedAudioPath,
                     outputPath: outputPath,
                     cacheDir: cacheDir,
-                    batchSize: 8,
+                    batchSize: 16,  // 🔥 增加批次大小提升并行度
                     fps: 25
                 );
 
                 if (!string.IsNullOrEmpty(resultPath) && File.Exists(resultPath))
                 {
                     var fileInfo = new FileInfo(resultPath);
-                    _logger.LogInformation("✅ 全局推理完成: {TemplateId}, 输出: {OutputPath}, 大小: {Size}bytes", 
+                    _logger.LogInformation("⚡ Ultra Fast推理完成: {TemplateId}, 输出: {OutputPath}, 大小: {Size}bytes", 
                         templateId, resultPath, fileInfo.Length);
                     return resultPath;
                 }
                 else
                 {
-                    throw new InvalidOperationException($"全局推理失败或输出文件不存在: {outputPath}");
+                    throw new InvalidOperationException($"Ultra Fast推理失败或输出文件不存在: {outputPath}");
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "全局推理执行失败: {TemplateId}", templateId);
+                _logger.LogError(ex, "Ultra Fast推理执行失败: {TemplateId}", templateId);
                 throw;
             }
         }

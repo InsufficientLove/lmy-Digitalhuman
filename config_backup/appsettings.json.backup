@@ -20,9 +20,7 @@
     }
   },
   "Serilog": {
-    "Using": [
-      "Serilog.Sinks.File"
-    ],
+    "Using": [ "Serilog.Sinks.File" ],
     "MinimumLevel": {
       "Default": "Information",
       "Override": {
@@ -145,15 +143,5 @@
       "GCCollectionInterval": 300000,
       "EnableMetrics": true
     }
-  },
-  "UltraFastSettings": {
-    "EnableUltraFastMode": true,
-    "DefaultBatchSize": 16,
-    "MaxParallelInferences": 4,
-    "EnablePerformanceMonitoring": true,
-    "TargetResponseTimeMs": 3000,
-    "EnableGPUOptimization": true,
-    "EnableModelCompilation": true,
-    "EnableShadowFix": true
   }
 }
