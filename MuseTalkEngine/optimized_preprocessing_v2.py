@@ -195,16 +195,24 @@ class OptimizedPreprocessor:
             
             # 🎯 1. 并行读取和处理图像
             print("📸 读取模板图像...")
-            image_files = []
-            for ext in ['*.jpg', '*.jpeg', '*.png', '*.bmp']:
-                image_files.extend(Path(template_path).glob(ext))
             
-            if not image_files:
-                raise ValueError(f"未找到图像文件: {template_path}")
-            
-            # 选择最佳图像（通常是第一张）
-            input_image_path = str(image_files[0])
-            print(f"📸 使用图像: {input_image_path}")
+            # 检查是否是直接的图像文件路径
+            template_path_obj = Path(template_path)
+            if template_path_obj.is_file() and template_path_obj.suffix.lower() in ['.jpg', '.jpeg', '.png', '.bmp']:
+                input_image_path = str(template_path_obj)
+                print(f"📸 使用直接图像文件: {input_image_path}")
+            else:
+                # 在目录中搜索图像文件
+                image_files = []
+                for ext in ['*.jpg', '*.jpeg', '*.png', '*.bmp']:
+                    image_files.extend(template_path_obj.glob(ext))
+                
+                if not image_files:
+                    raise ValueError(f"未找到图像文件: {template_path}")
+                
+                # 选择最佳图像（通常是第一张）
+                input_image_path = str(image_files[0])
+                print(f"📸 使用目录中的图像: {input_image_path}")
             
             # 🎨 2. 图像预处理和阴影修复
             print("🎨 图像预处理和阴影修复...")

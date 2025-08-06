@@ -26,10 +26,16 @@ def setup_environment():
         if path not in sys.path:
             sys.path.insert(0, path)
     
-    # 设置工作目录为MuseTalkEngine
-    os.chdir(script_dir)
+    # 设置工作目录为MuseTalk (Ultra Fast V2需要访问MuseTalk模型文件)
+    musetalk_dir = musetalk_path
+    if os.path.exists(musetalk_dir):
+        os.chdir(musetalk_dir)
+        current_dir = musetalk_dir
+    else:
+        os.chdir(script_dir)
+        current_dir = script_dir
     
-    print(f"🔧 工作目录设置为: {script_dir}")
+    print(f"🔧 工作目录设置为: {current_dir}")
     print(f"🔧 Python路径已添加: {paths_to_add}")
 
 def main():

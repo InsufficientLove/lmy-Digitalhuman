@@ -1448,10 +1448,9 @@ namespace LmyDigitalHuman.Services
             }
             
             var arguments = $"\"{preprocessingScript}\" " +
+                          $"--template_path \"{templateImagePath}\" " +
+                          $"--output_dir \"{Path.GetDirectoryName(stateFilePath)}\" " +
                           $"--template_id \"{templateId}\" " +
-                          $"--template_image \"{templateImagePath}\" " +
-                          $"--output_state \"{stateFilePath}\" " +
-                          $"--cache_dir \"{Path.GetDirectoryName(stateFilePath)}\" " +
                           $"--device cuda:0";
             
             // 设置路径 - 工作目录必须是MuseTalk目录以支持相对路径
