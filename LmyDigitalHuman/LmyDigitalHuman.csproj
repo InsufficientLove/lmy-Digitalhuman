@@ -48,6 +48,9 @@
     
     <!-- .NET原生TTS支持 -->
     <PackageReference Include="Microsoft.CognitiveServices.Speech" Version="1.38.0" />
+    
+    <!-- 系统管理 - 用于进程管理和WMI查询 -->
+    <PackageReference Include="System.Management" Version="8.0.0" />
   </ItemGroup>
 
   <ItemGroup>

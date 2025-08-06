@@ -144,6 +144,9 @@ namespace LmyDigitalHuman.Services
             // 🔧 关键预防：启动前先清理任何残留的Python进程
             await CleanupAnyRemainingPythonProcesses();
             
+            // 🚨 紧急清理：强制清理占用端口的进程
+            EmergencyCleanupPortOccupyingProcesses();
+            
             lock (_lock)
             {
                 if (_isServiceRunning)
@@ -448,36 +451,149 @@ namespace LmyDigitalHuman.Services
         }
 
         /// <summary>
-        /// 检查是否是MuseTalk相关的Python进程
+        /// 检查是否是MuseTalk相关的Python进程 - 增强识别逻辑
         /// </summary>
         private bool IsMuseTalkProcess(System.Diagnostics.Process process)
         {
             try
             {
+                // 🔧 关键修复：多重检查机制，确保识别准确
+                
+                // 1. 进程名检查
+                if (process.ProcessName.ToLower() != "python") 
+                {
+                    return false; // 不是Python进程，直接跳过
+                }
+                
+                // 2. 命令行参数检查
                 var commandLine = GetCommandLine(process);
-                return commandLine.Contains("global_musetalk_service") || 
-                       commandLine.Contains("musetalk") ||
-                       commandLine.Contains("MuseTalkEngine");
+                _logger.LogInformation("🔍 检查Python进程 PID:{Pid}, 命令行: {CommandLine}", process.Id, commandLine);
+                
+                if (commandLine.Contains("global_musetalk_service") || 
+                    commandLine.Contains("musetalk") ||
+                    commandLine.Contains("MuseTalkEngine"))
+                {
+                    _logger.LogInformation("✅ 确认MuseTalk进程: PID:{Pid}", process.Id);
+                    return true;
+                }
+                
+                // 3. 端口占用检查 - 如果Python进程占用我们的端口，也认为是MuseTalk进程
+                if (IsProcessListeningOnPort(process, 28888) || 
+                    IsProcessListeningOnPort(process, 19999) || 
+                    IsProcessListeningOnPort(process, 9999))
+                {
+                    _logger.LogWarning("⚠️ Python进程 PID:{Pid} 占用MuseTalk端口，标记为清理目标", process.Id);
+                    return true;
+                }
+                
+                // 4. 工作目录检查
+                try
+                {
+                    var workingDir = process.StartInfo.WorkingDirectory ?? "";
+                    if (workingDir.Contains("MuseTalk") || workingDir.Contains("MuseTalkEngine"))
+                    {
+                        _logger.LogInformation("✅ 通过工作目录确认MuseTalk进程: PID:{Pid}, 目录: {Dir}", process.Id, workingDir);
+                        return true;
+                    }
+                }
+                catch { }
+                
+                _logger.LogInformation("❌ 非MuseTalk Python进程: PID:{Pid}", process.Id);
+                return false;
             }
-            catch
+            catch (Exception ex)
             {
-                // 如果无法获取命令行，为安全起见不清理
+                _logger.LogWarning("⚠️ 检查进程PID:{Pid}时出错: {Error}", process.Id, ex.Message);
+                
+                // 🔧 激进策略：如果无法确定，但是Python进程占用了我们的端口，就清理掉
+                try
+                {
+                    if (process.ProcessName.ToLower() == "python" && 
+                        (IsProcessListeningOnPort(process, 28888) || 
+                         IsProcessListeningOnPort(process, 19999) || 
+                         IsProcessListeningOnPort(process, 9999)))
+                    {
+                        _logger.LogWarning("🔧 激进清理：Python进程占用MuseTalk端口，强制标记为清理目标 PID:{Pid}", process.Id);
+                        return true;
+                    }
+                }
+                catch { }
+                
                 return false;
             }
         }
 
         /// <summary>
-        /// 获取进程命令行参数
+        /// 获取进程命令行参数 - 使用WMI获取真实命令行
         /// </summary>
         private string GetCommandLine(System.Diagnostics.Process process)
         {
             try
             {
-                return process.StartInfo.Arguments ?? "";
+                // 🔧 关键修复：使用WMI获取真实的命令行参数
+                using var searcher = new System.Management.ManagementObjectSearcher(
+                    $"SELECT CommandLine FROM Win32_Process WHERE ProcessId = {process.Id}");
+                    
+                foreach (System.Management.ManagementObject obj in searcher.Get())
+                {
+                    var commandLine = obj["CommandLine"]?.ToString() ?? "";
+                    return commandLine;
+                }
+                
+                // 备用方案：检查进程名和模块
+                return process.ProcessName + " " + (process.StartInfo.Arguments ?? "");
             }
             catch
             {
-                return "";
+                try
+                {
+                    // 最后备用：至少返回进程名
+                    return process.ProcessName;
+                }
+                catch
+                {
+                    return "";
+                }
+            }
+        }
+
+        /// <summary>
+        /// 检查进程是否监听指定端口
+        /// </summary>
+        private bool IsProcessListeningOnPort(System.Diagnostics.Process process, int port)
+        {
+            try
+            {
+                // 使用netstat命令检查端口占用
+                var processInfo = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "netstat",
+                    Arguments = "-ano",
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    CreateNoWindow = true
+                };
+
+                using var netstatProcess = new System.Diagnostics.Process { StartInfo = processInfo };
+                netstatProcess.Start();
+                var output = netstatProcess.StandardOutput.ReadToEnd();
+                netstatProcess.WaitForExit();
+
+                // 检查输出中是否有该进程监听指定端口
+                var lines = output.Split('\n');
+                foreach (var line in lines)
+                {
+                    if (line.Contains($":{port}") && line.Contains("LISTENING") && line.Contains(process.Id.ToString()))
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+            catch
+            {
+                return false;
             }
         }
 
@@ -517,6 +633,81 @@ namespace LmyDigitalHuman.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "❌ 终极清理失败");
+            }
+        }
+
+        /// <summary>
+        /// 🚨 紧急清理：强制杀死占用MuseTalk端口的所有Python进程
+        /// </summary>
+        public void EmergencyCleanupPortOccupyingProcesses()
+        {
+            try
+            {
+                _logger.LogWarning("🚨 执行紧急清理：强制清理占用MuseTalk端口的所有进程");
+                
+                var ports = new[] { 28888, 19999, 9999 };
+                
+                foreach (var port in ports)
+                {
+                    try
+                    {
+                        // 使用netstat找到占用端口的进程
+                        var processInfo = new System.Diagnostics.ProcessStartInfo
+                        {
+                            FileName = "netstat",
+                            Arguments = "-ano",
+                            UseShellExecute = false,
+                            RedirectStandardOutput = true,
+                            CreateNoWindow = true
+                        };
+
+                        using var netstatProcess = new System.Diagnostics.Process { StartInfo = processInfo };
+                        netstatProcess.Start();
+                        var output = netstatProcess.StandardOutput.ReadToEnd();
+                        netstatProcess.WaitForExit();
+
+                        var lines = output.Split('\n');
+                        foreach (var line in lines)
+                        {
+                            if (line.Contains($":{port}") && line.Contains("LISTENING"))
+                            {
+                                // 提取PID
+                                var parts = line.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                                if (parts.Length > 0 && int.TryParse(parts[^1], out int pid))
+                                {
+                                    try
+                                    {
+                                        var process = System.Diagnostics.Process.GetProcessById(pid);
+                                        _logger.LogWarning("🔧 发现端口{Port}被进程占用: PID={Pid}, 名称={Name}", port, pid, process.ProcessName);
+                                        
+                                        // 如果是Python进程，强制终止
+                                        if (process.ProcessName.ToLower() == "python")
+                                        {
+                                            _logger.LogWarning("🚨 强制终止占用端口{Port}的Python进程: PID={Pid}", port, pid);
+                                            process.Kill(true);
+                                            process.WaitForExit(3000);
+                                            process.Dispose();
+                                        }
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        _logger.LogError("❌ 清理端口{Port}占用进程PID={Pid}失败: {Error}", port, pid, ex.Message);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError("❌ 检查端口{Port}占用情况失败: {Error}", port, ex.Message);
+                    }
+                }
+                
+                _logger.LogInformation("✅ 紧急清理完成");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ 紧急清理失败");
             }
         }
 

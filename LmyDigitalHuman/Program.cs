@@ -186,6 +186,7 @@ app.Logger.LogInformation("📖 API文档: http://localhost:5000/swagger");
 Console.CancelKeyPress += (sender, e) =>
 {
     app.Logger.LogInformation("🛑 检测到Ctrl+C，执行终极清理...");
+    globalServiceManager.EmergencyCleanupPortOccupyingProcesses(); // 紧急清理
     globalServiceManager.ForceCleanupAllPythonProcesses();
     app.Logger.LogInformation("✅ 终极清理完成");
     e.Cancel = false; // 允许程序退出
@@ -195,6 +196,7 @@ Console.CancelKeyPress += (sender, e) =>
 AppDomain.CurrentDomain.ProcessExit += (sender, e) =>
 {
     app.Logger.LogInformation("🛑 应用程序退出，执行终极清理...");
+    globalServiceManager.EmergencyCleanupPortOccupyingProcesses(); // 紧急清理
     globalServiceManager.ForceCleanupAllPythonProcesses();
     app.Logger.LogInformation("✅ 终极清理完成");
 };
@@ -204,6 +206,7 @@ var lifetime = app.Services.GetRequiredService<IHostApplicationLifetime>();
 lifetime.ApplicationStopping.Register(() =>
 {
     app.Logger.LogInformation("🛑 应用程序停止中，执行终极清理...");
+    globalServiceManager.EmergencyCleanupPortOccupyingProcesses(); // 紧急清理
     globalServiceManager.ForceCleanupAllPythonProcesses();
     app.Logger.LogInformation("✅ 终极清理完成");
 });
