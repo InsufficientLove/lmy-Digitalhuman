@@ -181,9 +181,7 @@ app.Logger.LogInformation("📱 HTTP访问地址: http://localhost:5000");
 app.Logger.LogInformation("📊 健康检查: http://localhost:5000/health");
 app.Logger.LogInformation("📖 API文档: http://localhost:5000/swagger");
 
-// 🔧 关键修复：注册程序退出时的进程清理
-var globalServiceManager = app.Services.GetRequiredService<GlobalMuseTalkServiceManager>();
-
+// 🔧 关键修复：注册程序退出时的进程清理（复用已有的globalServiceManager变量）
 // 🔧 强化清理：处理Ctrl+C
 Console.CancelKeyPress += (sender, e) =>
 {
