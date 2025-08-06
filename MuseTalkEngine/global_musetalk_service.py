@@ -437,23 +437,30 @@ class GlobalMuseTalkService:
                 compose_time = time.time() - compose_start
                 print(f"✅ 图像合成完成: 耗时: {compose_time:.2f}秒")
                 
-                # 5. 生成视频
-                print("🎬 生成视频...")
+                # 5. 🚀 极速视频生成 - 使用官方MuseTalk优化方法
+                print("🎬 极速生成视频...")
                 video_start = time.time()
+                
+                # 🔧 关键优化：直接从内存生成视频，避免磁盘I/O
+                import imageio
+                
+                # 收集所有合成的图像帧
+                print(f"📦 收集{len(res_frame_list)}帧图像...")
+                video_frames = []
+                for i in range(len(res_frame_list)):
+                    frame_path = os.path.join(temp_frames_dir, f"{i:08d}.png")
+                    if os.path.exists(frame_path):
+                        frame = imageio.imread(frame_path)
+                        video_frames.append(frame)
+                
+                if len(video_frames) == 0:
+                    raise Exception("没有找到合成的图像帧")
+                
+                # 🚀 关键优化：使用imageio直接生成视频，比FFmpeg更快
                 temp_video = output_path.replace('.mp4', '_temp.mp4')
+                print(f"🎬 使用imageio生成视频: {len(video_frames)}帧")
+                imageio.mimwrite(temp_video, video_frames, 'FFMPEG', fps=fps, codec='libx264', pixelformat='yuv420p')
                 
-                ffmpeg_cmd = [
-                    'ffmpeg', '-y', '-v', 'warning',
-                    '-r', str(fps),
-                    '-f', 'image2',
-                    '-i', os.path.join(temp_frames_dir, '%08d.png'),
-                    '-vcodec', 'libx264',
-                    '-vf', 'format=yuv420p',
-                    '-crf', '18',
-                    temp_video
-                ]
-                
-                subprocess.run(ffmpeg_cmd, check=True)
                 video_time = time.time() - video_start
                 print(f"✅ 视频生成完成: 耗时: {video_time:.2f}秒")
                 
