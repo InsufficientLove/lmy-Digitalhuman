@@ -128,34 +128,42 @@ class UltraFastMuseTalkService:
                 print(f"🎮 GPU{device_id} 开始初始化...")
                 
                 with torch.cuda.device(device_id):
-                    # 加载模型到指定GPU - 添加错误处理
+                    # 加载模型到指定GPU - 添加详细日志
                     try:
+                        print(f"GPU{device_id} 开始加载VAE模型...")
                         vae, unet, pe = load_all_model()
-                        print(f"GPU{device_id} 模型加载成功")
+                        print(f"GPU{device_id} VAE/UNet/PE模型加载成功")
                     except Exception as e:
                         print(f"GPU{device_id} 模型加载失败: {e}")
+                        print(f"GPU{device_id} 错误详情: {str(e)}")
                         # 尝试使用备用VAE路径
                         try:
+                            print(f"GPU{device_id} 尝试备用VAE路径...")
                             vae, unet, pe = load_all_model(vae_type="sd-vae-ft-mse")
                             print(f"GPU{device_id} 使用备用VAE模型加载成功")
                         except Exception as e2:
                             print(f"GPU{device_id} 备用模型也加载失败: {e2}")
+                            print(f"GPU{device_id} 备用错误详情: {str(e2)}")
                             raise e2
                     
                     # 优化模型 - 半精度+编译优化
+                    print(f"GPU{device_id} 开始模型优化...")
                     vae = vae.to(device).half().eval()
                     unet = unet.to(device).half().eval()
                     pe = pe.to(device).half().eval()
+                    print(f"GPU{device_id} 半精度转换完成")
                     
                     # 关键优化：模型编译加速
                     if hasattr(torch, 'compile'):
                         try:
+                            print(f"GPU{device_id} 开始模型编译...")
                             unet.model = torch.compile(unet.model, mode="reduce-overhead")
                             vae.vae = torch.compile(vae.vae, mode="reduce-overhead")
                             pe = torch.compile(pe, mode="reduce-overhead")
                             print(f"GPU{device_id} 模型编译优化完成")
-                        except:
-                            print(f"GPU{device_id} 模型编译失败，使用原始模型")
+                        except Exception as compile_error:
+                            print(f"GPU{device_id} 模型编译失败: {compile_error}")
+                            print(f"GPU{device_id} 使用原始模型")
                     
                     self.gpu_models[device] = {
                         'vae': vae,
@@ -510,8 +518,16 @@ def start_ultra_fast_service(port=28888):
     print(f"启动Ultra Fast Service - 端口: {port}")
     
     # 初始化模型
-    if not global_service.initialize_models_ultra_fast():
-        print("模型初始化失败")
+    print("开始初始化Ultra Fast模型...")
+    try:
+        if not global_service.initialize_models_ultra_fast():
+            print("模型初始化失败 - 返回False")
+            return
+        print("模型初始化成功！")
+    except Exception as e:
+        print(f"模型初始化异常: {e}")
+        import traceback
+        traceback.print_exc()
         return
     
     # 启动性能监控
