@@ -303,11 +303,13 @@ class GlobalMuseTalkService:
                 all_batches = list(gen)
                 total_batches = len(all_batches)
                 
-                if self.multi_gpu and len(self.gpu_devices) >= 4 and total_batches > 1:
-                    # 🚀 真正的4GPU并行推理
+                # 🔧 临时禁用4GPU并行，避免模型冲突 - 等稳定后再优化
+                if False and self.multi_gpu and len(self.gpu_devices) >= 4 and total_batches > 1:
+                    # 🚀 真正的4GPU并行推理 - 修复模型冲突问题
                     print(f"🚀 使用真正4GPU并行推理，总批次: {total_batches}")
                     sys.stdout.flush()
                     from concurrent.futures import ThreadPoolExecutor, as_completed
+                    import copy
                     
                     def process_batch_on_gpu(args):
                         i, (whisper_batch, latent_batch), target_gpu = args
@@ -323,29 +325,30 @@ class GlobalMuseTalkService:
                             whisper_batch = whisper_batch.to(device)
                             latent_batch = latent_batch.to(dtype=self.weight_dtype, device=device)
                             
-                            # 🔧 关键：将模型临时复制到目标GPU
-                            pe_gpu = self.pe.to(device)
-                            unet_gpu = self.unet.model.to(device)
-                            vae_gpu = self.vae.vae.to(device)
-                            timesteps_gpu = self.timesteps.to(device)
-                            
-                            # 执行推理
+                            # 🔧 关键修复：为每个GPU创建独立的模型副本
                             with torch.no_grad():
+                                # 创建模型的深度副本并移到目标GPU
+                                pe_gpu = copy.deepcopy(self.pe).to(device)
+                                unet_gpu = copy.deepcopy(self.unet.model).to(device)  
+                                vae_gpu = copy.deepcopy(self.vae.vae).to(device)
+                                timesteps_gpu = self.timesteps.to(device)
+                                
+                                # 执行推理
                                 audio_feature_batch = pe_gpu(whisper_batch)
                                 pred_latents = unet_gpu(latent_batch, timesteps_gpu, encoder_hidden_states=audio_feature_batch).sample
                                 recon = vae_gpu.decode(pred_latents / vae_gpu.config.scaling_factor).sample
-                            
-                            # 清理GPU内存，将模型移回主GPU
-                            pe_gpu.to(self.device)
-                            unet_gpu.to(self.device)  
-                            vae_gpu.to(self.device)
-                            torch.cuda.empty_cache()
+                                
+                                # 清理GPU内存
+                                del pe_gpu, unet_gpu, vae_gpu, timesteps_gpu
+                                torch.cuda.empty_cache()
                             
                             # 将结果移回CPU
                             return i, [frame.cpu().numpy() for frame in recon]
                         except Exception as e:
                             print(f"❌ 批次 {i} GPU {target_gpu} 推理失败: {str(e)}")
                             sys.stdout.flush()
+                            # 清理GPU内存
+                            torch.cuda.empty_cache()
                             return i, []
                     
                     # 将批次分配到4个GPU
