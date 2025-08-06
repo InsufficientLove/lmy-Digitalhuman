@@ -17,7 +17,7 @@ namespace LmyDigitalHuman.Services
         private readonly string _serverHost;
         private readonly int _serverPort;
 
-        public GlobalMuseTalkClient(ILogger<GlobalMuseTalkClient> logger, string serverHost = "127.0.0.1", int serverPort = 19999)
+        public GlobalMuseTalkClient(ILogger<GlobalMuseTalkClient> logger, string serverHost = "127.0.0.1", int serverPort = 28888)
         {
             _logger = logger;
             _serverHost = serverHost;
@@ -288,6 +288,19 @@ namespace LmyDigitalHuman.Services
             catch (Exception ex)
             {
                 _logger.LogWarning("⚠️ 端口{Port}连接测试失败: {Error}", port, ex.Message);
+                
+                // 🔧 额外诊断：检查端口是否被其他进程占用
+                try
+                {
+                    _logger.LogInformation("🔍 正在诊断端口{Port}占用情况...", port);
+                    var processes = System.Diagnostics.Process.GetProcesses();
+                    _logger.LogInformation("🔍 当前运行的进程数: {Count}", processes.Length);
+                }
+                catch (Exception diagEx)
+                {
+                    _logger.LogWarning("⚠️ 端口诊断失败: {Error}", diagEx.Message);
+                }
+                
                 return false;
             }
         }
