@@ -513,15 +513,13 @@ class GlobalMuseTalkService:
             print(f"🔧 进入主循环，等待客户端连接...")
             sys.stdout.flush()
             
+            print(f"🔧 开始接受连接... (绑定: 127.0.0.1:{port})")
+            sys.stdout.flush()
+            
             while self.is_server_running:
                 try:
-                    print(f"🔧 等待accept()... (绑定: 127.0.0.1:{port})")
-                    sys.stdout.flush()
-                    
-                    # 设置socket超时，避免无限等待
-                    self.server_socket.settimeout(1.0)  # 1秒超时
+                    # 🔧 关键修复：移除超时，直接阻塞等待连接
                     client_socket, addr = self.server_socket.accept()
-                    self.server_socket.settimeout(None)  # 重置超时
                     
                     print(f"🔗 客户端连接成功! 来源: {addr}")
                     sys.stdout.flush()
@@ -531,9 +529,6 @@ class GlobalMuseTalkService:
                     sys.stdout.flush()
                     threading.Thread(target=self._handle_client, args=(client_socket,)).start()
                     
-                except socket.timeout:
-                    # 超时是正常的，继续循环
-                    continue
                 except Exception as e:
                     if self.is_server_running:
                         print(f"❌ 接受连接失败: {str(e)}")
