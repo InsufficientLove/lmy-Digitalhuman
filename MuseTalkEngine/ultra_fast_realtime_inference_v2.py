@@ -39,11 +39,21 @@ from musetalk.utils.audio_processor import AudioProcessor
 
 # 导入性能监控
 try:
+    # 尝试从当前目录导入
     from performance_monitor import start_performance_monitoring, record_performance, print_performance_report
     PERFORMANCE_MONITORING = True
 except ImportError:
-    PERFORMANCE_MONITORING = False
-    print("⚠️ 性能监控模块未找到，跳过性能监控")
+    try:
+        # 尝试从相对路径导入
+        import sys
+        import os
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        sys.path.insert(0, current_dir)
+        from performance_monitor import start_performance_monitoring, record_performance, print_performance_report
+        PERFORMANCE_MONITORING = True
+    except ImportError:
+        PERFORMANCE_MONITORING = False
+        print("⚠️ 性能监控模块未找到，跳过性能监控")
 
 print("🚀 Ultra Fast Realtime Inference V2 - 毫秒级响应引擎")
 sys.stdout.flush()

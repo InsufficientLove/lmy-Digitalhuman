@@ -139,7 +139,7 @@ namespace LmyDigitalHuman.Services
         /// <summary>
         /// 启动4GPU共享算力的全局Python服务（程序启动时调用一次）
         /// </summary>
-        public async Task<bool> StartGlobalServiceAsync(int port = 9999)
+        public async Task<bool> StartGlobalServiceAsync(int port = 28888)
         {
             // 🔧 关键预防：启动前先清理任何残留的Python进程
             await CleanupAnyRemainingPythonProcesses();
@@ -160,12 +160,17 @@ namespace LmyDigitalHuman.Services
             {
                 var contentRoot = _pathManager.GetContentRootPath();
                 var projectRoot = Path.Combine(contentRoot, "..");
-                // 🚀 优先使用Ultra Fast推理引擎
-                var serviceScript = Path.Combine(projectRoot, "MuseTalkEngine", "ultra_fast_realtime_inference_v2.py");
+                // 🚀 优先使用Ultra Fast服务包装器
+                var serviceScript = Path.Combine(projectRoot, "MuseTalkEngine", "start_ultra_fast_service.py");
                 if (!File.Exists(serviceScript))
                 {
-                    // 备用使用全局服务
-                    serviceScript = Path.Combine(projectRoot, "MuseTalkEngine", "global_musetalk_service.py");
+                    // 备用1: 直接使用Ultra Fast推理引擎
+                    serviceScript = Path.Combine(projectRoot, "MuseTalkEngine", "ultra_fast_realtime_inference_v2.py");
+                    if (!File.Exists(serviceScript))
+                    {
+                        // 备用2: 使用全局服务
+                        serviceScript = Path.Combine(projectRoot, "MuseTalkEngine", "global_musetalk_service.py");
+                    }
                 }
 
                 if (!File.Exists(serviceScript))
@@ -177,7 +182,10 @@ namespace LmyDigitalHuman.Services
                 // 获取Python路径
                 var pythonPath = GetPythonPath();
                 
-                var workingDir = Path.Combine(projectRoot, "MuseTalk");
+                // 🚀 Ultra Fast V2脚本在MuseTalkEngine目录中运行
+                var workingDir = serviceScript.Contains("ultra_fast_realtime_inference_v2.py") 
+                    ? Path.Combine(projectRoot, "MuseTalkEngine")
+                    : Path.Combine(projectRoot, "MuseTalk");
                 var processInfo = new System.Diagnostics.ProcessStartInfo
                 {
                     FileName = pythonPath,
