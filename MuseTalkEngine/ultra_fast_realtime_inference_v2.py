@@ -199,8 +199,9 @@ class UltraFastMuseTalkService:
                     
                     print(f"GPU{device_id} 半精度转换完成")
                     
-                    # 关键优化：模型编译加速
-                    if hasattr(torch, 'compile'):
+                    # 关键优化：模型编译加速 (仅在Linux上启用)
+                    import platform
+                    if hasattr(torch, 'compile') and platform.system() != 'Windows':
                         try:
                             print(f"GPU{device_id} 开始模型编译...")
                             unet.model = torch.compile(unet.model, mode="reduce-overhead")
@@ -210,6 +211,11 @@ class UltraFastMuseTalkService:
                         except Exception as compile_error:
                             print(f"GPU{device_id} 模型编译失败: {compile_error}")
                             print(f"GPU{device_id} 使用原始模型")
+                    else:
+                        if platform.system() == 'Windows':
+                            print(f"GPU{device_id} 跳过模型编译 (Windows不支持)")
+                        else:
+                            print(f"GPU{device_id} 跳过模型编译 (torch.compile不可用)")
                     
                     self.gpu_models[device] = {
                         'vae': vae,
@@ -291,11 +297,24 @@ class UltraFastMuseTalkService:
             
             print("初始化AudioProcessor...")
             try:
-                self.shared_audio_processor = AudioProcessor()
-                print("AudioProcessor初始化完成")
+                # AudioProcessor需要whisper模型路径
+                if os.path.exists(whisper_dir):
+                    self.shared_audio_processor = AudioProcessor(feature_extractor_path=whisper_dir)
+                    print("AudioProcessor初始化完成")
+                else:
+                    print(f"警告: Whisper目录不存在，使用默认AudioProcessor")
+                    self.shared_audio_processor = AudioProcessor(feature_extractor_path=None)
+                    print("AudioProcessor初始化完成 (无Whisper)")
             except Exception as e:
                 print(f"AudioProcessor初始化失败: {e}")
-                self.shared_audio_processor = None
+                # 创建一个简单的AudioProcessor备用实例
+                try:
+                    print("尝试创建备用AudioProcessor...")
+                    self.shared_audio_processor = AudioProcessor(feature_extractor_path=None)
+                    print("备用AudioProcessor创建成功")
+                except:
+                    self.shared_audio_processor = None
+                    print("AudioProcessor完全失败，音频功能将不可用")
             
             print("初始化FaceParsing...")
             try:
@@ -360,7 +379,12 @@ class UltraFastMuseTalkService:
                 cache_data = cache_future.result()
                 whisper_chunks = audio_future.result()
             
-            if not cache_data or not whisper_chunks:
+            if not cache_data:
+                print("错误: 无法加载模板缓存")
+                return False
+                
+            if whisper_chunks is None:
+                print("错误: 音频特征提取失败")
                 return False
             
             prep_time = time.time() - total_start
@@ -542,6 +566,10 @@ class UltraFastMuseTalkService:
     def extract_audio_features_ultra_fast(self, audio_path, fps):
         """极速音频特征提取"""
         try:
+            # 检查AudioProcessor是否可用
+            if self.shared_audio_processor is None:
+                raise ValueError("AudioProcessor未初始化")
+                
             whisper_input_features, librosa_length = self.shared_audio_processor.get_audio_feature(audio_path)
             whisper_chunks = self.shared_audio_processor.get_whisper_chunk(
                 whisper_input_features, 
