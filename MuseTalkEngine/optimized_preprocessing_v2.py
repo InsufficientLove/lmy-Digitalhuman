@@ -73,9 +73,30 @@ class OptimizedPreprocessor:
                     print(f"预处理备用模型也加载失败: {e2}")
                     raise e2
             
-            self.vae = vae.to(device).half().eval()
-            self.unet = unet.to(device).half().eval() 
-            self.pe = pe.to(device).half().eval()
+            # 修复模型对象兼容性 - 使用正确的属性结构
+            if hasattr(vae, 'vae'):
+                vae.vae = vae.vae.to(device).half().eval()
+                self.vae = vae
+            elif hasattr(vae, 'to'):
+                self.vae = vae.to(device).half().eval()
+            else:
+                print("警告: VAE对象结构不明，跳过优化")
+                self.vae = vae
+            
+            if hasattr(unet, 'model'):
+                unet.model = unet.model.to(device).half().eval()
+                self.unet = unet
+            elif hasattr(unet, 'to'):
+                self.unet = unet.to(device).half().eval()
+            else:
+                print("警告: UNet对象结构不明，跳过优化")
+                self.unet = unet
+            
+            if hasattr(pe, 'to'):
+                self.pe = pe.to(device).half().eval()
+            else:
+                print("警告: PE对象没有.to()方法，跳过优化")
+                self.pe = pe
             
             # 面部解析器
             self.fp = FaceParsing()
