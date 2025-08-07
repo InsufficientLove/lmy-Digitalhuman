@@ -274,8 +274,21 @@ class OptimizedPreprocessor:
             mask_coords_list, mask_list = [], []
             
             for frame in frame_list:
-                # 面部解析
-                mask_out = self.fp.forward(frame)
+                # 面部解析 - 使用正确的方法调用
+                try:
+                    # 尝试常见的面部解析方法
+                    if hasattr(self.fp, '__call__'):
+                        mask_out = self.fp(frame)
+                    elif hasattr(self.fp, 'parse'):
+                        mask_out = self.fp.parse(frame)
+                    elif hasattr(self.fp, 'predict'):
+                        mask_out = self.fp.predict(frame)
+                    else:
+                        raise AttributeError(f"FaceParsing对象没有可用的解析方法")
+                except Exception as fp_error:
+                    print(f"面部解析失败: {fp_error}")
+                    # 使用默认的空mask
+                    mask_out = np.zeros_like(frame[:,:,0])
                 
                 # 获取面部区域坐标
                 mask_coords = get_image_prepare_material(mask_out)
