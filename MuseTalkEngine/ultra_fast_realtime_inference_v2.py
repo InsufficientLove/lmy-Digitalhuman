@@ -166,11 +166,31 @@ class UltraFastMuseTalkService:
                             print(f"GPU{device_id} 其他错误，跳过此GPU")
                             return None
                     
-                    # 优化模型 - 半精度+编译优化
+                    # 优化模型 - 半精度+编译优化 (修复模型对象兼容性)
                     print(f"GPU{device_id} 开始模型优化...")
-                    vae = vae.to(device).half().eval()
-                    unet = unet.to(device).half().eval()
-                    pe = pe.to(device).half().eval()
+                    
+                    # 修复VAE对象 - 使用.vae属性
+                    if hasattr(vae, 'vae'):
+                        vae.vae = vae.vae.to(device).half().eval()
+                    elif hasattr(vae, 'to'):
+                        vae = vae.to(device).half().eval()
+                    else:
+                        print(f"警告: VAE对象结构不明，跳过优化")
+                    
+                    # 修复UNet对象 - 使用.model属性  
+                    if hasattr(unet, 'model'):
+                        unet.model = unet.model.to(device).half().eval()
+                    elif hasattr(unet, 'to'):
+                        unet = unet.to(device).half().eval()
+                    else:
+                        print(f"警告: UNet对象结构不明，跳过优化")
+                    
+                    # 修复PE对象
+                    if hasattr(pe, 'to'):
+                        pe = pe.to(device).half().eval()
+                    else:
+                        print(f"警告: PE对象没有.to()方法，跳过优化")
+                    
                     print(f"GPU{device_id} 半精度转换完成")
                     
                     # 关键优化：模型编译加速
