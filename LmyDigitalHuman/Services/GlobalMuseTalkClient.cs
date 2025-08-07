@@ -228,6 +228,7 @@ namespace LmyDigitalHuman.Services
                 _logger.LogInformation("   Python路径: {PythonPath}", pythonPath);
                 _logger.LogInformation("   GPU配置: 0,1,2,3 (4GPU并行算力)");
                 _logger.LogInformation("   端口: {Port}", port);
+                _logger.LogInformation("   *** 代码版本: 2025-08-07-v2 ***");
 
                 _pythonProcess = new System.Diagnostics.Process { StartInfo = processInfo };
 
