@@ -160,12 +160,17 @@ namespace LmyDigitalHuman.Services
             {
                 var contentRoot = _pathManager.GetContentRootPath();
                 var projectRoot = Path.Combine(contentRoot, "..");
-                // 直接使用Ultra Fast推理引擎，避免双进程问题
-                var serviceScript = Path.Combine(projectRoot, "MuseTalkEngine", "ultra_fast_realtime_inference_v2.py");
+                // 使用直接启动器，确保正确的环境设置
+                var serviceScript = Path.Combine(projectRoot, "MuseTalkEngine", "direct_launcher.py");
                 if (!File.Exists(serviceScript))
                 {
-                    // 备用: 使用全局服务
-                    serviceScript = Path.Combine(projectRoot, "MuseTalkEngine", "global_musetalk_service.py");
+                    // 备用: 直接使用Ultra Fast推理引擎
+                    serviceScript = Path.Combine(projectRoot, "MuseTalkEngine", "ultra_fast_realtime_inference_v2.py");
+                    if (!File.Exists(serviceScript))
+                    {
+                        // 最后备用: 使用全局服务
+                        serviceScript = Path.Combine(projectRoot, "MuseTalkEngine", "global_musetalk_service.py");
+                    }
                 }
 
                 if (!File.Exists(serviceScript))
@@ -182,7 +187,7 @@ namespace LmyDigitalHuman.Services
                 var processInfo = new System.Diagnostics.ProcessStartInfo
                 {
                     FileName = pythonPath,
-                    Arguments = $"-c \"import sys; sys.path.insert(0, r'{Path.Combine(projectRoot, "MuseTalk")}'); sys.path.insert(0, r'{workingDir}'); import os; os.chdir(r'{Path.Combine(projectRoot, "MuseTalk")}'); from ultra_fast_realtime_inference_v2 import start_ultra_fast_service; start_ultra_fast_service({port})\"",
+                    Arguments = $"\"{serviceScript}\" --mode server --multi_gpu --port {port} --gpu_id 0",
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                     UseShellExecute = false,
