@@ -468,11 +468,7 @@ class UltraFastMuseTalkService:
                     
                     # 核心推理 - 使用独立的GPU模型
                     with torch.no_grad():
-                        # 检查latent通道数，如果是4通道则复制成8通道
-                        if latent_batch.shape[1] == 4:
-                            # 将4通道latent复制成8通道（masked + ref）
-                            latent_batch = torch.cat([latent_batch, latent_batch], dim=1)
-                        
+                        # 现在预处理直接生成8通道latent，不需要再进行通道数检查和转换
                         audio_features = gpu_models['pe'](whisper_batch)
                         pred_latents = gpu_models['unet'].model(
                             latent_batch, timesteps, encoder_hidden_states=audio_features

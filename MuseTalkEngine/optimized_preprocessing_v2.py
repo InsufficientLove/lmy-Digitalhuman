@@ -269,13 +269,13 @@ class OptimizedPreprocessor:
             if not coord_list or not frame_list:
                 raise ValueError("面部检测失败")
             
-            # 4. 面部解析
-            print("面部解析...")
+            # 4. 面部解析和特征提取
+            print("🎭 面部解析和特征提取...")
             mask_coords_list, mask_list = [], []
+            face_parsing_masks = []  # 存储面部解析的mask
             
-            for i, frame in enumerate(frame_list):
-                # 获取对应的face_box
-                face_box = coord_list[i] if i < len(coord_list) else None
+            # 使用coord_list作为bbox_list（从get_landmark_and_bbox返回的）
+            for i, (frame, face_box) in enumerate(zip(frame_list, coord_list)):
                 if face_box is None or face_box == coord_placeholder:
                     print(f"警告: 第{i}帧没有检测到人脸")
                     continue
@@ -296,6 +296,9 @@ class OptimizedPreprocessor:
                     # 使用默认的空mask
                     mask_out = np.zeros_like(frame[:,:,0])
                 
+                # 保存面部解析的mask
+                face_parsing_masks.append(mask_out)
+                
                 # 获取面部区域坐标 - 传入正确的参数
                 mask, crop_box = get_image_prepare_material(frame, face_box, fp=self.fp)
                 mask_coords_list.append(crop_box)
@@ -305,22 +308,81 @@ class OptimizedPreprocessor:
             print("VAE编码...")
             input_latent_list = []
             
-            def encode_frame(frame):
+            def encode_frame(frame, mask=None):
                 with torch.no_grad():
                     frame_tensor = torch.from_numpy(frame).float().to(self.device) / 127.5 - 1.0
                     frame_tensor = frame_tensor.permute(2, 0, 1).unsqueeze(0)
-                    latent = self.vae.encode_latents(frame_tensor)
-                    return latent.cpu()
+                    
+                    # 编码原始帧得到reference latent (4通道)
+                    reference_latent = self.vae.encode_latents(frame_tensor)
+                    
+                    # 如果有mask，创建masked版本
+                    if mask is not None and mask.size > 0:
+                        # 调试：打印mask信息
+                        print(f"Face parsing mask shape: {mask.shape}, dtype: {mask.dtype}, unique values: {np.unique(mask)[:5]}")
+                        
+                        # 处理面部解析mask
+                        # 面部解析mask通常包含不同的标签值（0=背景，1-19=不同面部区域）
+                        # 创建二值mask：非背景区域为1，背景为0
+                        binary_mask = (mask > 0).astype(np.float32)
+                        
+                        # 如果需要，可以对mask进行平滑处理
+                        from scipy.ndimage import gaussian_filter
+                        binary_mask = gaussian_filter(binary_mask, sigma=1.0)
+                        
+                        # 将mask转换为tensor
+                        mask_tensor = torch.from_numpy(binary_mask).float().to(self.device)
+                        
+                        # 调整mask维度以匹配frame_tensor
+                        if len(mask_tensor.shape) == 2:  # [H, W]
+                            mask_tensor = mask_tensor.unsqueeze(0).unsqueeze(0)  # [1, 1, H, W]
+                        
+                        # 如果mask和frame尺寸不匹配，进行resize
+                        if mask_tensor.shape[-2:] != frame_tensor.shape[-2:]:
+                            mask_tensor = torch.nn.functional.interpolate(
+                                mask_tensor, 
+                                size=frame_tensor.shape[-2:], 
+                                mode='bilinear', 
+                                align_corners=False
+                            )
+                        
+                        # 扩展mask到3通道
+                        mask_tensor = mask_tensor.repeat(1, 3, 1, 1)  # [1, 3, H, W]
+                        
+                        # 创建masked frame（保留面部区域，背景变黑）
+                        masked_frame_tensor = frame_tensor * mask_tensor
+                        masked_latent = self.vae.encode_latents(masked_frame_tensor)
+                        
+                        # 拼接masked和reference latent得到8通道
+                        combined_latent = torch.cat([masked_latent, reference_latent], dim=1)
+                    else:
+                        # 如果没有mask，直接复制reference latent
+                        print("No face parsing mask available, using duplicated reference latent")
+                        combined_latent = torch.cat([reference_latent, reference_latent], dim=1)
+                    
+                    return combined_latent.cpu()
             
             # 并行编码多帧
             with ThreadPoolExecutor(max_workers=4) as executor:
-                futures = [executor.submit(encode_frame, frame) for frame in frame_list]
+                # 将frame和对应的face parsing mask一起传递
+                futures = []
+                for i, frame in enumerate(frame_list):
+                    face_mask = face_parsing_masks[i] if i < len(face_parsing_masks) else None
+                    futures.append(executor.submit(encode_frame, frame, face_mask))
+                
                 for future in as_completed(futures):
                     latent = future.result()
                     input_latent_list.append(latent)
             
             # 6. 创建循环数据
             print("🔄 创建循环数据...")
+            
+            # 验证latent通道数
+            if input_latent_list:
+                latent_shape = input_latent_list[0].shape
+                print(f"✅ Latent形状: {latent_shape} (应该是8通道)")
+                if latent_shape[1] != 8:
+                    print(f"⚠️ 警告: Latent通道数为{latent_shape[1]}，期望为8通道")
             
             # 如果只有一帧，复制创建循环
             if len(input_latent_list) == 1:
