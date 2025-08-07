@@ -34,6 +34,14 @@ import imageio
 import warnings
 warnings.filterwarnings("ignore")
 
+# 导入GPU配置
+try:
+    from gpu_config import configure_gpu_memory, monitor_gpu_memory, GPU_MEMORY_CONFIG
+    configure_gpu_memory()
+except ImportError:
+    print("GPU配置模块未找到，使用默认设置")
+    GPU_MEMORY_CONFIG = {'batch_size': {'default': 4}}
+
 # 添加MuseTalk模块路径
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'MuseTalk'))
 
@@ -359,7 +367,7 @@ class UltraFastMuseTalkService:
         if device in self.gpu_usage:
             self.gpu_usage[device] = max(0, self.gpu_usage[device] - 1)
     
-    def ultra_fast_inference_parallel(self, template_id, audio_path, output_path, cache_dir, batch_size=16, fps=25):
+    def ultra_fast_inference_parallel(self, template_id, audio_path, output_path, cache_dir, batch_size=4, fps=25):
         """极速并行推理 - 毫秒级响应"""
         if not self.is_initialized:
             print("模型未初始化")
@@ -435,6 +443,11 @@ class UltraFastMuseTalkService:
         """真正的4GPU并行推理 - 无锁设计"""
         from musetalk.utils.utils import datagen
         
+        # 推理前清理所有GPU内存
+        for device in self.devices:
+            with torch.cuda.device(device):
+                torch.cuda.empty_cache()
+        
         input_latent_list_cycle = cache_data['input_latent_list_cycle']
         video_num = len(whisper_chunks)
         
@@ -444,7 +457,7 @@ class UltraFastMuseTalkService:
             vae_encode_latents=input_latent_list_cycle,
             batch_size=batch_size,
             delay_frame=0,
-            device=self.devices[0]  # 数据生成在GPU0
+            device='cpu'  # 在CPU上生成数据，避免GPU0内存压力
         )
         all_batches = list(gen)
         total_batches = len(all_batches)
@@ -458,6 +471,14 @@ class UltraFastMuseTalkService:
             # 智能GPU分配
             target_device = self.devices[batch_idx % self.gpu_count]
             gpu_models = self.gpu_models[target_device]
+            
+            print(f"处理批次 {batch_idx} -> GPU {target_device}")
+            
+            # 监控GPU内存（如果可用）
+            if 'monitor_gpu_memory' in globals():
+                memory_before = monitor_gpu_memory()
+                if target_device in memory_before:
+                    print(f"  GPU {target_device} 内存使用: {memory_before[target_device]['usage_percent']}%")
             
             try:
                 # 关键：数据移动到目标GPU
@@ -492,17 +513,30 @@ class UltraFastMuseTalkService:
         res_frame_list = []
         batch_results = {}
         
+        # 限制同时处理的批次数，避免内存溢出
+        max_concurrent_batches = min(self.gpu_count * 2, total_batches)
+        
         with ThreadPoolExecutor(max_workers=self.gpu_count) as executor:
-            # 提交所有批次
-            futures = {
-                executor.submit(process_batch_on_gpu, (i, batch)): i 
-                for i, batch in enumerate(all_batches)
-            }
-            
-            # 收集结果
-            for future in as_completed(futures):
-                batch_idx, frames = future.result()
-                batch_results[batch_idx] = frames
+            # 分批提交，而不是一次性提交所有批次
+            for start_idx in range(0, total_batches, max_concurrent_batches):
+                end_idx = min(start_idx + max_concurrent_batches, total_batches)
+                current_batches = list(enumerate(all_batches))[start_idx:end_idx]
+                
+                # 提交当前批次组
+                futures = {
+                    executor.submit(process_batch_on_gpu, batch_info): batch_info[0]
+                    for batch_info in current_batches
+                }
+                
+                # 等待当前批次组完成
+                for future in as_completed(futures):
+                    batch_idx, frames = future.result()
+                    batch_results[batch_idx] = frames
+                
+                # 清理GPU内存
+                for device in self.devices:
+                    with torch.cuda.device(device):
+                        torch.cuda.empty_cache()
         
         # 按顺序合并结果
         for i in range(total_batches):
@@ -751,7 +785,7 @@ def handle_client_ultra_fast(client_socket):
             audio_path=request['audio_path'],
             output_path=request['output_path'],
             cache_dir=request['cache_dir'],
-            batch_size=request.get('batch_size', 16),
+            batch_size=request.get('batch_size', 4),
             fps=request.get('fps', 25)
         )
         

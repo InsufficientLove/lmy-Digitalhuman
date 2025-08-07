@@ -284,7 +284,14 @@ class OptimizedPreprocessor:
                 try:
                     # 尝试常见的面部解析方法
                     if hasattr(self.fp, '__call__'):
-                        mask_out = self.fp(frame)
+                        result = self.fp(frame)
+                        # 检查返回值类型
+                        if isinstance(result, tuple):
+                            mask_out = result[0] if len(result) > 0 else np.zeros_like(frame[:,:,0])
+                        elif isinstance(result, np.ndarray):
+                            mask_out = result
+                        else:
+                            mask_out = np.array(result)
                     elif hasattr(self.fp, 'parse'):
                         mask_out = self.fp.parse(frame)
                     elif hasattr(self.fp, 'predict'):

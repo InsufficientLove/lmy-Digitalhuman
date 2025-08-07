@@ -27,7 +27,7 @@ namespace LmyDigitalHuman.Services
         /// <summary>
         /// 发送推理请求到全局Python服务
         /// </summary>
-        public async Task<string?> SendInferenceRequestAsync(string templateId, string audioPath, string outputPath, string cacheDir, int batchSize = 8, int fps = 25)
+        public async Task<string?> SendInferenceRequestAsync(string templateId, string audioPath, string outputPath, string cacheDir, int batchSize = 4, int fps = 25)
         {
             try
             {
