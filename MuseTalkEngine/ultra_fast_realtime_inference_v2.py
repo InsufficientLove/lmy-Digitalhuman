@@ -367,7 +367,7 @@ class UltraFastMuseTalkService:
         if device in self.gpu_usage:
             self.gpu_usage[device] = max(0, self.gpu_usage[device] - 1)
     
-    def ultra_fast_inference_parallel(self, template_id, audio_path, output_path, cache_dir, batch_size=1, fps=25):
+    def ultra_fast_inference_parallel(self, template_id, audio_path, output_path, cache_dir, batch_size=6, fps=25):
         """极速并行推理 - 毫秒级响应"""
         if not self.is_initialized:
             print("模型未初始化")
@@ -796,7 +796,7 @@ def handle_client_ultra_fast(client_socket):
             audio_path=request['audio_path'],
             output_path=request['output_path'],
             cache_dir=request['cache_dir'],
-            batch_size=request.get('batch_size', 1),
+            batch_size=request.get('batch_size', 6),
             fps=request.get('fps', 25)
         )
         
