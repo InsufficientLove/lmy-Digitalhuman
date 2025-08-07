@@ -624,6 +624,22 @@ def start_ultra_fast_service(port=28888):
     """启动极速服务"""
     print(f"启动Ultra Fast Service - 端口: {port}")
     
+    # 确保工作目录和路径正确
+    import os
+    from pathlib import Path
+    
+    # 如果不在正确的工作目录，切换到MuseTalk目录
+    current_dir = Path.cwd()
+    if not (current_dir / "models" / "musetalkV15" / "unet.pth").exists():
+        # 尝试找到MuseTalk目录
+        script_dir = Path(__file__).parent
+        musetalk_dir = script_dir.parent / "MuseTalk"
+        if musetalk_dir.exists():
+            os.chdir(musetalk_dir)
+            print(f"工作目录切换到: {musetalk_dir}")
+        else:
+            print(f"警告: 无法找到MuseTalk模型目录")
+    
     # 初始化模型
     print("开始初始化Ultra Fast模型...")
     try:
