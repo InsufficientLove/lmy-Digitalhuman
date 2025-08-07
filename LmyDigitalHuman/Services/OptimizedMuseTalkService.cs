@@ -1772,7 +1772,7 @@ namespace LmyDigitalHuman.Services
                     audioPath: fixedAudioPath,
                     outputPath: outputPath,
                     cacheDir: cacheDir,
-                    batchSize: 16,  // 增加批次大小提升并行度
+                    batchSize: 6,  // 优化为适合24GB显卡的批次大小
                     fps: 25
                 );
 
