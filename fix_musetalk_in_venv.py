@@ -368,27 +368,28 @@ except Exception as e:
     def generate_batch_script(self):
         """生成批处理脚本，用于在虚拟环境中运行"""
         batch_script = f'''@echo off
+chcp 65001 >nul
 echo MuseTalk Meta Tensor 修复工具 (虚拟环境版本)
 echo ================================================
 
 cd /d "{self.script_dir}"
 
 if not exist "{self.venv_path}" (
-    echo ❌ 虚拟环境不存在: {self.venv_path}
+    echo [错误] 虚拟环境不存在: {self.venv_path}
     echo 请确保虚拟环境路径正确
     pause
     exit /b 1
 )
 
 if not exist "{self.python_exe}" (
-    echo ❌ Python可执行文件不存在: {self.python_exe}
+    echo [错误] Python可执行文件不存在: {self.python_exe}
     echo 请检查虚拟环境是否正确安装
     pause
     exit /b 1
 )
 
-echo ✅ 使用虚拟环境: {self.venv_path}
-echo ✅ Python路径: {self.python_exe}
+echo [成功] 使用虚拟环境: {self.venv_path}
+echo [成功] Python路径: {self.python_exe}
 echo.
 
 echo 正在运行修复工具...
@@ -400,11 +401,14 @@ pause
 '''
         
         batch_file = self.script_dir / "run_fix_in_venv.bat"
-        with open(batch_file, 'w', encoding='gbk') as f:
-            f.write(batch_script)
-        
-        print(f"✅ 批处理脚本已创建: {batch_file}")
-        print("您可以直接双击运行 run_fix_in_venv.bat")
+        try:
+            with open(batch_file, 'w', encoding='utf-8') as f:
+                f.write(batch_script)
+            print(f"✅ 批处理脚本已创建: {batch_file}")
+            print("您可以直接双击运行 run_fix_in_venv.bat")
+        except Exception as e:
+            print(f"❌ 批处理脚本创建失败: {e}")
+            print("将跳过批处理脚本创建，直接进行修复")
     
     def run_full_diagnosis_and_fix(self):
         """运行完整的诊断和修复流程"""
@@ -451,14 +455,19 @@ pause
 def main():
     fixer = MuseTalkVenvFixer()
     
-    # 生成批处理脚本
-    fixer.generate_batch_script()
+    # 尝试生成批处理脚本（失败也继续）
+    try:
+        fixer.generate_batch_script()
+    except Exception as e:
+        print(f"❌ 批处理脚本生成失败: {e}")
+        print("将直接进行修复，跳过批处理脚本生成")
     
     # 运行诊断和修复
     success = fixer.run_full_diagnosis_and_fix()
     
     if success:
         print("\n🎉 修复完成！")
+        print("现在可以重新启动您的MuseTalk服务")
     else:
         print("\n❌ 修复失败，请检查上述错误信息")
 
