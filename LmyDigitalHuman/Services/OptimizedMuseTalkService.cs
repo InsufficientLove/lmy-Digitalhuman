@@ -1766,13 +1766,17 @@ namespace LmyDigitalHuman.Services
                 _logger.LogInformation("   缓存目录: {CacheDir}", cacheDir);
                 _logger.LogInformation("   使用GPU: {GpuId}", gpuId);
 
+                // 从配置中读取BatchSize
+                var batchSize = _configuration.GetValue<int>("MuseTalk:BatchSize", 4);
+                _logger.LogInformation("   批次大小: {BatchSize} (从配置读取)", batchSize);
+
                 // 使用极速IPC客户端进行推理 - 优化参数
                 var resultPath = await _globalClient.SendInferenceRequestAsync(
                     templateId: templateId,
                     audioPath: fixedAudioPath,
                     outputPath: outputPath,
                     cacheDir: cacheDir,
-                    batchSize: 6,  // 优化为适合24GB显卡的批次大小
+                    batchSize: batchSize,  // 从配置读取
                     fps: 25
                 );
 
