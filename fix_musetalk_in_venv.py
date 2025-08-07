@@ -56,9 +56,10 @@ class MuseTalkVenvFixer:
         
         check_torch_script = '''
 import sys
+import os
 try:
     import torch
-    print(f"✅ PyTorch版本: {torch.__version__}")
+    print(f"[SUCCESS] PyTorch版本: {torch.__version__}")
     print(f"CUDA可用: {torch.cuda.is_available()}")
     if torch.cuda.is_available():
         print(f"CUDA版本: {torch.version.cuda}")
@@ -67,16 +68,20 @@ try:
             print(f"  GPU {i}: {torch.cuda.get_device_name(i)}")
     print("TORCH_CHECK_SUCCESS")
 except ImportError as e:
-    print(f"❌ PyTorch未安装: {e}")
+    print(f"[ERROR] PyTorch未安装: {e}")
     print("TORCH_CHECK_FAILED")
 except Exception as e:
-    print(f"❌ PyTorch检查失败: {e}")
+    print(f"[ERROR] PyTorch检查失败: {e}")
     print("TORCH_CHECK_FAILED")
 '''
         
         try:
+            # 设置环境变量以使用UTF-8编码
+            env = os.environ.copy()
+            env['PYTHONIOENCODING'] = 'utf-8'
+            
             result = subprocess.run([str(self.python_exe), "-c", check_torch_script], 
-                                  capture_output=True, text=True, timeout=30)
+                                  capture_output=True, text=True, timeout=30, env=env)
             
             print(result.stdout)
             if result.stderr:
@@ -141,7 +146,7 @@ try:
     print("测试PyTorch基本操作...")
     x = torch.randn(2, 3, 4, 4)
     y = torch.nn.functional.relu(x)
-    print("✅ PyTorch基本操作正常")
+    print("[SUCCESS] PyTorch基本操作正常")
     
     # 测试UNet模型文件加载
     unet_path = "models/musetalkV15/unet.pth"
@@ -150,7 +155,7 @@ try:
         
         # 直接加载模型数据
         model_data = torch.load(unet_path, map_location='cpu')
-        print("✅ UNet模型文件读取成功")
+        print("[SUCCESS] UNet模型文件读取成功")
         print(f"模型数据类型: {{type(model_data)}}")
         
         # 检查meta tensor
@@ -163,7 +168,7 @@ try:
                     total_tensors += 1
                     if hasattr(value, 'is_meta') and value.is_meta:
                         meta_tensor_count += 1
-                        print(f"❌ 发现meta tensor: {{key}}")
+                        print(f"[ERROR] 发现meta tensor: {{key}}")
         
         print(f"总张量数: {{total_tensors}}")
         print(f"Meta张量数: {{meta_tensor_count}}")
@@ -177,33 +182,38 @@ try:
         try:
             print("\\n尝试导入MuseTalk模块...")
             from musetalk.utils.utils import load_all_model
-            print("✅ 成功导入load_all_model")
+            print("[SUCCESS] 成功导入load_all_model")
             
             # 测试模型加载
             print("测试完整模型加载...")
             vae, unet, pe = load_all_model(vae_type="sd-vae")
-            print("✅ 模型加载成功！")
+            print("[SUCCESS] 模型加载成功！")
             print("FULL_LOADING_SUCCESS")
             
         except Exception as load_error:
-            print(f"❌ 模型加载失败: {{load_error}}")
+            print(f"[ERROR] 模型加载失败: {{load_error}}")
             if "Cannot copy out of meta tensor" in str(load_error):
                 print("CONFIRMED_META_TENSOR_ISSUE")
             else:
                 print(f"OTHER_LOADING_ERROR: {{load_error}}")
     else:
-        print(f"❌ UNet模型文件不存在: {{unet_path}}")
+        print(f"[ERROR] UNet模型文件不存在: {{unet_path}}")
         print("UNET_FILE_MISSING")
         
 except Exception as e:
-    print(f"❌ 测试失败: {{e}}")
+    print(f"[ERROR] 测试失败: {{e}}")
     print(f"ERROR: {{e}}")
 '''
         
         try:
             print("在虚拟环境中运行测试...")
+            
+            # 设置环境变量以使用UTF-8编码
+            env = os.environ.copy()
+            env['PYTHONIOENCODING'] = 'utf-8'
+            
             result = subprocess.run([str(self.python_exe), "-c", test_script], 
-                                  capture_output=True, text=True, timeout=60)
+                                  capture_output=True, text=True, timeout=60, env=env)
             
             print(result.stdout)
             if result.stderr:
@@ -344,8 +354,13 @@ except Exception as e:
         
         try:
             print("在虚拟环境中执行修复...")
+            
+            # 设置环境变量以使用UTF-8编码
+            env = os.environ.copy()
+            env['PYTHONIOENCODING'] = 'utf-8'
+            
             result = subprocess.run([str(self.python_exe), "-c", fix_script], 
-                                  capture_output=True, text=True, timeout=120)
+                                  capture_output=True, text=True, timeout=120, env=env)
             
             print(result.stdout)
             if result.stderr:
