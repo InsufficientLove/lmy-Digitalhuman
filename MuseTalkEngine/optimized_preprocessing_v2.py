@@ -273,7 +273,13 @@ class OptimizedPreprocessor:
             print("面部解析...")
             mask_coords_list, mask_list = [], []
             
-            for frame in frame_list:
+            for i, frame in enumerate(frame_list):
+                # 获取对应的face_box
+                face_box = coord_list[i] if i < len(coord_list) else None
+                if face_box is None or face_box == coord_placeholder:
+                    print(f"警告: 第{i}帧没有检测到人脸")
+                    continue
+                    
                 # 面部解析 - 使用正确的方法调用
                 try:
                     # 尝试常见的面部解析方法
@@ -290,10 +296,10 @@ class OptimizedPreprocessor:
                     # 使用默认的空mask
                     mask_out = np.zeros_like(frame[:,:,0])
                 
-                # 获取面部区域坐标
-                mask_coords = get_image_prepare_material(mask_out)
-                mask_coords_list.append(mask_coords)
-                mask_list.append(mask_out)
+                # 获取面部区域坐标 - 传入正确的参数
+                mask, crop_box = get_image_prepare_material(frame, face_box, fp=self.fp)
+                mask_coords_list.append(crop_box)
+                mask_list.append(mask)
             
             # 5. VAE编码 - 并行处理
             print("VAE编码...")

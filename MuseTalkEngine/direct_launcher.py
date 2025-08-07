@@ -9,6 +9,11 @@ import sys
 import argparse
 from pathlib import Path
 
+# 禁用输出缓冲
+os.environ['PYTHONUNBUFFERED'] = '1'
+sys.stdout.reconfigure(line_buffering=True)
+sys.stderr.reconfigure(line_buffering=True)
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--port', type=int, default=28888)
