@@ -483,8 +483,10 @@ class UltraFastMuseTalkService:
             # 修正内存估算（float16 = 2 bytes per element）
             whisper_memory = whisper_batch.numel() * 2 / 1024**3
             latent_memory = latent_batch.numel() * 2 / 1024**3
-            total_memory = whisper_memory + latent_memory
-            print(f"  Estimated memory: Whisper={whisper_memory:.2f}GB + Latent={latent_memory:.2f}GB = {total_memory:.2f}GB")
+            # UNet推理需要额外的内存，通常是输入的3-4倍
+            inference_multiplier = 4.0
+            total_memory = (whisper_memory + latent_memory) * inference_multiplier
+            print(f"  Estimated memory: Input={whisper_memory + latent_memory:.2f}GB × {inference_multiplier} = {total_memory:.2f}GB")
             
             # 监控GPU内存（如果可用）
             if 'monitor_gpu_memory' in globals():
@@ -493,16 +495,19 @@ class UltraFastMuseTalkService:
                     print(f"  GPU {target_device} 内存使用: {memory_before[target_device]['usage_percent']}%")
             
             try:
-                # 内存安全检查
-                max_memory_gb = 20  # 设置最大内存限制
-                estimated_memory_gb = (whisper_batch.numel() + latent_batch.numel()) * 4 / 1024**3
+                # 内存安全检查 - 使用更准确的估算
+                max_memory_gb = 15  # 降低限制，留出安全余量
                 
-                if estimated_memory_gb > max_memory_gb:
-                    print(f"⚠️ 批次 {batch_idx} 内存需求过大 ({estimated_memory_gb:.1f}GB > {max_memory_gb}GB)，跳过")
+                if total_memory > max_memory_gb:
+                    print(f"⚠️ 批次 {batch_idx} 内存需求过大 ({total_memory:.1f}GB > {max_memory_gb}GB)，跳过")
                     return batch_idx, []
                 
                 # 关键：数据移动到目标GPU
                 with torch.cuda.device(target_device):
+                    # 推理前清理内存
+                    torch.cuda.empty_cache()
+                    torch.cuda.synchronize()
+                    
                     whisper_batch = whisper_batch.to(target_device, dtype=self.weight_dtype, non_blocking=True)
                     latent_batch = latent_batch.to(target_device, dtype=self.weight_dtype, non_blocking=True)
                     timesteps = self.timesteps.to(target_device)
@@ -527,6 +532,10 @@ class UltraFastMuseTalkService:
                     
             except Exception as e:
                 print(f"批次 {batch_idx} GPU {target_device} 失败: {str(e)}")
+                # 关键：失败时也要清理GPU内存
+                with torch.cuda.device(target_device):
+                    torch.cuda.empty_cache()
+                    torch.cuda.synchronize()
                 return batch_idx, []
         
         # 真正的4GPU并行执行
@@ -534,13 +543,16 @@ class UltraFastMuseTalkService:
         batch_results = {}
         
         # 限制同时处理的批次数，避免内存溢出
-        max_concurrent_batches = min(self.gpu_count * 2, total_batches)
+        # 关键：每个GPU同时只处理一个批次
+        max_concurrent_batches = self.gpu_count
         
         with ThreadPoolExecutor(max_workers=self.gpu_count) as executor:
             # 分批提交，而不是一次性提交所有批次
             for start_idx in range(0, total_batches, max_concurrent_batches):
                 end_idx = min(start_idx + max_concurrent_batches, total_batches)
                 current_batches = list(enumerate(all_batches))[start_idx:end_idx]
+                
+                print(f"提交批次组 {start_idx}-{end_idx-1} (共{len(current_batches)}个批次)")
                 
                 # 提交当前批次组
                 futures = {
@@ -549,14 +561,20 @@ class UltraFastMuseTalkService:
                 }
                 
                 # 等待当前批次组完成
+                completed = 0
                 for future in as_completed(futures):
                     batch_idx, frames = future.result()
                     batch_results[batch_idx] = frames
+                    completed += 1
+                    if frames:
+                        print(f"  批次 {batch_idx} 完成 ({completed}/{len(current_batches)})")
                 
-                # 清理GPU内存
+                # 每组批次完成后都清理GPU内存
+                print("清理GPU内存...")
                 for device in self.devices:
                     with torch.cuda.device(device):
                         torch.cuda.empty_cache()
+                        torch.cuda.synchronize()
         
         # 按顺序合并结果
         for i in range(total_batches):
