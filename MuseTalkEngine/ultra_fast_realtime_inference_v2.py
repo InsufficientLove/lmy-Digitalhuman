@@ -367,7 +367,7 @@ class UltraFastMuseTalkService:
         if device in self.gpu_usage:
             self.gpu_usage[device] = max(0, self.gpu_usage[device] - 1)
     
-    def ultra_fast_inference_parallel(self, template_id, audio_path, output_path, cache_dir, batch_size=4, fps=25):
+    def ultra_fast_inference_parallel(self, template_id, audio_path, output_path, cache_dir, batch_size=1, fps=25):
         """极速并行推理 - 毫秒级响应"""
         if not self.is_initialized:
             print("模型未初始化")
@@ -473,6 +473,9 @@ class UltraFastMuseTalkService:
             gpu_models = self.gpu_models[target_device]
             
             print(f"处理批次 {batch_idx} -> GPU {target_device}")
+            print(f"  Whisper batch shape: {whisper_batch.shape}")
+            print(f"  Latent batch shape: {latent_batch.shape}")
+            print(f"  Estimated memory: {(whisper_batch.numel() + latent_batch.numel()) * 4 / 1024**3:.2f} GB")
             
             # 监控GPU内存（如果可用）
             if 'monitor_gpu_memory' in globals():
@@ -481,6 +484,14 @@ class UltraFastMuseTalkService:
                     print(f"  GPU {target_device} 内存使用: {memory_before[target_device]['usage_percent']}%")
             
             try:
+                # 内存安全检查
+                max_memory_gb = 20  # 设置最大内存限制
+                estimated_memory_gb = (whisper_batch.numel() + latent_batch.numel()) * 4 / 1024**3
+                
+                if estimated_memory_gb > max_memory_gb:
+                    print(f"⚠️ 批次 {batch_idx} 内存需求过大 ({estimated_memory_gb:.1f}GB > {max_memory_gb}GB)，跳过")
+                    return batch_idx, []
+                
                 # 关键：数据移动到目标GPU
                 with torch.cuda.device(target_device):
                     whisper_batch = whisper_batch.to(target_device, dtype=self.weight_dtype, non_blocking=True)
@@ -785,7 +796,7 @@ def handle_client_ultra_fast(client_socket):
             audio_path=request['audio_path'],
             output_path=request['output_path'],
             cache_dir=request['cache_dir'],
-            batch_size=request.get('batch_size', 4),
+            batch_size=request.get('batch_size', 1),
             fps=request.get('fps', 25)
         )
         
