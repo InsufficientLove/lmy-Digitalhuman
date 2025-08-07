@@ -455,6 +455,13 @@ class UltraFastMuseTalkService:
         input_latent_list_cycle = cache_data['input_latent_list_cycle']
         video_num = len(whisper_chunks)
         
+        # 添加批次优化建议
+        print(f"音频帧数: {video_num}")
+        if video_num > 50 and batch_size < 4:
+            suggested_batch_size = min(8, max(4, video_num // 10))
+            print(f"⚠️ 当前batch_size={batch_size}可能太小，建议使用batch_size={suggested_batch_size}")
+            print(f"  这将减少批次数从{video_num // batch_size}到{video_num // suggested_batch_size}")
+        
         # 生成所有批次
         gen = datagen(
             whisper_chunks=whisper_chunks,
@@ -522,7 +529,14 @@ class UltraFastMuseTalkService:
                         recon_frames = gpu_models['vae'].decode_latents(pred_latents)
                     
                     # 立即移回CPU释放GPU内存
-                    result_frames = [frame.cpu().numpy() for frame in recon_frames]
+                    # 检查返回类型，如果已经是numpy数组就直接使用
+                    if isinstance(recon_frames, list):
+                        result_frames = recon_frames
+                    elif isinstance(recon_frames, np.ndarray):
+                        result_frames = [recon_frames[i] for i in range(recon_frames.shape[0])]
+                    else:
+                        # 如果是torch tensor，转换为numpy
+                        result_frames = [frame.cpu().numpy() if hasattr(frame, 'cpu') else frame for frame in recon_frames]
                     
                     # 清理GPU内存
                     del whisper_batch, latent_batch, audio_features, pred_latents, recon_frames
