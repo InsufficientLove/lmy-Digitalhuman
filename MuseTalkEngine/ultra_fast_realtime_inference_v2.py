@@ -458,9 +458,17 @@ class UltraFastMuseTalkService:
         # 添加批次优化建议
         print(f"音频帧数: {video_num}")
         if video_num > 50 and batch_size < 4:
-            suggested_batch_size = min(8, max(4, video_num // 10))
+            # 基于实际GPU内存情况的建议
+            if video_num > 100:
+                suggested_batch_size = 6  # 长音频用更大批次
+            elif video_num > 50:
+                suggested_batch_size = 4  # 中等音频
+            else:
+                suggested_batch_size = 3  # 短音频
+            
             print(f"⚠️ 当前batch_size={batch_size}可能太小，建议使用batch_size={suggested_batch_size}")
             print(f"  这将减少批次数从{video_num // batch_size}到{video_num // suggested_batch_size}")
+            print(f"  预计可节省{(video_num // batch_size - video_num // suggested_batch_size) * 5}秒")
         
         # 生成所有批次
         gen = datagen(
@@ -511,10 +519,6 @@ class UltraFastMuseTalkService:
                 
                 # 关键：数据移动到目标GPU
                 with torch.cuda.device(target_device):
-                    # 推理前清理内存
-                    torch.cuda.empty_cache()
-                    torch.cuda.synchronize()
-                    
                     whisper_batch = whisper_batch.to(target_device, dtype=self.weight_dtype, non_blocking=True)
                     latent_batch = latent_batch.to(target_device, dtype=self.weight_dtype, non_blocking=True)
                     timesteps = self.timesteps.to(target_device)
@@ -546,49 +550,39 @@ class UltraFastMuseTalkService:
                     
             except Exception as e:
                 print(f"批次 {batch_idx} GPU {target_device} 失败: {str(e)}")
-                # 关键：失败时也要清理GPU内存
+                # 失败时清理GPU内存，但不强制同步
                 with torch.cuda.device(target_device):
                     torch.cuda.empty_cache()
-                    torch.cuda.synchronize()
                 return batch_idx, []
         
         # 真正的4GPU并行执行
         res_frame_list = []
         batch_results = {}
         
-        # 限制同时处理的批次数，避免内存溢出
-        # 关键：每个GPU同时只处理一个批次
-        max_concurrent_batches = self.gpu_count
+        # 使用更大的并发数，让GPU保持忙碌
+        max_workers = self.gpu_count * 2  # 允许更多并发
         
-        with ThreadPoolExecutor(max_workers=self.gpu_count) as executor:
-            # 分批提交，而不是一次性提交所有批次
-            for start_idx in range(0, total_batches, max_concurrent_batches):
-                end_idx = min(start_idx + max_concurrent_batches, total_batches)
-                current_batches = list(enumerate(all_batches))[start_idx:end_idx]
-                
-                print(f"提交批次组 {start_idx}-{end_idx-1} (共{len(current_batches)}个批次)")
-                
-                # 提交当前批次组
-                futures = {
-                    executor.submit(process_batch_on_gpu, batch_info): batch_info[0]
-                    for batch_info in current_batches
-                }
-                
-                # 等待当前批次组完成
-                completed = 0
-                for future in as_completed(futures):
-                    batch_idx, frames = future.result()
-                    batch_results[batch_idx] = frames
-                    completed += 1
-                    if frames:
-                        print(f"  批次 {batch_idx} 完成 ({completed}/{len(current_batches)})")
-                
-                # 每组批次完成后都清理GPU内存
-                print("清理GPU内存...")
-                for device in self.devices:
-                    with torch.cuda.device(device):
-                        torch.cuda.empty_cache()
-                        torch.cuda.synchronize()
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # 直接提交所有批次，让线程池管理调度
+            futures = {}
+            for batch_idx, batch_info in enumerate(all_batches):
+                future = executor.submit(process_batch_on_gpu, (batch_idx, batch_info))
+                futures[future] = batch_idx
+            
+            # 收集结果
+            completed = 0
+            for future in as_completed(futures):
+                batch_idx, frames = future.result()
+                batch_results[batch_idx] = frames
+                completed += 1
+                if completed % 10 == 0 or completed == total_batches:
+                    print(f"进度: {completed}/{total_batches} 批次完成")
+        
+        # 处理完所有批次后，只清理一次内存
+        if total_batches > 20:  # 只有在批次很多时才清理
+            for device in self.devices:
+                with torch.cuda.device(device):
+                    torch.cuda.empty_cache()
         
         # 按顺序合并结果
         for i in range(total_batches):
