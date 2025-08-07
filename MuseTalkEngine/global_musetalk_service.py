@@ -247,7 +247,7 @@ class GlobalMuseTalkService:
             print(f"加载模板缓存失败: {str(e)}")
             return None
     
-    def ultra_fast_inference(self, template_id, audio_path, output_path, cache_dir, batch_size=8, fps=25):
+    def ultra_fast_inference(self, template_id, audio_path, output_path, cache_dir, batch_size=6, fps=25):
         """超快速推理 - 复用全局模型，无需重复加载"""
         if not self.is_initialized:
             print("全局模型未初始化")

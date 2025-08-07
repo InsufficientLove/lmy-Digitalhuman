@@ -443,6 +443,8 @@ class UltraFastMuseTalkService:
         """真正的4GPU并行推理 - 无锁设计"""
         from musetalk.utils.utils import datagen
         
+        print(f"⚙️ 执行4GPU并行推理，batch_size={batch_size}")
+        
         # 推理前清理所有GPU内存
         for device in self.devices:
             with torch.cuda.device(device):
@@ -475,7 +477,12 @@ class UltraFastMuseTalkService:
             print(f"处理批次 {batch_idx} -> GPU {target_device}")
             print(f"  Whisper batch shape: {whisper_batch.shape}")
             print(f"  Latent batch shape: {latent_batch.shape}")
-            print(f"  Estimated memory: {(whisper_batch.numel() + latent_batch.numel()) * 4 / 1024**3:.2f} GB")
+            
+            # 修正内存估算（float16 = 2 bytes per element）
+            whisper_memory = whisper_batch.numel() * 2 / 1024**3
+            latent_memory = latent_batch.numel() * 2 / 1024**3
+            total_memory = whisper_memory + latent_memory
+            print(f"  Estimated memory: Whisper={whisper_memory:.2f}GB + Latent={latent_memory:.2f}GB = {total_memory:.2f}GB")
             
             # 监控GPU内存（如果可用）
             if 'monitor_gpu_memory' in globals():
