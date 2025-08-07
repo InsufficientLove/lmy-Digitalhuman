@@ -284,7 +284,12 @@ class UltraFastMuseTalkService:
                 print("开始加载Whisper模型...")
                 try:
                     self.shared_whisper = WhisperModel.from_pretrained(whisper_dir).eval()
-                    print("Whisper模型加载完成")
+                    # 将Whisper模型移到GPU0并保持float32（Whisper不支持half）
+                    if torch.cuda.is_available():
+                        self.shared_whisper = self.shared_whisper.to(self.devices[0])
+                        print(f"Whisper模型加载完成，已移至{self.devices[0]}")
+                    else:
+                        print("Whisper模型加载完成（CPU模式）")
                 except Exception as e:
                     print(f"Whisper模型加载失败: {e}")
                     self.shared_whisper = None
@@ -571,10 +576,20 @@ class UltraFastMuseTalkService:
                 raise ValueError("AudioProcessor未初始化")
                 
             whisper_input_features, librosa_length = self.shared_audio_processor.get_audio_feature(audio_path)
+            
+            # 确保Whisper使用正确的数据类型
+            # Whisper模型始终使用float32，不支持half precision
+            whisper_dtype = torch.float32
+            
+            # 如果输入特征在GPU上且是half类型，转换为float32
+            if isinstance(whisper_input_features, torch.Tensor):
+                if whisper_input_features.dtype == torch.float16:
+                    whisper_input_features = whisper_input_features.float()
+            
             whisper_chunks = self.shared_audio_processor.get_whisper_chunk(
                 whisper_input_features, 
                 self.devices[0],  # Whisper在GPU0
-                self.weight_dtype, 
+                whisper_dtype,  # 使用正确的数据类型
                 self.shared_whisper, 
                 librosa_length,
                 fps=fps,
