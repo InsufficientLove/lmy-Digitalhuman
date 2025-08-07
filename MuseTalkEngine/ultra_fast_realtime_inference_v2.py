@@ -121,8 +121,13 @@ class UltraFastMuseTalkService:
     
     def initialize_models_ultra_fast(self):
         """极速初始化所有模型 - 并行加载到所有GPU"""
-        if self.is_initialized:
+        if self.is_initialized and len(self.gpu_models) > 0:
+            print("模型已初始化，跳过重复初始化")
             return True
+        
+        # 重置初始化状态，强制重新初始化
+        self.is_initialized = False
+        self.gpu_models = {}
             
         try:
             print(f"开始极速初始化 - {self.gpu_count}GPU并行加载...")

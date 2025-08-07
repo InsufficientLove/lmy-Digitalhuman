@@ -258,7 +258,13 @@ class OptimizedPreprocessor:
             
             # 3. 面部检测和关键点提取
             print("👤 面部检测和关键点提取...")
-            coord_list, frame_list = get_landmark_and_bbox([image])
+            # 保存临时图像文件给get_landmark_and_bbox使用
+            temp_image_path = os.path.join(output_dir, "temp_image.jpg")
+            cv2.imwrite(temp_image_path, image)
+            coord_list, frame_list = get_landmark_and_bbox([temp_image_path])
+            # 清理临时文件
+            if os.path.exists(temp_image_path):
+                os.remove(temp_image_path)
             
             if not coord_list or not frame_list:
                 raise ValueError("面部检测失败")
