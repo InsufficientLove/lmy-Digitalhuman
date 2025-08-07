@@ -13,6 +13,7 @@ import torch
 import cv2
 import numpy as np
 import time
+import gc
 import threading
 import queue
 import socket
@@ -215,23 +216,40 @@ class UltraFastMuseTalkService:
                     print(f"GPU{device_id} 模型加载完成")
                     return device_id
             
-            # 真正的并行初始化 - 允许部分GPU失败
-            print(f"开始并行初始化{self.gpu_count}个GPU...")
+            # SEQUENTIAL_LOADING_FIXED: 顺序初始化避免并发冲突
+            print(f"开始顺序初始化{self.gpu_count}个GPU（避免并发冲突）...")
             successful_gpus = []
-            with ThreadPoolExecutor(max_workers=self.gpu_count) as executor:
-                futures = {executor.submit(init_gpu_model, i): i for i in range(self.gpu_count)}
-                
-                for future in as_completed(futures, timeout=300):  # 5分钟超时
-                    gpu_id = futures[future]
-                    try:
-                        result = future.result()
-                        if result is not None:
-                            successful_gpus.append(gpu_id)
-                            print(f"GPU{gpu_id} 就绪 ({len(successful_gpus)}/{self.gpu_count})")
-                        else:
-                            print(f"GPU{gpu_id} 初始化失败，跳过")
-                    except Exception as e:
-                        print(f"GPU{gpu_id} 初始化异常: {e}")
+            
+            for i in range(self.gpu_count):
+                print(f"正在初始化GPU {i}/{self.gpu_count}...")
+                try:
+                    # 在每个GPU初始化前清理内存
+                    torch.cuda.set_device(i)
+                    torch.cuda.empty_cache()
+                    
+                    result = init_gpu_model(i)
+                    if result is not None:
+                        successful_gpus.append(i)
+                        print(f"✅ GPU{i} 初始化成功 ({len(successful_gpus)}/{self.gpu_count})")
+                    else:
+                        print(f"❌ GPU{i} 初始化失败，跳过")
+                except Exception as e:
+                    print(f"❌ GPU{i} 初始化异常: {e}")
+                    # 如果是meta tensor错误，尝试重试一次
+                    if "meta tensor" in str(e) or "Cannot copy out" in str(e):
+                        print(f"检测到meta tensor错误，清理内存后重试GPU{i}...")
+                        try:
+                            torch.cuda.empty_cache()
+                            import gc
+                            gc.collect()
+                            result = init_gpu_model(i)
+                            if result is not None:
+                                successful_gpus.append(i)
+                                print(f"✅ GPU{i} 重试成功")
+                            else:
+                                print(f"❌ GPU{i} 重试失败")
+                        except Exception as retry_e:
+                            print(f"❌ GPU{i} 重试异常: {retry_e}")
             
             if len(successful_gpus) == 0:
                 print("所有GPU初始化都失败了")
