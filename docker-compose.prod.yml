@@ -1,0 +1,78 @@
+version: "3.9"
+
+services:
+  traefik:
+    image: traefik:v3.0
+    container_name: traefik
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --certificatesresolvers.myresolver.acme.httpchallenge=true
+      - --certificatesresolvers.myresolver.acme.httpchallenge.entrypoint=web
+      - --certificatesresolvers.myresolver.acme.email=${ACME_EMAIL}
+      - --certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json
+      - --log.level=INFO
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./letsencrypt:/letsencrypt
+    restart: unless-stopped
+
+  musetalk-python:
+    image: ${REGISTRY}/${NAMESPACE}/${PY_IMAGE}:${TAG}
+    container_name: musetalk-python
+    environment:
+      - CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0,1}
+      - NVIDIA_VISIBLE_DEVICES=all
+      - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:256,garbage_collection_threshold:0.9,expandable_segments:True
+      - MUSE_MODELS_DIR=/models
+      - MUSE_VIDEOS_DIR=/videos
+      - MUSE_TEMP_DIR=/temp
+    volumes:
+      - /opt/musetalk/models:/models
+      - /opt/musetalk/videos:/videos
+      - /opt/musetalk/temp:/temp
+    # 需要主机已安装 nvidia-container-toolkit
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+    networks:
+      - web
+    restart: unless-stopped
+
+  lmy-digitalhuman:
+    image: ${REGISTRY}/${NAMESPACE}/${WEB_IMAGE}:${TAG}
+    container_name: lmy-digitalhuman
+    environment:
+      - ASPNETCORE_URLS=http://0.0.0.0:5000
+      - ASPNETCORE_ENVIRONMENT=Linux
+    depends_on:
+      - musetalk-python
+    volumes:
+      - /opt/musetalk/models:/models
+      - /opt/musetalk/videos:/videos
+      - /opt/musetalk/temp:/temp
+    networks:
+      - web
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.middlewares.https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.routers.lmy-web.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.lmy-web.entrypoints=web"
+      - "traefik.http.routers.lmy-web.middlewares=https-redirect"
+      - "traefik.http.routers.lmy-websecure.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.lmy-websecure.entrypoints=websecure"
+      - "traefik.http.routers.lmy-websecure.tls=true"
+      - "traefik.http.routers.lmy-websecure.tls.certresolver=myresolver"
+      - "traefik.http.services.lmy.loadbalancer.server.port=5000"
+    restart: unless-stopped
+
+networks:
+  web:
+    external: false
