@@ -25,6 +25,16 @@ ACME_EMAIL=your-email@example.com
 CUDA_VISIBLE_DEVICES=0,1
 ```
 
+## 准备 MuseTalk 源码
+- 该项目依赖上游 `MuseTalk` 源码作为子目录：`/opt/musetalk/repo/MuseTalk`
+- 如果根目录下没有 `MuseTalk` 文件夹，请按以下任一方式准备：
+  - 从你已有的环境拷贝 `MuseTalk` 目录到仓库根目录
+  - 或者在仓库根目录克隆上游仓库（示例）：
+    ```bash
+    cd /opt/musetalk/repo
+    git clone <YOUR_MUSETALK_REPO_URL> MuseTalk
+    ```
+
 ## 准备模型
 - 推荐直接把旧服务器的 `models` 整个目录拷贝到 `/opt/musetalk/models`
 - 可参见 `scripts/download_models.sh`
@@ -64,4 +74,4 @@ cd /opt/musetalk/repo
 ## 常见问题
 - 证书未签发：确保域名解析到公网IP，端口 80/443 未被占用/未被防火墙拦截
 - GPU不可见：确认主机已安装 `nvidia-container-toolkit`，`nvidia-smi` 可用，并重启 docker
-- 路径问题：所有容器内路径通过 `appsettings.Linux.json` 与 Compose 挂载统一为 `/models` `/videos` `/temp`
+- 路径问题：若容器日志提示 `MuseTalk目录不存在`，请确认仓库根目录下存在 `MuseTalk` 文件夹，或按“准备 MuseTalk 源码”一节补齐。
