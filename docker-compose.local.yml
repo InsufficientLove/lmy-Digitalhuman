@@ -1,0 +1,19 @@
+version: "3.9"
+
+services:
+  # 本地测试仅覆盖端口与标签，不改变构建和卷挂载
+  musetalk-python:
+    ports:
+      - "28888:28888"
+
+  lmy-digitalhuman:
+    # 直接暴露端口便于本地访问 http://localhost:5000
+    ports:
+      - "5000:5000"
+    # 覆盖掉 traefik 的 labels，避免本地无需域名也要走 traefik
+    labels: []
+
+  # 本地测试不启动 traefik（可不指定该服务）
+  traefik:
+    deploy:
+      replicas: 0
