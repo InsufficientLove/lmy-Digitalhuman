@@ -22,10 +22,11 @@ def main():
     parser.add_argument('--gpu_id', type=int, default=0)
     args = parser.parse_args()
     
-    # 设置路径
+    # 设置路径（支持通过环境变量 MUSE_TALK_DIR 覆盖）
     script_dir = Path(__file__).parent
     project_root = script_dir.parent
-    musetalk_path = project_root / "MuseTalk"
+    env_musetalk_dir = os.environ.get("MUSE_TALK_DIR", "").strip()
+    musetalk_path = Path(env_musetalk_dir) if env_musetalk_dir else (project_root / "MuseTalk")
     
     # 添加路径
     sys.path.insert(0, str(musetalk_path))
@@ -37,7 +38,12 @@ def main():
         print(f"工作目录: {musetalk_path}")
         print(f"Python路径: {sys.path[:3]}")
     else:
+        parent = musetalk_path.parent
         print(f"❌ MuseTalk目录不存在: {musetalk_path}")
+        try:
+            print(f"父目录内容: {list(parent.iterdir())}")
+        except Exception:
+            pass
         sys.exit(1)
     
     # 直接启动服务

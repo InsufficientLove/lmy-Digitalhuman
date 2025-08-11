@@ -34,6 +34,7 @@ services:
       - MUSE_MODELS_DIR=/models
       - MUSE_VIDEOS_DIR=/videos
       - MUSE_TEMP_DIR=/temp
+      - MUSE_TALK_DIR=/opt/musetalk/repo/MuseTalk
     volumes:
       - ./MuseTalkEngine:/opt/musetalk/repo/MuseTalkEngine
       - ./MuseTalk:/opt/musetalk/repo/MuseTalk
