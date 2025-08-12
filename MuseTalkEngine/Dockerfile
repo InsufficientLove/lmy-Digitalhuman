@@ -21,4 +21,6 @@ RUN python3 -m pip install --upgrade pip setuptools wheel && \
     python3 -m pip install --no-cache-dir -r /opt/musetalk/repo/requirements.txt
 
 EXPOSE 28888
-CMD ["python3", "direct_launcher.py"]
+COPY MuseTalkEngine/start.sh /usr/local/bin/muse-start
+RUN chmod +x /usr/local/bin/muse-start
+CMD ["muse-start"]
