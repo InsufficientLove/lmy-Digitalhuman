@@ -10,8 +10,7 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /opt/musetalk/repo/MuseTalkEngine
 
-# 复制代码（仅Python目录，避免层过大）
-COPY MuseTalkEngine /opt/musetalk/repo/MuseTalkEngine
+# 仅复制依赖文件用于缓存
 COPY requirements.txt /opt/musetalk/repo/requirements.txt
 
 # 安装依赖（先装 PyTorch cu121，再装通用依赖）
@@ -19,6 +18,9 @@ RUN python3 -m pip install --upgrade pip setuptools wheel && \
     python3 -m pip install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cu121 \
       torch==2.3.1+cu121 torchvision==0.18.1+cu121 torchaudio==2.3.1+cu121 && \
     python3 -m pip install --no-cache-dir -r /opt/musetalk/repo/requirements.txt
+
+# 再复制代码（避免代码改动触发依赖重装）
+COPY MuseTalkEngine /opt/musetalk/repo/MuseTalkEngine
 
 EXPOSE 28888
 COPY MuseTalkEngine/start.sh /usr/local/bin/muse-start
