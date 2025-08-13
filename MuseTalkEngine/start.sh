@@ -18,5 +18,19 @@ fi
 # Ensure caches exist
 mkdir -p /root/.cache/huggingface /root/.cache/torch
 
+# Ensure mmpose stack present (use mmcv-lite to avoid CUDA builds)
+python3 - <<'PY'
+try:
+    import mmpose  # type: ignore
+except Exception:
+    import subprocess, sys
+    pkgs = [
+        'mmengine==0.10.4',
+        'mmcv-lite==2.0.1',
+        'mmpose==1.3.2'
+    ]
+    subprocess.check_call([sys.executable, '-m', 'pip', 'install', '--no-cache-dir', *pkgs])
+PY
+
 cd "$ENGINE_DIR"
 exec python3 direct_launcher.py
