@@ -40,11 +40,12 @@ PY
 # 2) Install xtcocotools without deps so it does not force numpy upgrade
 python3 -m pip install --no-cache-dir --no-deps --upgrade --force-reinstall xtcocotools==1.14.3
 
-# 3) Install mmpose stack (avoid deps on mmpose itself to prevent opencv/numpy changes)
+# 3) Install mmpose/mmdet stack (avoid deps to prevent opencv/numpy changes)
 python3 -m pip install --no-cache-dir --upgrade mmengine==0.10.4 mmcv-lite==2.0.1
 python3 -m pip install --no-cache-dir --no-deps --upgrade mmpose==1.3.2
-# mmpose small runtime helpers
-python3 -m pip install --no-cache-dir --upgrade json-tricks==3.17.3 munkres==1.1.4 chumpy==0.70
+python3 -m pip install --no-cache-dir --no-deps --upgrade mmdet==3.3.0
+# minimal runtime helpers for mmdet
+python3 -m pip install --no-cache-dir --upgrade pycocotools==2.0.7 shapely==2.0.6
 
 # 4) Ensure diffusers stack present (needed by musetalk.models.vae)
 python3 - <<'PY'
