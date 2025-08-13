@@ -1,11 +1,16 @@
 FROM nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04
 
-ENV DEBIAN_FRONTEND=noninteractive
+ENV DEBIAN_FRONTEND=noninteractive \
+    PIP_DEFAULT_TIMEOUT=120 \
+    PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple \
+    PIP_TRUSTED_HOST=pypi.tuna.tsinghua.edu.cn
 RUN apt-get update && apt-get install -y \
     python3.10 python3.10-venv python3-pip \
+    ca-certificates \
     ffmpeg git curl wget \
     libgl1 libglib2.0-0 libsndfile1 \
     build-essential pkg-config \
+  && update-ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /opt/musetalk/repo/MuseTalkEngine
