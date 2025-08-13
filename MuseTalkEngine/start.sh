@@ -5,14 +5,20 @@ export PYTHONUNBUFFERED=1
 
 MUSE_DIR=${MUSE_TALK_DIR:-/opt/musetalk/repo/MuseTalk}
 ENGINE_DIR=/opt/musetalk/repo/MuseTalkEngine
-STAMP_FILE=/opt/musetalk/.musetalk_reqs_installed
+# Old (non-persistent) stamp for backward compatibility
+STAMP_OLD=/opt/musetalk/.musetalk_reqs_installed
+# New persistent stamp inside bind-mounted MuseTalk directory
+STAMP_NEW="$MUSE_DIR/.musetalk_reqs_installed"
 
 python3 -m pip install --upgrade pip >/dev/null 2>&1 || true
 
-if [ -f "$MUSE_DIR/requirements.txt" ] && [ ! -f "$STAMP_FILE" ]; then
+if [ -f "$MUSE_DIR/requirements.txt" ] && [ ! -f "$STAMP_OLD" ] && [ ! -f "$STAMP_NEW" ]; then
   echo "Detected MuseTalk requirements: $MUSE_DIR/requirements.txt"
   python3 -m pip install --no-cache-dir -r "$MUSE_DIR/requirements.txt"
-  touch "$STAMP_FILE"
+  # Write both stamps to cover old/new logic
+  mkdir -p "$(dirname "$STAMP_OLD")" || true
+  touch "$STAMP_OLD" || true
+  touch "$STAMP_NEW" || true
 fi
 
 # Ensure caches exist
