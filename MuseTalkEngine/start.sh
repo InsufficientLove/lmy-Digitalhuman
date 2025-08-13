@@ -24,6 +24,20 @@ fi
 # Ensure caches exist
 mkdir -p /root/.cache/huggingface /root/.cache/torch
 
+# Enforce NumPy/Scipy 1.x ABI before installing pose stack
+python3 - <<'PY'
+import subprocess, sys
+from importlib import import_module
+from packaging.version import parse as V
+try:
+    import numpy as np
+    if V(np.__version__).major >= 2:
+        subprocess.check_call([sys.executable,'-m','pip','install','--no-cache-dir','--force-reinstall','numpy==1.26.4','scipy==1.11.4'])
+        subprocess.check_call([sys.executable,'-m','pip','install','--no-cache-dir','--force-reinstall','xtcocotools==1.14.3'])
+except Exception:
+    subprocess.check_call([sys.executable,'-m','pip','install','--no-cache-dir','numpy==1.26.4','scipy==1.11.4','xtcocotools==1.14.3'])
+PY
+
 # Ensure mmpose stack present (use mmcv-lite to avoid CUDA builds)
 python3 - <<'PY'
 try:
@@ -36,6 +50,16 @@ except Exception:
         'mmpose==1.3.2'
     ]
     subprocess.check_call([sys.executable, '-m', 'pip', 'install', '--no-cache-dir', *pkgs])
+PY
+
+# Re-enforce NumPy/Scipy 1.x ABI after pose stack (and rebuild xtcocotools if needed)
+python3 - <<'PY'
+import subprocess, sys
+from packaging.version import parse as V
+import numpy as np
+if V(np.__version__).major >= 2:
+    subprocess.check_call([sys.executable,'-m','pip','install','--no-cache-dir','--force-reinstall','numpy==1.26.4','scipy==1.11.4'])
+    subprocess.check_call([sys.executable,'-m','pip','install','--no-cache-dir','--force-reinstall','xtcocotools==1.14.3'])
 PY
 
 # Ensure diffusers stack present (needed by musetalk.models.vae)
