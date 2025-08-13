@@ -24,45 +24,29 @@ fi
 # Ensure caches exist
 mkdir -p /root/.cache/huggingface /root/.cache/torch
 
-# Enforce NumPy/Scipy 1.x ABI before installing pose stack
+# 1) Pin core numeric/IO stack to avoid ABI conflicts
 python3 - <<'PY'
 import subprocess, sys
-from importlib import import_module
-from packaging.version import parse as V
-try:
-    import numpy as np
-    if V(np.__version__).major >= 2:
-        subprocess.check_call([sys.executable,'-m','pip','install','--no-cache-dir','--force-reinstall','numpy==1.26.4','scipy==1.11.4'])
-        subprocess.check_call([sys.executable,'-m','pip','install','--no-cache-dir','--force-reinstall','xtcocotools==1.14.3'])
-except Exception:
-    subprocess.check_call([sys.executable,'-m','pip','install','--no-cache-dir','numpy==1.26.4','scipy==1.11.4','xtcocotools==1.14.3'])
+pins = [
+    'numpy==1.26.4',
+    'scipy==1.11.4',
+    'pillow==10.0.1',
+    'opencv-python==4.9.0.80',
+    'matplotlib==3.8.2'
+]
+subprocess.check_call([sys.executable,'-m','pip','install','--no-cache-dir','--upgrade','--force-reinstall',*pins])
 PY
 
-# Ensure mmpose stack present (use mmcv-lite to avoid CUDA builds)
-python3 - <<'PY'
-try:
-    import mmpose  # type: ignore
-except Exception:
-    import subprocess, sys
-    pkgs = [
-        'mmengine==0.10.4',
-        'mmcv-lite==2.0.1',
-        'mmpose==1.3.2'
-    ]
-    subprocess.check_call([sys.executable, '-m', 'pip', 'install', '--no-cache-dir', *pkgs])
-PY
+# 2) Install xtcocotools without deps so it does not force numpy upgrade
+python3 -m pip install --no-cache-dir --no-deps --upgrade --force-reinstall xtcocotools==1.14.3
 
-# Re-enforce NumPy/Scipy 1.x ABI after pose stack (and rebuild xtcocotools if needed)
-python3 - <<'PY'
-import subprocess, sys
-from packaging.version import parse as V
-import numpy as np
-if V(np.__version__).major >= 2:
-    subprocess.check_call([sys.executable,'-m','pip','install','--no-cache-dir','--force-reinstall','numpy==1.26.4','scipy==1.11.4'])
-    subprocess.check_call([sys.executable,'-m','pip','install','--no-cache-dir','--force-reinstall','xtcocotools==1.14.3'])
-PY
+# 3) Install mmpose stack (avoid deps on mmpose itself to prevent opencv/numpy changes)
+python3 -m pip install --no-cache-dir --upgrade mmengine==0.10.4 mmcv-lite==2.0.1
+python3 -m pip install --no-cache-dir --no-deps --upgrade mmpose==1.3.2
+# mmpose small runtime helpers
+python3 -m pip install --no-cache-dir --upgrade json-tricks==3.17.3 munkres==1.1.4 chumpy==0.70
 
-# Ensure diffusers stack present (needed by musetalk.models.vae)
+# 4) Ensure diffusers stack present (needed by musetalk.models.vae)
 python3 - <<'PY'
 missing = []
 for name in ['diffusers','accelerate','huggingface_hub','tokenizers','safetensors']:
