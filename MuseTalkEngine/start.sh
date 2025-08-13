@@ -38,5 +38,26 @@ except Exception:
     subprocess.check_call([sys.executable, '-m', 'pip', 'install', '--no-cache-dir', *pkgs])
 PY
 
+# Ensure diffusers stack present (needed by musetalk.models.vae)
+python3 - <<'PY'
+missing = []
+for name in ['diffusers','accelerate','huggingface_hub','tokenizers','safetensors']:
+    try:
+        __import__(name)
+    except Exception:
+        missing.append(name)
+if missing:
+    import subprocess, sys
+    pins = {
+        'diffusers':'diffusers==0.30.2',
+        'accelerate':'accelerate==0.28.0',
+        'huggingface_hub':'huggingface_hub==0.30.2',
+        'tokenizers':'tokenizers==0.15.2',
+        'safetensors':'safetensors==0.6.2'
+    }
+    args = [pins[n] for n in missing]
+    subprocess.check_call([sys.executable,'-m','pip','install','--no-cache-dir',*args])
+PY
+
 cd "$ENGINE_DIR"
 exec python3 direct_launcher.py
