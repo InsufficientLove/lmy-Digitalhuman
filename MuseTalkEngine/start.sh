@@ -10,19 +10,35 @@ ENGINE_DIR=/opt/musetalk/repo/MuseTalkEngine
 mkdir -p /root/.cache/huggingface /root/.cache/torch
 [ -f "$MUSE_DIR/.musetalk_reqs_installed" ] || true
 
+# 0) Align torch stack to 2.3.0+cu121 to match available mmcv wheels
+python3 - <<'PY'
+import subprocess, sys
+try:
+    import torch
+    v = getattr(torch, '__version__', '')
+except Exception:
+    v = ''
+if not v.startswith('2.3.0'):
+    subprocess.check_call([
+        sys.executable,'-m','pip','install','--no-cache-dir','--upgrade',
+        '--extra-index-url','https://download.pytorch.org/whl/cu121',
+        'torch==2.3.0+cu121','torchvision==0.18.0+cu121','torchaudio==2.3.0+cu121'
+    ])
+PY
+
 # 1) Pin core stack to avoid ABI conflicts
 python3 -m pip install --no-cache-dir --upgrade --force-reinstall \
   numpy==1.26.4 scipy==1.11.4 pillow==10.0.1 opencv-python==4.9.0.80 matplotlib==3.8.2
 
-# 2) Install mmengine and precompiled mmcv wheels (GPU cu121/torch2.3.1, fallback CPU)
+# 2) Install mmengine and precompiled mmcv wheels (GPU cu121/torch2.3.0, fallback CPU)
 python3 -m pip install --no-cache-dir -U mmengine==0.10.4
 python3 - <<'PY'
 import subprocess, sys
 cmds = [
   [sys.executable,'-m','pip','install','--no-cache-dir','--only-binary=:all:',
-   '-f','https://download.openmmlab.com/mmcv/dist/cu121/torch2.3.1/index.html','mmcv==2.0.1'],
+   '-f','https://download.openmmlab.com/mmcv/dist/cu121/torch2.3.0/index.html','mmcv==2.0.1'],
   [sys.executable,'-m','pip','install','--no-cache-dir','--only-binary=:all:',
-   '-f','https://download.openmmlab.com/mmcv/dist/cpu/torch2.3.1/index.html','mmcv==2.0.1'],
+   '-f','https://download.openmmlab.com/mmcv/dist/cpu/torch2.3.0/index.html','mmcv==2.0.1'],
 ]
 for c in cmds:
   try:
