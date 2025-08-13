@@ -10,7 +10,7 @@ numpy==1.26.4
 scipy==1.11.4
 
 # 图像处理（容器中使用 headless 版本）
-Pillow==10.2.0
+Pillow==10.0.1
 opencv-python-headless==4.8.1.78
 
 # 音频处理
