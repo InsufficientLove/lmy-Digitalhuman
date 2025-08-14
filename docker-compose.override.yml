@@ -6,8 +6,8 @@ services:
       # 将宿主机模型目录直接映射为代码期望的 ./models（/opt/musetalk/repo/MuseTalk/models）
       - /opt/musetalk/models:/opt/musetalk/repo/MuseTalk/models
     environment:
-      # 单卡优先，便于稳定复现；如需多卡可在服务器覆盖此值
-      CUDA_VISIBLE_DEVICES: "0"
+      # 自动选择空闲GPU（在 start.sh 中实现），如需固定手动覆盖为 0/1
+      CUDA_VISIBLE_DEVICES: "auto"
       OMP_NUM_THREADS: "1"
       MKL_NUM_THREADS: "1"
       HF_HOME: "/root/.cache/huggingface"

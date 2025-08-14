@@ -6,6 +6,38 @@ export PYTHONUNBUFFERED=1
 MUSE_DIR=${MUSE_TALK_DIR:-/opt/musetalk/repo/MuseTalk}
 ENGINE_DIR=/opt/musetalk/repo/MuseTalkEngine
 
+# 自动选择最空闲 GPU（当未显式指定或设为 auto 时）
+if [ -z "${CUDA_VISIBLE_DEVICES:-}" ] || [ "${CUDA_VISIBLE_DEVICES}" = "auto" ]; then
+	GPU_ID=""
+	# 优先使用 GPUtil
+	GPU_ID=$(python3 - <<'PY'
+try:
+	import os
+	import GPUtil
+	gpus = GPUtil.getGPUs()
+	if gpus:
+		best = sorted(gpus, key=lambda g: (g.memoryUtil, g.load))[0]
+		print(best.id)
+	else:
+		print("")
+except Exception:
+	print("")
+PY
+)
+	if [ -z "$GPU_ID" ]; then
+		# 回退使用 nvidia-smi 查询空闲显存最多的 GPU
+		if command -v nvidia-smi >/dev/null 2>&1; then
+			GPU_ID=$(nvidia-smi --query-gpu=index,memory.free --format=csv,noheader | sort -t, -k2 -nr | head -n1 | cut -d, -f1 | tr -d ' ' || echo "")
+		fi
+	fi
+	if [ -n "$GPU_ID" ]; then
+		export CUDA_VISIBLE_DEVICES="$GPU_ID"
+		echo "[AutoGPU] Selected GPU: $GPU_ID (export CUDA_VISIBLE_DEVICES=$GPU_ID)"
+	else
+		echo "[AutoGPU] No GPU auto-selected (leaving CUDA_VISIBLE_DEVICES unchanged)"
+	fi
+fi
+
 # Skip re-installing upstream requirements if present
 mkdir -p /root/.cache/huggingface /root/.cache/torch
 [ -f "$MUSE_DIR/.musetalk_reqs_installed" ] || true
@@ -14,16 +46,16 @@ mkdir -p /root/.cache/huggingface /root/.cache/torch
 python3 - <<'PY'
 import subprocess, sys
 try:
-    import torch
-    v = getattr(torch, '__version__', '')
+	import torch
+	v = getattr(torch, '__version__', '')
 except Exception:
-    v = ''
+	v = ''
 if not v.startswith('2.3.0'):
-    subprocess.check_call([
-        sys.executable,'-m','pip','install','--no-cache-dir','--upgrade',
-        '--extra-index-url','https://download.pytorch.org/whl/cu121',
-        'torch==2.3.0+cu121','torchvision==0.18.0+cu121','torchaudio==2.3.0+cu121'
-    ])
+	subprocess.check_call([
+		sys.executable,'-m','pip','install','--no-cache-dir','--upgrade',
+		'--extra-index-url','https://download.pytorch.org/whl/cu121',
+		'torch==2.3.0+cu121','torchvision==0.18.0+cu121','torchaudio==2.3.0+cu121'
+	])
 PY
 
 # 1) Pin core stack to avoid ABI conflicts
