@@ -1,73 +1,114 @@
 version: '3.8'
 
 services:
+  # 主服务 - MuseTalk GPU推理
   musetalk-gpu:
     build:
       context: .
       dockerfile: Dockerfile.gpu
+      target: production
       args:
         - BUILDKIT_INLINE_CACHE=1
+      cache_from:
+        - musetalk:gpu-cache
     image: musetalk:gpu-latest
     container_name: musetalk-gpu-service
     
-    # GPU配置
+    # GPU配置 - 自动使用所有可用GPU
     deploy:
       resources:
         reservations:
           devices:
             - driver: nvidia
-              count: all  # 使用所有可用GPU
-              capabilities: [gpu]
+              count: all
+              capabilities: [gpu, compute, utility, video]
     
-    # 环境变量
+    # 运行时配置
+    runtime: nvidia
+    privileged: false  # 提高安全性
+    ipc: host  # 共享内存，提高多进程性能
+    shm_size: ${SHM_SIZE:-8g}  # 共享内存大小
+    
+    # 环境变量 - 从.env文件读取
+    env_file:
+      - .env
     environment:
-      - NVIDIA_VISIBLE_DEVICES=all
+      # GPU配置
+      - NVIDIA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-all}
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility,video
-      - CUDA_VISIBLE_DEVICES=0,1,2,3  # 根据实际GPU数量调整
-      - TF_FORCE_GPU_ALLOW_GROWTH=true
-      - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
-      - OMP_NUM_THREADS=8
-      - MKL_NUM_THREADS=8
-      - GPU_CONFIG=multi_gpu
-      - BATCH_SIZE_PER_GPU=8
-      - LOG_LEVEL=INFO
+      - CUDA_DEVICE_ORDER=PCI_BUS_ID
+      
+      # 运行模式
+      - RUN_MODE=${RUN_MODE:-inference}
+      - AUTO_DOWNLOAD_MODELS=${AUTO_DOWNLOAD_MODELS:-true}
+      
+      # GPU并行配置
+      - GPU_CONFIG_MODE=${GPU_CONFIG_MODE:-auto}
+      - BATCH_SIZE_PER_GPU=${BATCH_SIZE_PER_GPU:-8}
+      - INFERENCE_MODE=${INFERENCE_MODE:-parallel}
+      - PARALLEL_STRATEGY=${PARALLEL_STRATEGY:-data_parallel}
+      
+      # 性能优化
+      - ENABLE_AMP=${ENABLE_AMP:-true}
+      - ENABLE_CUDNN_BENCHMARK=${ENABLE_CUDNN_BENCHMARK:-true}
+      - PYTORCH_CUDA_ALLOC_CONF=${PYTORCH_CUDA_ALLOC_CONF:-max_split_size_mb:512}
+      
+      # 路径配置
+      - MODEL_ROOT=/app/models
+      - INPUT_DIR=/app/inputs
+      - OUTPUT_DIR=/app/outputs
+      - LOG_DIR=/app/logs
+      
+      # 服务配置
+      - API_PORT=${API_PORT:-8000}
+      - WEB_PORT=${WEB_PORT:-7860}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
     
     # 卷挂载
     volumes:
-      - ./models:/app/models:ro  # 模型文件（只读）
-      - ./inputs:/app/inputs:rw   # 输入文件
-      - ./outputs:/app/outputs:rw # 输出文件
-      - ./logs:/app/logs:rw       # 日志文件
+      # 模型目录 - 持久化存储
+      - musetalk-models:/app/models:rw
+      
+      # 输入输出目录
+      - ./inputs:/app/inputs:rw
+      - ./outputs:/app/outputs:rw
+      - ./logs:/app/logs:rw
+      
+      # 缓存目录
+      - musetalk-cache:/app/cache:rw
+      
+      # 代码挂载（开发模式）
       - ./MuseTalk:/app/MuseTalk:ro
       - ./MuseTalkEngine:/app/MuseTalkEngine:ro
-      - /tmp/.X11-unix:/tmp/.X11-unix:rw  # GUI支持（如需要）
+      - ./benchmark_gpu.py:/app/benchmark_gpu.py:ro
+      
+      # 配置文件
+      - ./.env:/app/.env:ro
+      
+      # Docker socket（可选，用于容器内管理）
+      # - /var/run/docker.sock:/var/run/docker.sock:ro
     
     # 网络配置
     ports:
-      - "8000:8000"  # API服务
-      - "8080:8080"  # Web界面
-      - "9090:9090"  # 监控端口
+      - "${API_PORT:-8000}:8000"     # API端口
+      - "${WEB_PORT:-7860}:7860"     # Gradio Web界面
+      - "${MONITOR_PORT:-9090}:9090" # 监控端口
     
     # 资源限制
-    mem_limit: 64g  # 根据实际内存调整
-    memswap_limit: 64g
-    shm_size: 8g  # 共享内存，对于多进程很重要
-    
-    # 运行配置
-    runtime: nvidia
-    privileged: true  # 某些GPU操作需要
-    ipc: host  # 改善多进程性能
+    mem_limit: ${MEM_LIMIT:-64g}
+    memswap_limit: ${MEM_LIMIT:-64g}
+    cpu_shares: 1024
     
     # 健康检查
     healthcheck:
-      test: ["CMD", "python3", "-c", "import torch; assert torch.cuda.is_available(); print(f'GPUs: {torch.cuda.device_count()}')"]
+      test: ["CMD", "python", "/app/healthcheck.py"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 60s
     
     # 重启策略
-    restart: unless-stopped
+    restart: ${RESTART_POLICY:-unless-stopped}
     
     # 日志配置
     logging:
@@ -75,56 +116,162 @@ services:
       options:
         max-size: "100m"
         max-file: "10"
+        labels: "service=musetalk-gpu"
     
-    # 命令覆盖（可选）
-    command: ["/app/MuseTalkEngine/multi_gpu_parallel_engine.py"]
+    # 依赖关系
+    depends_on:
+      - redis
+    
+    # 网络
+    networks:
+      - musetalk-network
 
-  # 性能监控服务（可选）
+  # Redis缓存服务（可选）
+  redis:
+    image: redis:7-alpine
+    container_name: musetalk-redis
+    command: redis-server --maxmemory 2gb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-data:/data
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    networks:
+      - musetalk-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Nginx反向代理（可选，用于生产环境）
+  nginx:
+    image: nginx:alpine
+    container_name: musetalk-nginx
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - musetalk-gpu
+    restart: unless-stopped
+    networks:
+      - musetalk-network
+    profiles:
+      - production
+
+  # GPU监控服务
   gpu-monitor:
-    image: nvidia/dcgm-exporter:latest
-    container_name: gpu-monitor
+    image: nvidia/dcgm-exporter:3.1.7-3.1.4-ubuntu20.04
+    container_name: musetalk-gpu-monitor
     runtime: nvidia
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
+      - DCGM_EXPORTER_LISTEN=:9400
+      - DCGM_EXPORTER_KUBERNETES=false
     ports:
       - "9400:9400"
     restart: unless-stopped
-    depends_on:
-      - musetalk-gpu
+    networks:
+      - musetalk-network
+    profiles:
+      - monitoring
 
-  # Prometheus监控（可选）
+  # Prometheus监控
   prometheus:
     image: prom/prometheus:latest
-    container_name: prometheus
+    container_name: musetalk-prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-lifecycle'
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - prometheus_data:/prometheus
+      - prometheus-data:/prometheus
     ports:
       - "9091:9090"
     restart: unless-stopped
-    depends_on:
-      - gpu-monitor
+    networks:
+      - musetalk-network
+    profiles:
+      - monitoring
 
-  # Grafana可视化（可选）
+  # Grafana可视化
   grafana:
     image: grafana/grafana:latest
-    container_name: grafana
+    container_name: musetalk-grafana
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
       - GF_INSTALL_PLUGINS=grafana-piechart-panel
+      - GF_SERVER_ROOT_URL=http://localhost:3000
     volumes:
-      - grafana_data:/var/lib/grafana
+      - grafana-data:/var/lib/grafana
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./grafana/datasources:/etc/grafana/provisioning/datasources:ro
     ports:
       - "3000:3000"
     restart: unless-stopped
     depends_on:
       - prometheus
+    networks:
+      - musetalk-network
+    profiles:
+      - monitoring
 
+  # 批处理任务运行器（可选）
+  batch-runner:
+    image: musetalk:gpu-latest
+    container_name: musetalk-batch
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    environment:
+      - RUN_MODE=batch
+      - BATCH_INPUT_DIR=/app/batch/inputs
+      - BATCH_OUTPUT_DIR=/app/batch/outputs
+    volumes:
+      - musetalk-models:/app/models:ro
+      - ./batch/inputs:/app/batch/inputs:rw
+      - ./batch/outputs:/app/batch/outputs:rw
+      - ./batch/logs:/app/logs:rw
+    networks:
+      - musetalk-network
+    profiles:
+      - batch
+
+# 卷定义
 volumes:
-  prometheus_data:
-  grafana_data:
+  musetalk-models:
+    name: musetalk-models
+    driver: local
+  musetalk-cache:
+    name: musetalk-cache
+    driver: local
+  redis-data:
+    name: musetalk-redis-data
+    driver: local
+  prometheus-data:
+    name: musetalk-prometheus-data
+    driver: local
+  grafana-data:
+    name: musetalk-grafana-data
+    driver: local
 
+# 网络定义
 networks:
-  default:
+  musetalk-network:
     name: musetalk-network
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
