@@ -1,0 +1,254 @@
+version: '3.8'
+
+services:
+  # 单GPU配置 - RTX 4090D 48GB
+  musetalk-single-4090d:
+    image: musetalk:gpu-latest
+    container_name: musetalk-single-4090d
+    build:
+      context: .
+      dockerfile: Dockerfile.gpu
+    runtime: nvidia
+    environment:
+      # GPU配置
+      - CUDA_VISIBLE_DEVICES=0  # 指定GPU 0
+      - GPU_CONFIG=single_4090d_48gb
+      - GPU_MODE=manual
+      - GPU_IDS=[0]
+      - BATCH_SIZE_PER_GPU=20
+      - MAX_BATCH_SIZE=20
+      - GPU_MEMORY_FRACTION=0.95
+      
+      # 预加载配置
+      - PRELOAD_FRAMES=200
+      - PRELOAD_LATENTS=true
+      
+      # 性能优化
+      - ENABLE_AMP=true
+      - ENABLE_CUDNN_BENCHMARK=true
+      - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
+      
+      # 运行模式
+      - RUN_MODE=inference
+      
+    volumes:
+      - ./models:/app/models
+      - ./inputs:/app/inputs
+      - ./outputs:/app/outputs
+      - ./logs:/app/logs
+      - ./MuseTalk:/app/MuseTalk
+      - ./MuseTalkEngine:/workspace/MuseTalkEngine
+      
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ['0']  # 只使用GPU 0
+              capabilities: [gpu]
+    
+    ports:
+      - "8001:8000"
+      - "7861:7860"
+    
+    healthcheck:
+      test: ["CMD", "python", "-c", "import torch; assert torch.cuda.is_available()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    
+    profiles:
+      - single
+
+  # 四GPU配置 - 4x RTX 4090 24GB
+  musetalk-quad-4090:
+    image: musetalk:gpu-latest
+    container_name: musetalk-quad-4090
+    build:
+      context: .
+      dockerfile: Dockerfile.gpu
+    runtime: nvidia
+    environment:
+      # GPU配置
+      - CUDA_VISIBLE_DEVICES=0,1,2,3  # 指定4个GPU
+      - GPU_CONFIG=quad_4090_24gb
+      - GPU_MODE=manual
+      - GPU_IDS=[0,1,2,3]
+      - BATCH_SIZE_PER_GPU=8
+      - MAX_BATCH_SIZE=32
+      - GPU_MEMORY_FRACTION=0.9
+      
+      # 预加载配置
+      - PRELOAD_FRAMES=100
+      - PRELOAD_LATENTS=true
+      
+      # 性能优化
+      - ENABLE_AMP=true
+      - ENABLE_CUDNN_BENCHMARK=true
+      - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:256
+      
+      # 运行模式
+      - RUN_MODE=inference
+      
+    volumes:
+      - ./models:/app/models
+      - ./inputs:/app/inputs
+      - ./outputs:/app/outputs
+      - ./logs:/app/logs
+      - ./MuseTalk:/app/MuseTalk
+      - ./MuseTalkEngine:/workspace/MuseTalkEngine
+      
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ['0', '1', '2', '3']  # 使用4个GPU
+              capabilities: [gpu]
+    
+    ports:
+      - "8002:8000"
+      - "7862:7860"
+    
+    healthcheck:
+      test: ["CMD", "python", "-c", "import torch; assert torch.cuda.device_count() == 4"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    
+    profiles:
+      - quad
+
+  # 双GPU配置 - 2x RTX 4090 24GB（用于部分GPU被占用的情况）
+  musetalk-dual-4090:
+    image: musetalk:gpu-latest
+    container_name: musetalk-dual-4090
+    build:
+      context: .
+      dockerfile: Dockerfile.gpu
+    runtime: nvidia
+    environment:
+      # GPU配置 - 可以指定任意两个空闲的GPU
+      - CUDA_VISIBLE_DEVICES=${GPU_IDS:-2,3}  # 默认使用GPU 2和3，可通过环境变量覆盖
+      - GPU_CONFIG=dual_4090_24gb
+      - GPU_MODE=manual
+      - GPU_IDS=${GPU_IDS:-[2,3]}
+      - BATCH_SIZE_PER_GPU=10
+      - MAX_BATCH_SIZE=20
+      - GPU_MEMORY_FRACTION=0.9
+      
+      # 预加载配置
+      - PRELOAD_FRAMES=150
+      - PRELOAD_LATENTS=true
+      
+      # 性能优化
+      - ENABLE_AMP=true
+      - ENABLE_CUDNN_BENCHMARK=true
+      
+      # 运行模式
+      - RUN_MODE=inference
+      
+    volumes:
+      - ./models:/app/models
+      - ./inputs:/app/inputs
+      - ./outputs:/app/outputs
+      - ./logs:/app/logs
+      - ./MuseTalk:/app/MuseTalk
+      - ./MuseTalkEngine:/workspace/MuseTalkEngine
+      
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ${GPU_DEVICE_IDS:-['2', '3']}
+              capabilities: [gpu]
+    
+    ports:
+      - "8003:8000"
+      - "7863:7860"
+    
+    profiles:
+      - dual
+
+  # 自动选择空闲GPU
+  musetalk-auto:
+    image: musetalk:gpu-latest
+    container_name: musetalk-auto
+    build:
+      context: .
+      dockerfile: Dockerfile.gpu
+    runtime: nvidia
+    environment:
+      # GPU配置
+      - GPU_CONFIG=auto
+      - GPU_MODE=auto  # 自动检测空闲GPU
+      - BATCH_SIZE_PER_GPU=8
+      - GPU_MEMORY_FRACTION=0.8
+      
+      # 性能优化
+      - ENABLE_AMP=true
+      - ENABLE_CUDNN_BENCHMARK=true
+      
+      # 运行模式
+      - RUN_MODE=inference
+      
+    volumes:
+      - ./models:/app/models
+      - ./inputs:/app/inputs
+      - ./outputs:/app/outputs
+      - ./logs:/app/logs
+      - ./MuseTalk:/app/MuseTalk
+      - ./MuseTalkEngine:/workspace/MuseTalkEngine
+      
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: [gpu]
+              count: all  # 使用所有可用GPU
+    
+    ports:
+      - "8004:8000"
+      - "7864:7860"
+    
+    profiles:
+      - auto
+
+  # GPU监控服务
+  gpu-monitor:
+    image: nvidia/dcgm-exporter:3.0.4-3.0.2-ubuntu20.04
+    container_name: gpu-monitor
+    runtime: nvidia
+    environment:
+      - DCGM_EXPORTER_NO_HOSTNAME=1
+      - DCGM_EXPORTER_LISTEN=:9400
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: [gpu]
+              count: all
+    ports:
+      - "9400:9400"
+    profiles:
+      - monitoring
+
+# 网络配置
+networks:
+  default:
+    name: musetalk-network
+    driver: bridge
+
+# 卷配置
+volumes:
+  models:
+    driver: local
+  inputs:
+    driver: local
+  outputs:
+    driver: local
+  logs:
+    driver: local
