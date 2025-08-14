@@ -1,0 +1,14 @@
+version: "3.9"
+
+services:
+  musetalk-python:
+    volumes:
+      # 将宿主机模型目录直接映射为代码期望的 ./models（/opt/musetalk/repo/MuseTalk/models）
+      - /opt/musetalk/models:/opt/musetalk/repo/MuseTalk/models
+    environment:
+      # 单卡优先，便于稳定复现；如需多卡可在服务器覆盖此值
+      CUDA_VISIBLE_DEVICES: "0"
+      OMP_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
+      HF_HOME: "/root/.cache/huggingface"
+      PYTORCH_CUDA_ALLOC_CONF: "max_split_size_mb=256"
