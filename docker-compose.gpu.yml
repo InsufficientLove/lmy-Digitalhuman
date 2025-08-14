@@ -1,0 +1,130 @@
+version: '3.8'
+
+services:
+  musetalk-gpu:
+    build:
+      context: .
+      dockerfile: Dockerfile.gpu
+      args:
+        - BUILDKIT_INLINE_CACHE=1
+    image: musetalk:gpu-latest
+    container_name: musetalk-gpu-service
+    
+    # GPU配置
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all  # 使用所有可用GPU
+              capabilities: [gpu]
+    
+    # 环境变量
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility,video
+      - CUDA_VISIBLE_DEVICES=0,1,2,3  # 根据实际GPU数量调整
+      - TF_FORCE_GPU_ALLOW_GROWTH=true
+      - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
+      - OMP_NUM_THREADS=8
+      - MKL_NUM_THREADS=8
+      - GPU_CONFIG=multi_gpu
+      - BATCH_SIZE_PER_GPU=8
+      - LOG_LEVEL=INFO
+    
+    # 卷挂载
+    volumes:
+      - ./models:/app/models:ro  # 模型文件（只读）
+      - ./inputs:/app/inputs:rw   # 输入文件
+      - ./outputs:/app/outputs:rw # 输出文件
+      - ./logs:/app/logs:rw       # 日志文件
+      - ./MuseTalk:/app/MuseTalk:ro
+      - ./MuseTalkEngine:/app/MuseTalkEngine:ro
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw  # GUI支持（如需要）
+    
+    # 网络配置
+    ports:
+      - "8000:8000"  # API服务
+      - "8080:8080"  # Web界面
+      - "9090:9090"  # 监控端口
+    
+    # 资源限制
+    mem_limit: 64g  # 根据实际内存调整
+    memswap_limit: 64g
+    shm_size: 8g  # 共享内存，对于多进程很重要
+    
+    # 运行配置
+    runtime: nvidia
+    privileged: true  # 某些GPU操作需要
+    ipc: host  # 改善多进程性能
+    
+    # 健康检查
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import torch; assert torch.cuda.is_available(); print(f'GPUs: {torch.cuda.device_count()}')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    
+    # 重启策略
+    restart: unless-stopped
+    
+    # 日志配置
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "10"
+    
+    # 命令覆盖（可选）
+    command: ["/app/MuseTalkEngine/multi_gpu_parallel_engine.py"]
+
+  # 性能监控服务（可选）
+  gpu-monitor:
+    image: nvidia/dcgm-exporter:latest
+    container_name: gpu-monitor
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+    ports:
+      - "9400:9400"
+    restart: unless-stopped
+    depends_on:
+      - musetalk-gpu
+
+  # Prometheus监控（可选）
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9091:9090"
+    restart: unless-stopped
+    depends_on:
+      - gpu-monitor
+
+  # Grafana可视化（可选）
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+    volumes:
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+
+volumes:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  default:
+    name: musetalk-network
+    driver: bridge

@@ -1,0 +1,97 @@
+# Multi-stage build for MuseTalk GPU deployment
+# Stage 1: Base CUDA image with Python
+FROM nvidia/cuda:11.8.0-cudnn8-devel-ubuntu22.04 AS base
+
+# Set environment variables
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    CUDA_HOME=/usr/local/cuda \
+    PATH=/usr/local/cuda/bin:${PATH} \
+    LD_LIBRARY_PATH=/usr/local/cuda/lib64:${LD_LIBRARY_PATH} \
+    TORCH_CUDA_ARCH_LIST="7.5;8.0;8.6;8.9;9.0" \
+    FORCE_CUDA=1
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    python3.10 \
+    python3.10-dev \
+    python3-pip \
+    git \
+    wget \
+    curl \
+    vim \
+    ffmpeg \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgomp1 \
+    libglib2.0-0 \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    libsm6 \
+    libxrender1 \
+    libxext6 \
+    libgomp1 \
+    build-essential \
+    cmake \
+    ninja-build \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create working directory
+WORKDIR /app
+
+# Upgrade pip and install Python packages
+RUN python3 -m pip install --upgrade pip setuptools wheel
+
+# Install PyTorch with CUDA support
+RUN pip3 install torch==2.1.0 torchvision==0.16.0 torchaudio==2.1.0 --index-url https://download.pytorch.org/whl/cu118
+
+# Install core dependencies
+COPY requirements.txt /app/
+RUN pip3 install --no-cache-dir -r requirements.txt
+
+# Install additional GPU optimization packages
+RUN pip3 install --no-cache-dir \
+    nvidia-ml-py3 \
+    pynvml \
+    gpustat \
+    py3nvml \
+    cupy-cuda11x \
+    tensorrt
+
+# Stage 2: MuseTalk installation
+FROM base AS musetalk
+
+# Copy MuseTalk code
+COPY MuseTalk /app/MuseTalk
+COPY MuseTalkEngine /app/MuseTalkEngine
+
+# Install MuseTalk dependencies
+WORKDIR /app/MuseTalk
+RUN if [ -f requirements.txt ]; then pip3 install --no-cache-dir -r requirements.txt; fi
+
+# Download models (if needed)
+# RUN python3 -c "from musetalk.utils.utils import download_models; download_models()"
+
+# Stage 3: Production image
+FROM musetalk AS production
+
+# Copy application code
+COPY . /app/
+
+# Set working directory
+WORKDIR /app
+
+# Create directories for models and outputs
+RUN mkdir -p /app/models /app/outputs /app/inputs /app/logs
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python3 -c "import torch; assert torch.cuda.is_available()" || exit 1
+
+# Expose ports
+EXPOSE 8000 8080 9090
+
+# Set entrypoint
+ENTRYPOINT ["python3"]
+CMD ["/app/MuseTalkEngine/multi_gpu_parallel_engine.py"]
