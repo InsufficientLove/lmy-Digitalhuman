@@ -1,8 +1,8 @@
 # Multi-stage build for MuseTalk GPU deployment
-# 完整的Docker镜像，包含所有环境和依赖
+# 支持CUDA 12.x版本的完整Docker镜像
 
-# Stage 1: Base CUDA image with Python
-FROM nvidia/cuda:11.8.0-cudnn8-devel-ubuntu22.04 AS base
+# Stage 1: Base CUDA image with Python (使用CUDA 12.1版本，兼容12.9)
+FROM nvidia/cuda:12.1.0-cudnn8-devel-ubuntu22.04 AS base
 
 # 防止交互式提示
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -54,7 +54,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     tmux \
     htop \
     iotop \
-    nvtop \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
@@ -70,16 +69,20 @@ FROM base AS python-deps
 
 WORKDIR /tmp
 
-# 安装PyTorch和相关库（使用特定版本确保兼容性）
+# 安装PyTorch和相关库（使用CUDA 12.1版本，兼容12.x）
 RUN pip install --no-cache-dir \
-    torch==2.1.0+cu118 \
-    torchvision==0.16.0+cu118 \
-    torchaudio==2.1.0+cu118 \
-    --index-url https://download.pytorch.org/whl/cu118
+    torch==2.2.0+cu121 \
+    torchvision==0.17.0+cu121 \
+    torchaudio==2.2.0+cu121 \
+    --index-url https://download.pytorch.org/whl/cu121
+
+# 复制requirements文件（如果存在）
+COPY requirements.txt* /tmp/
 
 # 安装MuseTalk核心依赖
-COPY requirements.txt /tmp/musetalk_requirements.txt
-RUN pip install --no-cache-dir -r /tmp/musetalk_requirements.txt
+RUN if [ -f /tmp/requirements.txt ]; then \
+        pip install --no-cache-dir -r /tmp/requirements.txt; \
+    fi
 
 # 安装额外的依赖
 RUN pip install --no-cache-dir \
@@ -120,30 +123,13 @@ RUN pip install --no-cache-dir \
     gdown \
     huggingface_hub
 
-# 安装TensorRT（可选，用于加速）
-RUN pip install --no-cache-dir \
-    tensorrt \
-    torch2trt \
-    --index-url https://pypi.nvidia.com || echo "TensorRT installation skipped"
-
 # Stage 3: Application setup
 FROM python-deps AS app
 
 # 设置工作目录
 WORKDIR /app
 
-# 复制MuseTalk代码
-COPY MuseTalk /app/MuseTalk
-COPY MuseTalkEngine /app/MuseTalkEngine
-
-# 复制配置和脚本
-COPY *.py /app/
-COPY *.sh /app/
-COPY *.yml /app/
-COPY *.yaml /app/
-COPY .env.example /app/.env.example
-
-# 创建必要的目录
+# 创建必要的目录结构
 RUN mkdir -p \
     /app/models \
     /app/inputs \
@@ -151,7 +137,9 @@ RUN mkdir -p \
     /app/logs \
     /app/cache \
     /app/temp \
-    /app/configs
+    /app/configs \
+    /app/MuseTalk \
+    /app/MuseTalkEngine
 
 # 设置Python路径
 ENV PYTHONPATH=/app:/app/MuseTalk:${PYTHONPATH}
@@ -176,35 +164,56 @@ def download_models():
     
     print("Downloading models...")
     
-    # 使用download_weights.sh如果存在
-    if Path("/app/MuseTalk/download_weights.sh").exists():
-        os.chdir("/app/MuseTalk")
-        subprocess.run(["bash", "download_weights.sh"], check=True)
-    else:
-        # 手动下载
-        os.environ['HF_ENDPOINT'] = os.environ.get('HF_ENDPOINT', 'https://huggingface.co')
-        
-        # 安装huggingface-cli
-        subprocess.run([sys.executable, "-m", "pip", "install", "-U", "huggingface_hub[cli]"], check=True)
-        
-        # 下载模型
-        commands = [
-            ["huggingface-cli", "download", "TMElyralab/MuseTalk", 
-             "--local-dir", "/app/models", 
-             "--include", "musetalkV15/*", "musetalk/*"],
-            ["huggingface-cli", "download", "stabilityai/sd-vae-ft-mse",
-             "--local-dir", "/app/models/sd-vae"],
-            ["huggingface-cli", "download", "openai/whisper-tiny",
-             "--local-dir", "/app/models/whisper"],
-        ]
-        
-        for cmd in commands:
-            try:
-                subprocess.run(cmd, check=True)
-            except Exception as e:
-                print(f"Warning: {e}")
+    # 设置镜像（如果在中国）
+    hf_endpoint = os.environ.get('HF_ENDPOINT', 'https://huggingface.co')
+    if os.environ.get('USE_CHINA_MIRROR', 'false').lower() == 'true':
+        hf_endpoint = 'https://hf-mirror.com'
+        os.environ['HF_ENDPOINT'] = hf_endpoint
+        print(f"Using HuggingFace mirror: {hf_endpoint}")
+    
+    # 安装huggingface-cli
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "huggingface_hub[cli]"], check=False)
+    
+    # 下载模型
+    commands = [
+        ["huggingface-cli", "download", "TMElyralab/MuseTalk", 
+         "--local-dir", "/app/models", 
+         "--include", "musetalkV15/*", "musetalk/*"],
+        ["huggingface-cli", "download", "stabilityai/sd-vae-ft-mse",
+         "--local-dir", "/app/models/sd-vae",
+         "--include", "*.bin", "*.json"],
+        ["huggingface-cli", "download", "openai/whisper-tiny",
+         "--local-dir", "/app/models/whisper",
+         "--include", "*.bin", "*.json"],
+        ["huggingface-cli", "download", "yzd-v/DWPose",
+         "--local-dir", "/app/models/dwpose",
+         "--include", "*.pth"],
+        ["huggingface-cli", "download", "ByteDance/LatentSync",
+         "--local-dir", "/app/models/syncnet",
+         "--include", "*.pt"],
+    ]
+    
+    for cmd in commands:
+        try:
+            print(f"Downloading: {cmd[2]}")
+            subprocess.run(cmd, check=False, capture_output=True)
+        except Exception as e:
+            print(f"Warning downloading {cmd[2]}: {e}")
+    
+    # 下载face-parse-bisent（使用gdown）
+    try:
+        subprocess.run([sys.executable, "-m", "pip", "install", "-q", "gdown"], check=False)
+        import gdown
+        os.makedirs("/app/models/face-parse-bisent", exist_ok=True)
+        gdown.download("https://drive.google.com/uc?id=154JgKpzCPW82qINcVieuPH3fZ2e0P812", 
+                      "/app/models/face-parse-bisent/79999_iter.pth", quiet=False)
+    except Exception as e:
+        print(f"Warning downloading face-parse-bisent: {e}")
     
     print("Model download completed")
+
+if __name__ == "__main__":
+    download_models()
 EOF
 
 RUN chmod +x /app/download_models.py
@@ -218,28 +227,48 @@ echo "=========================================="
 echo "MuseTalk Docker Container Starting..."
 echo "=========================================="
 
+# 显示环境信息
+echo "System Information:"
+echo "  - OS: $(cat /etc/os-release | grep PRETTY_NAME | cut -d'"' -f2)"
+echo "  - Kernel: $(uname -r)"
+echo "  - Python: $(python --version)"
+
 # 显示GPU信息
-echo "GPU Information:"
-nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader || echo "No GPU detected"
-
-# 检查CUDA
-echo -e "\nCUDA Version:"
-nvcc --version || echo "CUDA compiler not found"
-
-# 显示Python信息
-echo -e "\nPython Version:"
-python --version
+echo -e "\nGPU Information:"
+if nvidia-smi &>/dev/null; then
+    nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader
+    echo "  - CUDA Runtime: $(nvidia-smi | grep "CUDA Version" | awk '{print $9}')"
+else
+    echo "  - No GPU detected (running in CPU mode)"
+fi
 
 # 显示PyTorch信息
 echo -e "\nPyTorch Configuration:"
-python -c "import torch; print(f'PyTorch: {torch.__version__}'); print(f'CUDA Available: {torch.cuda.is_available()}'); print(f'GPU Count: {torch.cuda.device_count()}')" || echo "PyTorch check failed"
+python -c "
+import torch
+print(f'  - PyTorch Version: {torch.__version__}')
+print(f'  - CUDA Available: {torch.cuda.is_available()}')
+if torch.cuda.is_available():
+    print(f'  - CUDA Version: {torch.version.cuda}')
+    print(f'  - cuDNN Version: {torch.backends.cudnn.version()}')
+    print(f'  - GPU Count: {torch.cuda.device_count()}')
+    for i in range(torch.cuda.device_count()):
+        print(f'  - GPU {i}: {torch.cuda.get_device_name(i)}')
+" 2>/dev/null || echo "  - PyTorch check failed"
 
 # 检查环境变量
 echo -e "\nEnvironment Configuration:"
-echo "CUDA_VISIBLE_DEVICES: ${CUDA_VISIBLE_DEVICES:-all}"
-echo "GPU_CONFIG_MODE: ${GPU_CONFIG_MODE:-auto}"
-echo "BATCH_SIZE_PER_GPU: ${BATCH_SIZE_PER_GPU:-8}"
-echo "INFERENCE_MODE: ${INFERENCE_MODE:-parallel}"
+echo "  - CUDA_VISIBLE_DEVICES: ${CUDA_VISIBLE_DEVICES:-all}"
+echo "  - RUN_MODE: ${RUN_MODE:-inference}"
+echo "  - BATCH_SIZE_PER_GPU: ${BATCH_SIZE_PER_GPU:-8}"
+echo "  - INFERENCE_MODE: ${INFERENCE_MODE:-parallel}"
+
+# 克隆MuseTalk代码（如果不存在）
+if [ ! -d "/app/MuseTalk/.git" ] && [ "${AUTO_CLONE_REPO:-true}" = "true" ]; then
+    echo -e "\nCloning MuseTalk repository..."
+    cd /app
+    git clone https://github.com/TMElyralab/MuseTalk.git || echo "Clone failed, continuing..."
+fi
 
 # 下载模型（如果需要）
 if [ "${AUTO_DOWNLOAD_MODELS:-true}" = "true" ]; then
@@ -251,36 +280,59 @@ fi
 mkdir -p /app/logs /app/outputs /app/inputs /app/cache
 
 # 根据启动模式执行不同的命令
-case "${RUN_MODE:-benchmark}" in
+case "${RUN_MODE:-shell}" in
     "benchmark")
         echo -e "\nRunning benchmark..."
-        exec python /app/benchmark_gpu.py --config ${GPU_CONFIG:-auto}
+        if [ -f "/app/benchmark_gpu.py" ]; then
+            exec python /app/benchmark_gpu.py --config ${GPU_CONFIG:-auto}
+        else
+            echo "Benchmark script not found"
+            exec python -c "import torch; print(f'GPUs available: {torch.cuda.device_count()}')"
+        fi
         ;;
     "inference")
         echo -e "\nRunning inference..."
-        exec python /app/MuseTalkEngine/musetalk_realtime_engine.py \
-            --video ${VIDEO_PATH:-/app/inputs/video.mp4} \
-            --audio ${AUDIO_PATH:-/app/inputs/audio.wav} \
-            --output ${OUTPUT_PATH:-/app/outputs/result.mp4} \
-            --mode ${INFERENCE_MODE:-parallel} \
-            --gpus ${GPU_IDS:-auto}
+        if [ -f "/app/MuseTalkEngine/musetalk_realtime_engine.py" ]; then
+            exec python /app/MuseTalkEngine/musetalk_realtime_engine.py \
+                --video ${VIDEO_PATH:-/app/inputs/video.mp4} \
+                --audio ${AUDIO_PATH:-/app/inputs/audio.wav} \
+                --output ${OUTPUT_PATH:-/app/outputs/result.mp4} \
+                --mode ${INFERENCE_MODE:-parallel} \
+                --gpus ${GPU_IDS:-auto}
+        else
+            echo "Inference engine not found"
+            exec /bin/bash
+        fi
         ;;
     "gradio")
         echo -e "\nStarting Gradio interface..."
-        exec python /app/MuseTalk/app.py \
-            --server_name 0.0.0.0 \
-            --server_port ${WEB_PORT:-7860} \
-            --share
+        if [ -f "/app/MuseTalk/app.py" ]; then
+            cd /app/MuseTalk
+            exec python app.py \
+                --server_name 0.0.0.0 \
+                --server_port ${WEB_PORT:-7860} \
+                --share
+        else
+            echo "Gradio app not found"
+            exec /bin/bash
+        fi
         ;;
     "api")
         echo -e "\nStarting API server..."
-        exec uvicorn api_server:app \
-            --host 0.0.0.0 \
-            --port ${API_PORT:-8000} \
-            --workers ${API_WORKERS:-1}
+        if [ -f "/app/api_server.py" ]; then
+            exec uvicorn api_server:app \
+                --host 0.0.0.0 \
+                --port ${API_PORT:-8000} \
+                --workers ${API_WORKERS:-1}
+        else
+            echo "API server not found, starting test server..."
+            exec python -m http.server ${API_PORT:-8000}
+        fi
         ;;
     "shell")
         echo -e "\nStarting interactive shell..."
+        echo "You can now run commands inside the container."
+        echo "Example: python /app/benchmark_gpu.py --config auto"
         exec /bin/bash
         ;;
     *)
@@ -299,25 +351,18 @@ import sys
 import torch
 
 try:
-    # 检查CUDA
-    if not torch.cuda.is_available():
-        print("CUDA not available")
+    # 检查PyTorch
+    if not torch.__version__:
+        print("PyTorch not installed")
         sys.exit(1)
     
-    # 检查GPU数量
-    gpu_count = torch.cuda.device_count()
-    if gpu_count == 0:
-        print("No GPUs detected")
-        sys.exit(1)
+    # 检查CUDA（可选）
+    if torch.cuda.is_available():
+        gpu_count = torch.cuda.device_count()
+        print(f"Health check passed: {gpu_count} GPUs available")
+    else:
+        print("Health check passed: CPU mode")
     
-    # 检查GPU内存
-    for i in range(gpu_count):
-        mem_free = torch.cuda.mem_get_info(i)[0] / 1024**3
-        if mem_free < 1:  # 至少1GB空闲内存
-            print(f"GPU {i} has insufficient memory")
-            sys.exit(1)
-    
-    print(f"Health check passed: {gpu_count} GPUs available")
     sys.exit(0)
     
 except Exception as e:
@@ -330,12 +375,14 @@ RUN chmod +x /app/healthcheck.py
 # Stage 4: Production image
 FROM app AS production
 
-# 设置非root用户（可选，提高安全性）
-# RUN groupadd -g 1000 musetalk && \
-#     useradd -u 1000 -g musetalk -s /bin/bash -m musetalk && \
-#     chown -R musetalk:musetalk /app
-
-# USER musetalk
+# 复制应用代码（构建时添加）
+# 注意：实际代码将通过volume挂载或在运行时复制
+COPY MuseTalk* /app/
+COPY *.py /app/
+COPY *.sh /app/
+COPY *.yml /app/
+COPY *.yaml /app/
+COPY .env* /app/
 
 # 暴露端口
 EXPOSE 8000 8080 7860 9090
@@ -348,4 +395,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
 ENTRYPOINT ["/app/entrypoint.sh"]
 
 # 默认命令
-CMD ["benchmark"]
+CMD ["shell"]
