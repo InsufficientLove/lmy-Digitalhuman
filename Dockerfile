@@ -24,8 +24,19 @@ RUN pip install --no-cache-dir \
     torchaudio==2.2.0+cu121 \
     --index-url https://download.pytorch.org/whl/cu121
 
-# 克隆MuseTalk
-RUN git clone https://github.com/TMElyralab/MuseTalk.git /app/MuseTalk
+# 克隆MuseTalk - 支持代理和重试
+ARG HTTP_PROXY
+ARG HTTPS_PROXY
+ENV http_proxy=${HTTP_PROXY}
+ENV https_proxy=${HTTPS_PROXY}
+
+RUN git clone https://github.com/TMElyralab/MuseTalk.git /app/MuseTalk || \
+    (sleep 5 && git clone https://github.com/TMElyralab/MuseTalk.git /app/MuseTalk) || \
+    (sleep 10 && git clone https://github.com/TMElyralab/MuseTalk.git /app/MuseTalk)
+
+# 清除代理设置
+ENV http_proxy=
+ENV https_proxy=
 
 # 安装MuseTalk依赖
 WORKDIR /app/MuseTalk
@@ -54,8 +65,8 @@ COPY entrypoint.py /app/
 # 创建必要目录
 RUN mkdir -p /app/models /app/inputs /app/outputs /app/logs
 
-# 下载模型
-RUN cd /app/MuseTalk && bash download_weights.sh || true
+# 下载模型（可选）
+RUN cd /app/MuseTalk && bash download_weights.sh || echo "Model download skipped"
 
 WORKDIR /app
 ENV PYTHONPATH=/app:/app/MuseTalk:$PYTHONPATH
