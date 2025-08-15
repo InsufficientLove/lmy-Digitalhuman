@@ -14,6 +14,7 @@ Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Debug()
     .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
     .Enrich.FromLogContext()
+    .WriteTo.Console() // 新增：输出到控制台，便于 docker logs 查看
     .WriteTo.File("logs/realtime-digital-human-.log", 
         rollingInterval: RollingInterval.Day,
         outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {Message:lj}{NewLine}{Exception}",
@@ -49,7 +50,6 @@ builder.Services.AddSingleton<ILocalLLMService, OllamaService>();
 builder.Services.AddSingleton<IDigitalHumanTemplateService, DigitalHumanTemplateService>();
 builder.Services.AddSingleton<IEdgeTTSService, EdgeTTSService>();
 builder.Services.AddSingleton<IConversationService, ConversationService>();
-builder.Services.AddSingleton<IAudioPipelineService, AudioPipelineService>();
 
 // 超低延迟实时服务
 builder.Services.AddSingleton<IGPUResourceManager, GPUResourceManager>();
@@ -100,7 +100,6 @@ if (app.Environment.IsDevelopment())
 
 
 
-
 app.UseCors("AllowAll");
 
 // 确保必要的目录存在
@@ -115,24 +114,35 @@ Directory.CreateDirectory(tempPath);
 Directory.CreateDirectory(templatesPath);
 Directory.CreateDirectory(imagesPath);
 
-// 启动全局MuseTalk服务
+// 启动全局MuseTalk服务（容器内禁用）
+var runningInContainer = string.Equals(Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER"), "true", StringComparison.OrdinalIgnoreCase);
+var disableGlobal = string.Equals(Environment.GetEnvironmentVariable("DISABLE_GLOBAL_MUSETALK"), "1");
+var shouldStartGlobalService = !runningInContainer && !disableGlobal;
+
 var globalServiceManager = app.Services.GetRequiredService<GlobalMuseTalkServiceManager>();
-try
+if (shouldStartGlobalService)
 {
-    app.Logger.LogInformation("正在启动4GPU共享全局MuseTalk服务...");
-    var startSuccess = await globalServiceManager.StartGlobalServiceAsync(port: 28888);
-    if (startSuccess)
+    try
     {
-        app.Logger.LogInformation("4GPU共享全局MuseTalk服务启动成功");
+        app.Logger.LogInformation("正在启动4GPU共享全局MuseTalk服务...");
+        var startSuccess = await globalServiceManager.StartGlobalServiceAsync(port: 28888);
+        if (startSuccess)
+        {
+            app.Logger.LogInformation("4GPU共享全局MuseTalk服务启动成功");
+        }
+        else
+        {
+            app.Logger.LogError("4GPU共享全局MuseTalk服务启动失败");
+        }
     }
-    else
+    catch (Exception ex)
     {
-        app.Logger.LogError("4GPU共享全局MuseTalk服务启动失败");
+        app.Logger.LogError(ex, "启动4GPU共享全局MuseTalk服务时发生异常");
     }
 }
-catch (Exception ex)
+else
 {
-    app.Logger.LogError(ex, "启动4GPU共享全局MuseTalk服务时发生异常");
+    app.Logger.LogInformation("容器环境或手动禁用标志生效，跳过全局MuseTalk服务启动");
 }
 
 // 静态文件服务
@@ -181,35 +191,39 @@ app.Logger.LogInformation("HTTP访问地址: http://localhost:5000");
 app.Logger.LogInformation("健康检查: http://localhost:5000/health");
 app.Logger.LogInformation("API文档: http://localhost:5000/swagger");
 
-// 关键修复：注册程序退出时的进程清理（复用已有的globalServiceManager变量）
-// 强化清理：处理Ctrl+C
-Console.CancelKeyPress += (sender, e) =>
+// 仅在需要时注册清理（当全局服务未启动时无需清理）
+if (shouldStartGlobalService)
 {
-    app.Logger.LogInformation("🛑 检测到Ctrl+C，执行终极清理...");
-    globalServiceManager.EmergencyCleanupPortOccupyingProcesses(); // 紧急清理
-    globalServiceManager.ForceCleanupAllPythonProcesses();
-    app.Logger.LogInformation("终极清理完成");
-    e.Cancel = false; // 允许程序退出
-};
+    // 关键修复：注册程序退出时的进程清理（复用已有的globalServiceManager变量）
+    // 强化清理：处理Ctrl+C
+    Console.CancelKeyPress += (sender, e) =>
+    {
+        app.Logger.LogInformation("🛑 检测到Ctrl+C，执行终极清理...");
+        globalServiceManager.EmergencyCleanupPortOccupyingProcesses(); // 紧急清理
+        globalServiceManager.ForceCleanupAllPythonProcesses();
+        app.Logger.LogInformation("终极清理完成");
+        e.Cancel = false; // 允许程序退出
+    };
 
-// 强化清理：处理应用程序退出
-AppDomain.CurrentDomain.ProcessExit += (sender, e) =>
-{
-    app.Logger.LogInformation("🛑 应用程序退出，执行终极清理...");
-    globalServiceManager.EmergencyCleanupPortOccupyingProcesses(); // 紧急清理
-    globalServiceManager.ForceCleanupAllPythonProcesses();
-    app.Logger.LogInformation("终极清理完成");
-};
+    // 强化清理：处理应用程序退出
+    AppDomain.CurrentDomain.ProcessExit += (sender, e) =>
+    {
+        app.Logger.LogInformation("🛑 应用程序退出，执行终极清理...");
+        globalServiceManager.EmergencyCleanupPortOccupyingProcesses(); // 紧急清理
+        globalServiceManager.ForceCleanupAllPythonProcesses();
+        app.Logger.LogInformation("终极清理完成");
+    };
 
-// 强化清理：处理应用程序生命周期
-var lifetime = app.Services.GetRequiredService<IHostApplicationLifetime>();
-lifetime.ApplicationStopping.Register(() =>
-{
-    app.Logger.LogInformation("🛑 应用程序停止中，执行终极清理...");
-    globalServiceManager.EmergencyCleanupPortOccupyingProcesses(); // 紧急清理
-    globalServiceManager.ForceCleanupAllPythonProcesses();
-    app.Logger.LogInformation("终极清理完成");
-});
+    // 强化清理：处理应用程序生命周期
+    var lifetime = app.Services.GetRequiredService<IHostApplicationLifetime>();
+    lifetime.ApplicationStopping.Register(() =>
+    {
+        app.Logger.LogInformation("🛑 应用程序停止中，执行终极清理...");
+        globalServiceManager.EmergencyCleanupPortOccupyingProcesses(); // 紧急清理
+        globalServiceManager.ForceCleanupAllPythonProcesses();
+        app.Logger.LogInformation("终极清理完成");
+    });
+}
 
 try
 {
