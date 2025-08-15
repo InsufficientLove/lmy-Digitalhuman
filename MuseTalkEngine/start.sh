@@ -38,11 +38,17 @@ PY
 	fi
 fi
 
-# 保证缓存与模型目录存在；若未挂载 ./models 但存在 /models，则建立符号链接
+# 保证缓存与模型目录存在；若未挂载 ./models 或其为空，但存在 /models，则建立符号链接
 mkdir -p /root/.cache/huggingface /root/.cache/torch "$MUSE_DIR"
-if [ -d "/models" ] && [ ! -e "$MUSE_DIR/models" ]; then
-	echo "[Models] Linking $MUSE_DIR/models -> /models"
-	ln -s /models "$MUSE_DIR/models"
+if [ -d "/models" ]; then
+	if [ ! -e "$MUSE_DIR/models" ]; then
+		echo "[Models] Linking $MUSE_DIR/models -> /models (not exists)"
+		ln -s /models "$MUSE_DIR/models"
+	elif [ -d "$MUSE_DIR/models" ] && [ -z "$(ls -A "$MUSE_DIR/models" 2>/dev/null)" ]; then
+		echo "[Models] $MUSE_DIR/models is empty dir, replacing with symlink to /models"
+		rmdir "$MUSE_DIR/models" || rm -rf "$MUSE_DIR/models"
+		ln -s /models "$MUSE_DIR/models"
+	fi
 fi
 
 cd "$ENGINE_DIR"
