@@ -38,8 +38,12 @@ PY
 	fi
 fi
 
-# 保证缓存目录存在
-mkdir -p /root/.cache/huggingface /root/.cache/torch "$MUSE_DIR/models"
+# 保证缓存与模型目录存在；若未挂载 ./models 但存在 /models，则建立符号链接
+mkdir -p /root/.cache/huggingface /root/.cache/torch "$MUSE_DIR"
+if [ -d "/models" ] && [ ! -e "$MUSE_DIR/models" ]; then
+	echo "[Models] Linking $MUSE_DIR/models -> /models"
+	ln -s /models "$MUSE_DIR/models"
+fi
 
 cd "$ENGINE_DIR"
 exec python3 direct_launcher.py
