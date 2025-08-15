@@ -30,9 +30,8 @@ ARG HTTPS_PROXY
 ENV http_proxy=${HTTP_PROXY}
 ENV https_proxy=${HTTPS_PROXY}
 
-RUN git clone https://github.com/TMElyralab/MuseTalk.git /app/MuseTalk || \
-    (sleep 5 && git clone https://github.com/TMElyralab/MuseTalk.git /app/MuseTalk) || \
-    (sleep 10 && git clone https://github.com/TMElyralab/MuseTalk.git /app/MuseTalk)
+# 复制本地的MuseTalk（需要先在本地克隆）
+COPY MuseTalk /app/MuseTalk
 
 # 清除代理设置
 ENV http_proxy=
@@ -65,8 +64,8 @@ COPY entrypoint.py /app/
 # 创建必要目录
 RUN mkdir -p /app/models /app/inputs /app/outputs /app/logs
 
-# 下载模型（可选）
-RUN cd /app/MuseTalk && bash download_weights.sh || echo "Model download skipped"
+# 复制模型文件（如果存在）
+COPY models /app/models 2>/dev/null || true
 
 WORKDIR /app
 ENV PYTHONPATH=/app:/app/MuseTalk:$PYTHONPATH
