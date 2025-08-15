@@ -32,7 +32,7 @@ RUN python3 -m pip install --upgrade pip setuptools wheel && \
     python3 -m pip install --no-cache-dir json-tricks==3.17.3 munkres==1.1.4 chumpy==0.70 pycocotools==2.0.7 shapely==2.0.6 terminaltables==3.1.10 && \
     # 文本/语音相关依赖
     python3 -m pip install --no-cache-dir transformers==4.41.2 huggingface_hub==0.34.4 && \
-    python3 -m pip install --no-cache-dir diffusers==0.30.2 accelerate==0.28.0 tokenizers==0.15.2 safetensors==0.6.2 && \
+    python3 -m pip install --no-cache-dir diffusers==0.30.2 accelerate==0.28.0 tokenizers==0.19.1 safetensors==0.6.2 && \
     # 最终钉死与二进制兼容的数值栈，避免被间接升级
     python3 -m pip install --no-cache-dir --force-reinstall --no-deps numpy==1.26.4 scipy==1.11.4 Pillow==10.0.1 opencv-python-headless==4.9.0.80
 
