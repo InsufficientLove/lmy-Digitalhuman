@@ -28,6 +28,8 @@ RUN python3 -m pip install --upgrade pip setuptools wheel && \
     (python3 -m pip install --no-cache-dir --only-binary=:all: -f https://download.openmmlab.com/mmcv/dist/cu121/torch2.1.0/index.html mmcv==2.1.0 \
      || python3 -m pip install --no-cache-dir --only-binary=:all: -f https://download.openmmlab.com/mmcv/dist/cu121/torch2.1/index.html mmcv==2.1.0) && \
     python3 -m pip install --no-cache-dir --no-deps mmpose==1.3.2 mmdet==3.3.0 && \
+    # mmpose/mmdet 运行期的小依赖
+    python3 -m pip install --no-cache-dir json-tricks==3.17.3 munkres==1.1.4 chumpy==0.70 pycocotools==2.0.7 shapely==2.0.6 && \
     python3 -m pip install --no-cache-dir diffusers==0.30.2 accelerate==0.28.0 huggingface_hub==0.30.2 tokenizers==0.15.2 safetensors==0.6.2 && \
     # 最终钉死与二进制兼容的数值栈，避免被间接升级
     python3 -m pip install --no-cache-dir --force-reinstall --no-deps numpy==1.26.4 scipy==1.11.4 Pillow==10.0.1 opencv-python-headless==4.9.0.80
