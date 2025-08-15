@@ -8,17 +8,17 @@ import torch
 GPU_MEMORY_CONFIG = {
     # 批次大小配置
     'batch_size': {
-        'default': 6,  # 默认批次大小（基于24GB显存优化）
+        'default': 8,  # 默认批次大小（48GB单卡建议）
         'min': 1,      # 最小批次大小
-        'max': 8,      # 最大批次大小
+        'max': 12,     # 最大批次大小
     },
     
     # 内存管理
-    'memory_fraction': 0.8,  # 每个GPU使用的最大内存比例
+    'memory_fraction': 0.9,  # 每个GPU使用的最大内存比例（48GB 预留10%）
     'max_split_size_mb': 256,  # PyTorch内存分配块大小
     
     # 并发控制
-    'max_concurrent_batches_per_gpu': 1,  # 每个GPU同时处理的最大批次数
+    'max_concurrent_batches_per_gpu': 2,  # 单卡并发批次
     
     # 内存清理
     'aggressive_cleanup': True,  # 激进的内存清理模式
