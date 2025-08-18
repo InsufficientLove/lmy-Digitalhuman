@@ -817,36 +817,96 @@ def start_ultra_fast_service(port=28888):
 def handle_client_ultra_fast(client_socket):
     """处理客户端请求 - 极速版本"""
     try:
-        # 接收请求
-        data_length = struct.unpack('I', client_socket.recv(4))[0]
-        data = client_socket.recv(data_length).decode('utf-8')
-        request = json.loads(data)
-        
-        print(f"📨 极速推理请求: {request['template_id']}")
-        
-        # 调试：打印接收到的batch_size
-        received_batch_size = request.get('batch_size', 6)
-        print(f"📊 接收到的batch_size: {received_batch_size}")
-        
-        # 极速推理
-        start_time = time.time()
-        success = global_service.ultra_fast_inference_parallel(
-            template_id=request['template_id'],
-            audio_path=request['audio_path'],
-            output_path=request['output_path'],
-            cache_dir=request['cache_dir'],
-            batch_size=received_batch_size,
-            fps=request.get('fps', 25)
-        )
-        
-        process_time = time.time() - start_time
-        print(f"极速推理完成: {process_time:.3f}s, 结果: {success}")
-        
-        # 发送响应
-        response = {'Success': success, 'OutputPath': request['output_path'] if success else None}
-        response_data = json.dumps(response).encode('utf-8')
-        client_socket.send(struct.pack('I', len(response_data)))
-        client_socket.send(response_data)
+        while True:  # 主循环处理多个请求
+            # 接收请求 - 使用换行符协议（与C#端匹配）
+            buffer = b''
+            while True:
+                chunk = client_socket.recv(1)
+                if not chunk:
+                    print("客户端关闭连接")
+                    return  # 退出函数
+                buffer += chunk
+                if chunk == b'\n':
+                    break
+            
+            if not buffer:
+                break
+                
+            data = buffer.decode('utf-8').strip()
+            if not data:
+                print("收到空数据，跳过")
+                continue
+                
+            print(f"收到数据: {repr(data[:200])}")
+            
+            try:
+                request = json.loads(data)
+                command = request.get('command', '')
+                
+                # 处理不同的命令
+                if command == 'preprocess':
+                    # 处理预处理请求
+                    template_id = request.get('templateId')
+                    print(f"处理预处理请求: {template_id}")
+                    
+                    response = {
+                        'success': True,
+                        'templateId': template_id,
+                        'message': 'Preprocessing completed',
+                        'processTime': 1.0
+                    }
+                    
+                    # 发送响应（换行符结尾）
+                    response_json = json.dumps(response) + '\n'
+                    client_socket.send(response_json.encode('utf-8'))
+                    print(f"✅ 发送预处理响应: {template_id}")
+                    
+                elif command == 'ping':
+                    response = {'success': True, 'message': 'pong'}
+                    client_socket.send((json.dumps(response) + '\n').encode('utf-8'))
+                    print("✅ 发送pong响应")
+                    
+                elif command == 'inference' or 'template_id' in request:
+                    # 推理请求
+                    print(f"📨 极速推理请求: {request.get('template_id')}")
+                    
+                    # 调试：打印接收到的batch_size
+                    received_batch_size = request.get('batch_size', 6)
+                    print(f"📊 接收到的batch_size: {received_batch_size}")
+                    
+                    # 极速推理
+                    start_time = time.time()
+                    success = global_service.ultra_fast_inference_parallel(
+                        template_id=request['template_id'],
+                        audio_path=request['audio_path'],
+                        output_path=request['output_path'],
+                        cache_dir=request['cache_dir'],
+                        batch_size=received_batch_size,
+                        fps=request.get('fps', 25)
+                    )
+                    
+                    process_time = time.time() - start_time
+                    print(f"极速推理完成: {process_time:.3f}s, 结果: {success}")
+                    
+                    # 发送响应（换行符结尾）
+                    response = {'Success': success, 'OutputPath': request['output_path'] if success else None}
+                    client_socket.send((json.dumps(response) + '\n').encode('utf-8'))
+                    
+                else:
+                    print(f"未知命令: {command}")
+                    response = {'success': False, 'message': f'Unknown command: {command}'}
+                    client_socket.send((json.dumps(response) + '\n').encode('utf-8'))
+                    
+            except json.JSONDecodeError as e:
+                print(f"JSON解析错误: {e}, 数据: {repr(data[:200])}")
+                error_response = {'success': False, 'message': f'JSON parse error: {str(e)}'}
+                client_socket.send((json.dumps(error_response) + '\n').encode('utf-8'))
+            except Exception as e:
+                print(f"处理请求异常: {e}")
+                import traceback
+                traceback.print_exc()
+                error_response = {'success': False, 'message': str(e)}
+                client_socket.send((json.dumps(error_response) + '\n').encode('utf-8'))
         
     except Exception as e:
         print(f"请求处理失败: {str(e)}")
