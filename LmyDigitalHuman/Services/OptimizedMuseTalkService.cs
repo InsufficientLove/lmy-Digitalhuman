@@ -813,7 +813,7 @@ namespace LmyDigitalHuman.Services
                 if (!_persistentModels.ContainsKey(templateId))
                 {
                     _logger.LogWarning("模板 {TemplateId} 未进行预处理，这通常表示模板创建时预处理失败", templateId);
-                    _logger.LogInformation("正在进行紧急预处理，建议重新创建模板以获得最佳性能...", templateId);
+                    _logger.LogInformation("正在进行紧急预处理，模板: {TemplateId}。建议重新创建模板以获得最佳性能...", templateId);
                     await PreprocessTemplateAsync(templateId);
                 }
                 else
