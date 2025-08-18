@@ -1,92 +1,27 @@
-version: "3.9"
+version: '3.8'
 
 services:
-  traefik:
-    image: traefik:v3.0
-    container_name: traefik
-    command:
-      - --providers.docker=true
-      - --providers.docker.exposedbydefault=false
-      - --entrypoints.web.address=:80
-      - --entrypoints.websecure.address=:443
-      - --certificatesresolvers.myresolver.acme.httpchallenge=true
-      - --certificatesresolvers.myresolver.acme.httpchallenge.entrypoint=web
-      - --certificatesresolvers.myresolver.acme.email=${ACME_EMAIL}
-      - --certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json
-      - --log.level=INFO
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./letsencrypt:/letsencrypt
-    restart: unless-stopped
-
-  musetalk-python:
-    build:
-      context: .
-      dockerfile: MuseTalkEngine/Dockerfile
-    container_name: musetalk-python
+  musetalk:
+    build: .
+    image: musetalk:latest
+    container_name: musetalk
+    runtime: nvidia
     environment:
-      - CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0,1}
-      - NVIDIA_VISIBLE_DEVICES=all
-      - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:256,garbage_collection_threshold:0.9,expandable_segments:True
-      - MUSE_MODELS_DIR=/models
-      - MUSE_VIDEOS_DIR=/videos
-      - MUSE_TEMP_DIR=/temp
-      - MUSE_TALK_DIR=/opt/musetalk/repo/MuseTalk
-      - PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
-      - HF_HOME=/root/.cache/huggingface
+      - RUN_MODE=${RUN_MODE:-gradio}
+      - CUDA_VISIBLE_DEVICES=${GPU_IDS:-all}
+      - BATCH_SIZE=${BATCH_SIZE:-auto}
     volumes:
-      - ./MuseTalkEngine:/opt/musetalk/repo/MuseTalkEngine
-      - ./MuseTalk:/opt/musetalk/repo/MuseTalk
-      - ./LmyDigitalHuman:/opt/musetalk/repo/LmyDigitalHuman
-      - /opt/musetalk/models:/models
-      - /opt/musetalk/videos:/videos
-      - /opt/musetalk/temp:/temp
-      - /opt/musetalk/models/hf-cache:/root/.cache/huggingface
-      - /opt/musetalk/models/torch-cache:/root/.cache/torch
-    working_dir: /opt/musetalk/repo/MuseTalkEngine
-    # 需要主机已安装 nvidia-container-toolkit
+      - ./models:/app/models
+      - ./inputs:/app/inputs  
+      - ./outputs:/app/outputs
+      - ./logs:/app/logs
+    ports:
+      - "7860:7860"
+      - "8000:8000"
     deploy:
       resources:
         reservations:
           devices:
-            - capabilities: [gpu]
-    networks:
-      - web
-    restart: unless-stopped
-
-  lmy-digitalhuman:
-    build:
-      context: .
-      dockerfile: LmyDigitalHuman/Dockerfile
-    container_name: lmy-digitalhuman
-    environment:
-      - ASPNETCORE_URLS=http://0.0.0.0:5000
-      - ASPNETCORE_ENVIRONMENT=Linux
-    depends_on:
-      - musetalk-python
-    volumes:
-      - ./LmyDigitalHuman:/opt/musetalk/repo/LmyDigitalHuman
-      - /opt/musetalk/models:/models
-      - /opt/musetalk/videos:/videos
-      - /opt/musetalk/temp:/temp
-    networks:
-      - web
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.middlewares.https-redirect.redirectscheme.scheme=https"
-      - "traefik.http.routers.lmy-web.rule=Host(`${DOMAIN}`)"
-      - "traefik.http.routers.lmy-web.entrypoints=web"
-      - "traefik.http.routers.lmy-web.middlewares=https-redirect"
-      - "traefik.http.routers.lmy-websecure.rule=Host(`${DOMAIN}`)"
-      - "traefik.http.routers.lmy-websecure.entrypoints=websecure"
-      - "traefik.http.routers.lmy-websecure.tls=true"
-      - "traefik.http.routers.lmy-websecure.tls.certresolver=myresolver"
-      - "traefik.http.services.lmy.loadbalancer.server.port=5000"
-    restart: unless-stopped
-
-networks:
-  web:
-    external: false
+            - driver: nvidia
+              capabilities: [gpu]
+              count: all
