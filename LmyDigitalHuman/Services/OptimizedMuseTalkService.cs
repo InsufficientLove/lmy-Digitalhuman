@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using LmyDigitalHuman.Models;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
 
 namespace LmyDigitalHuman.Services
 {
@@ -15,12 +17,16 @@ namespace LmyDigitalHuman.Services
 
         public OptimizedMuseTalkService(
             ILogger<OptimizedMuseTalkService> logger,
-            PersistentMuseTalkClient persistentClient,
-            IPathManager pathManager)
+            IPathManager pathManager,
+            IConfiguration configuration,
+            ILoggerFactory loggerFactory)
         {
             _logger = logger;
-            _persistentClient = persistentClient;
             _pathManager = pathManager;
+            _persistentClient = new PersistentMuseTalkClient(
+                loggerFactory.CreateLogger<PersistentMuseTalkClient>(),
+                configuration
+            );
         }
 
         public async Task<DigitalHumanResponse> GenerateVideoAsync(DigitalHumanRequest request)

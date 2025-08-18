@@ -332,6 +332,7 @@
             text-align: center;
             cursor: pointer;
             transition: all 0.3s ease;
+            position: relative;
         }
 
         .template-card:hover {
@@ -864,6 +865,12 @@
                     // 正常可用模板
                     templateCard.onclick = (event) => selectTemplate(template, event);
                     templateCard.innerHTML = `
+                        <div style="position:absolute; top:8px; right:8px;">
+                          <button class="btn btn-danger" style="padding:6px 10px; font-size:12px;"
+                            onclick="event.stopPropagation(); deleteTemplate('${template.templateId}','${template.templateName}')">
+                            删除
+                          </button>
+                        </div>
                         <img src="${template.imageUrl || '/images/default-avatar.svg'}" 
                              alt="${template.templateName}" class="template-image"
                              onerror="this.src='/images/default-avatar.svg'">
@@ -1506,6 +1513,29 @@
 
         function updateConnectionStatus(status) {
             document.getElementById('connectionStatus').textContent = status;
+        }
+
+        // 删除模板
+        async function deleteTemplate(templateId, templateName) {
+            if (!confirm(`确定删除模板「${templateName}」吗？`)) return;
+            try {
+                const resp = await fetch(`/api/digitalhumantemplate/${templateId}`, { method: 'DELETE' });
+                const data = await resp.json().catch(() => ({}));
+                if (resp.ok && data.success) {
+                    addLog(`模板删除成功: ${templateName}`, 'success');
+                    if (currentTemplateId === templateId) {
+                        currentTemplateId = null;
+                        document.getElementById('currentTemplate').textContent = '未选择';
+                    }
+                    await loadTemplates();
+                } else {
+                    addLog(`模板删除失败: ${data.error || resp.statusText}`, 'error');
+                    alert(`删除失败: ${data.error || resp.statusText}`);
+                }
+            } catch (e) {
+                addLog(`模板删除异常: ${e.message}`, 'error');
+                alert(`删除异常: ${e.message}`);
+            }
         }
 
         // 文件选择提示
