@@ -41,9 +41,22 @@ namespace LmyDigitalHuman.Services
             _httpClient = httpClient;
             _museTalkService = museTalkService;
             
-            _templatesPath = (_configuration["DigitalHumanTemplate:TemplatesPath"] ?? Path.Combine("wwwroot", "templates")).Replace('/', Path.DirectorySeparatorChar);
-            _outputPath = (_configuration["DigitalHumanTemplate:OutputPath"] ?? Path.Combine("wwwroot", "videos")).Replace('/', Path.DirectorySeparatorChar);
-            _tempPath = (_configuration["DigitalHumanTemplate:TempPath"] ?? "temp").Replace('/', Path.DirectorySeparatorChar);
+            // 优先使用全局 Paths 配置（Docker 环境挂载目录），不存在时回退到 DigitalHumanTemplate 同名配置，再回退到默认值
+            _templatesPath = (
+                _configuration["Paths:Templates"]
+                ?? _configuration["DigitalHumanTemplate:TemplatesPath"]
+                ?? Path.Combine("wwwroot", "templates")
+            ).Replace('/', Path.DirectorySeparatorChar);
+            _outputPath = (
+                _configuration["Paths:Videos"]
+                ?? _configuration["DigitalHumanTemplate:OutputPath"]
+                ?? Path.Combine("wwwroot", "videos")
+            ).Replace('/', Path.DirectorySeparatorChar);
+            _tempPath = (
+                _configuration["Paths:Temp"]
+                ?? _configuration["DigitalHumanTemplate:TempPath"]
+                ?? "temp"
+            ).Replace('/', Path.DirectorySeparatorChar);
             // SadTalker配置已移除，现在使用MuseTalk
             
             Directory.CreateDirectory(_templatesPath);
