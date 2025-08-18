@@ -83,9 +83,9 @@ try
     builder.Services.AddSingleton<ILocalLLMService, OllamaService>();
     
     // 注册辅助服务
-    builder.Services.AddSingleton<PathManager>();
-    builder.Services.AddSingleton<PythonEnvironmentService>();
-    builder.Services.AddSingleton<GPUResourceManager>();
+    builder.Services.AddSingleton<IPathManager, PathManager>();
+    builder.Services.AddSingleton<IPythonEnvironmentService, PythonEnvironmentService>();
+    builder.Services.AddSingleton<IGPUResourceManager, GPUResourceManager>();
     builder.Services.AddSingleton<GlobalMuseTalkClient>();
 
     // 配置静态文件目录
