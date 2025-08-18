@@ -1,0 +1,1118 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebRTC 数字人测试平台</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            font-weight: 300;
+        }
+
+        .test-modes {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .test-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+
+        .test-card h2 {
+            color: #495057;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .video-container {
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 20px;
+            position: relative;
+            aspect-ratio: 16/9;
+            min-height: 400px;
+        }
+
+        .video-container video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .placeholder {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #888;
+            font-size: 1.2rem;
+            text-align: center;
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .control-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            min-width: 120px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-warning {
+            background: #ffc107;
+            color: #333;
+        }
+
+        .btn-info {
+            background: #17a2b8;
+            color: white;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .status-panel {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            padding: 5px 0;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .status-item:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+
+        .status-label {
+            font-weight: 500;
+            color: #495057;
+        }
+
+        .status-value {
+            color: #6c757d;
+            font-family: monospace;
+        }
+
+        .status-value.success {
+            color: #28a745;
+        }
+
+        .status-value.error {
+            color: #dc3545;
+        }
+
+        .status-value.warning {
+            color: #ffc107;
+        }
+
+        .logs {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 30px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .logs h3 {
+            margin-bottom: 15px;
+            color: #495057;
+        }
+
+        .log-entry {
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.6;
+            margin-bottom: 5px;
+            padding: 3px 5px;
+            border-radius: 3px;
+        }
+
+        .log-info { 
+            background: #e7f3ff;
+            color: #0066cc; 
+        }
+
+        .log-success { 
+            background: #d4edda;
+            color: #155724; 
+        }
+
+        .log-warning { 
+            background: #fff3cd;
+            color: #856404; 
+        }
+
+        .log-error { 
+            background: #f8d7da;
+            color: #721c24; 
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .input-group input {
+            flex: 1;
+            padding: 10px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .stat-card {
+            background: white;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 12px;
+            text-align: center;
+        }
+
+        .stat-label {
+            font-size: 0.85em;
+            color: #6c757d;
+            margin-bottom: 5px;
+        }
+
+        .stat-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #495057;
+        }
+
+        .connection-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-left: 8px;
+            animation: pulse 2s infinite;
+        }
+
+        .connection-indicator.connected {
+            background: #28a745;
+        }
+
+        .connection-indicator.connecting {
+            background: #ffc107;
+        }
+
+        .connection-indicator.disconnected {
+            background: #dc3545;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .template-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            align-items: center;
+        }
+
+        .template-selector select {
+            flex: 1;
+            padding: 10px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 14px;
+            background: white;
+        }
+
+        @media (max-width: 1024px) {
+            .test-modes {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .ice-candidates {
+            background: #f1f3f5;
+            border-radius: 8px;
+            padding: 10px;
+            margin-top: 10px;
+            max-height: 150px;
+            overflow-y: auto;
+            font-size: 0.85em;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎥 WebRTC 数字人测试平台</h1>
+            <p>实时 WebRTC 通信测试 & 非实时视频生成测试</p>
+        </div>
+
+        <div class="test-modes">
+            <!-- 实时 WebRTC 测试 -->
+            <div class="test-card">
+                <h2>
+                    🔴 实时 WebRTC 通信
+                    <span class="connection-indicator disconnected" id="rtcIndicator"></span>
+                </h2>
+                
+                <div class="video-container">
+                    <video id="remoteVideo" autoplay playsinline muted></video>
+                    <div class="placeholder" id="rtcPlaceholder">
+                        等待 WebRTC 连接...
+                    </div>
+                </div>
+
+                <div class="controls">
+                    <div class="template-selector">
+                        <label>选择模板:</label>
+                        <select id="rtcTemplateSelect">
+                            <option value="">-- 请选择模板 --</option>
+                        </select>
+                        <button class="btn btn-info" onclick="loadTemplates()">🔄 刷新</button>
+                    </div>
+
+                    <div class="control-group">
+                        <button class="btn btn-success" onclick="startWebRTC()" id="startRTCBtn">
+                            ▶️ 开始连接
+                        </button>
+                        <button class="btn btn-danger" onclick="stopWebRTC()" id="stopRTCBtn" disabled>
+                            ⏹️ 断开连接
+                        </button>
+                        <button class="btn btn-warning" onclick="restartWebRTC()" id="restartRTCBtn" disabled>
+                            🔄 重新连接
+                        </button>
+                    </div>
+
+                    <div class="input-group">
+                        <input type="text" id="rtcMessage" placeholder="输入消息发送到服务器...">
+                        <button class="btn btn-primary" onclick="sendRTCMessage()">📤 发送</button>
+                    </div>
+
+                    <div class="control-group">
+                        <button class="btn btn-info" onclick="getStats()">📊 获取统计</button>
+                        <button class="btn btn-info" onclick="toggleAudio()">🔇 切换音频</button>
+                        <button class="btn btn-info" onclick="toggleVideo()">📹 切换视频</button>
+                    </div>
+                </div>
+
+                <div class="status-panel">
+                    <div class="status-item">
+                        <span class="status-label">连接状态:</span>
+                        <span class="status-value" id="rtcStatus">未连接</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">信令状态:</span>
+                        <span class="status-value" id="signalingState">-</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">ICE 状态:</span>
+                        <span class="status-value" id="iceState">-</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">当前模板:</span>
+                        <span class="status-value" id="currentRTCTemplate">未选择</span>
+                    </div>
+                </div>
+
+                <div class="stats-grid" id="rtcStats" style="display: none;">
+                    <div class="stat-card">
+                        <div class="stat-label">比特率</div>
+                        <div class="stat-value" id="bitrate">0 kbps</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">帧率</div>
+                        <div class="stat-value" id="framerate">0 fps</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">分辨率</div>
+                        <div class="stat-value" id="resolution">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">延迟</div>
+                        <div class="stat-value" id="latency">0 ms</div>
+                    </div>
+                </div>
+
+                <div class="ice-candidates" id="iceCandidates" style="display: none;">
+                    <strong>ICE Candidates:</strong>
+                    <div id="candidatesList"></div>
+                </div>
+            </div>
+
+            <!-- 非实时视频生成测试 -->
+            <div class="test-card">
+                <h2>
+                    🎬 非实时视频生成
+                    <span class="connection-indicator disconnected" id="apiIndicator"></span>
+                </h2>
+                
+                <div class="video-container">
+                    <video id="generatedVideo" controls></video>
+                    <div class="placeholder" id="videoPlaceholder">
+                        等待视频生成...
+                    </div>
+                </div>
+
+                <div class="controls">
+                    <div class="template-selector">
+                        <label>选择模板:</label>
+                        <select id="videoTemplateSelect">
+                            <option value="">-- 请选择模板 --</option>
+                        </select>
+                    </div>
+
+                    <div class="input-group">
+                        <input type="text" id="textInput" placeholder="输入要生成的文本内容...">
+                    </div>
+
+                    <div class="control-group">
+                        <button class="btn btn-primary" onclick="generateVideo()" id="generateBtn">
+                            🎥 生成视频
+                        </button>
+                        <button class="btn btn-success" onclick="generateWelcome()" id="welcomeBtn">
+                            👋 生成欢迎视频
+                        </button>
+                        <button class="btn btn-info" onclick="testAudio()" id="audioBtn">
+                            🎵 测试音频
+                        </button>
+                    </div>
+
+                    <div class="control-group">
+                        <button class="btn btn-warning" onclick="downloadVideo()">
+                            💾 下载视频
+                        </button>
+                        <button class="btn btn-danger" onclick="clearVideo()">
+                            🗑️ 清除视频
+                        </button>
+                    </div>
+                </div>
+
+                <div class="status-panel">
+                    <div class="status-item">
+                        <span class="status-label">API 状态:</span>
+                        <span class="status-value" id="apiStatus">就绪</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">处理进度:</span>
+                        <span class="status-value" id="processProgress">-</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">处理时间:</span>
+                        <span class="status-value" id="processTime">-</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">当前模板:</span>
+                        <span class="status-value" id="currentVideoTemplate">未选择</span>
+                    </div>
+                </div>
+
+                <div class="stats-grid" id="videoStats" style="display: none;">
+                    <div class="stat-card">
+                        <div class="stat-label">视频时长</div>
+                        <div class="stat-value" id="videoDuration">0s</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">文件大小</div>
+                        <div class="stat-value" id="videoSize">0 MB</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">生成耗时</div>
+                        <div class="stat-value" id="genTime">0s</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">缓存状态</div>
+                        <div class="stat-value" id="cacheStatus">-</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 统一日志区域 -->
+        <div class="logs">
+            <h3>📊 系统日志</h3>
+            <div id="systemLogs">
+                <div class="log-entry log-info">[系统] WebRTC 测试平台已初始化</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全局变量
+        let pc = null;
+        let localStream = null;
+        let remoteStream = null;
+        let ws = null;
+        let currentRTCTemplate = null;
+        let currentVideoTemplate = null;
+        let statsInterval = null;
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            addLog('系统初始化完成', 'info');
+            loadTemplates();
+            checkAPIStatus();
+        });
+
+        // 加载模板列表
+        async function loadTemplates() {
+            try {
+                const response = await fetch('/api/digitalhumantemplate/list');
+                const data = await response.json();
+                
+                if (data.success) {
+                    const rtcSelect = document.getElementById('rtcTemplateSelect');
+                    const videoSelect = document.getElementById('videoTemplateSelect');
+                    
+                    // 清空现有选项
+                    rtcSelect.innerHTML = '<option value="">-- 请选择模板 --</option>';
+                    videoSelect.innerHTML = '<option value="">-- 请选择模板 --</option>';
+                    
+                    // 添加模板选项
+                    data.templates.forEach(template => {
+                        if (template.status === 'ready') {
+                            const option1 = new Option(template.templateName, template.templateId);
+                            const option2 = new Option(template.templateName, template.templateId);
+                            rtcSelect.add(option1);
+                            videoSelect.add(option2);
+                        }
+                    });
+                    
+                    addLog(`加载了 ${data.templates.filter(t => t.status === 'ready').length} 个可用模板`, 'success');
+                } else {
+                    addLog('加载模板失败', 'error');
+                }
+            } catch (error) {
+                addLog(`加载模板错误: ${error.message}`, 'error');
+            }
+        }
+
+        // 检查API状态
+        async function checkAPIStatus() {
+            try {
+                const response = await fetch('/api/health');
+                if (response.ok) {
+                    document.getElementById('apiIndicator').className = 'connection-indicator connected';
+                    document.getElementById('apiStatus').textContent = '正常';
+                    document.getElementById('apiStatus').className = 'status-value success';
+                } else {
+                    document.getElementById('apiIndicator').className = 'connection-indicator disconnected';
+                    document.getElementById('apiStatus').textContent = '异常';
+                    document.getElementById('apiStatus').className = 'status-value error';
+                }
+            } catch (error) {
+                document.getElementById('apiIndicator').className = 'connection-indicator disconnected';
+                document.getElementById('apiStatus').textContent = '离线';
+                document.getElementById('apiStatus').className = 'status-value error';
+            }
+        }
+
+        // WebRTC 相关函数
+        async function startWebRTC() {
+            const templateId = document.getElementById('rtcTemplateSelect').value;
+            if (!templateId) {
+                alert('请先选择一个模板');
+                return;
+            }
+            
+            currentRTCTemplate = templateId;
+            document.getElementById('currentRTCTemplate').textContent = 
+                document.getElementById('rtcTemplateSelect').selectedOptions[0].text;
+            
+            addLog('开始建立 WebRTC 连接...', 'info');
+            updateRTCStatus('connecting');
+            
+            try {
+                // 创建 PeerConnection
+                const configuration = {
+                    iceServers: [
+                        { urls: 'stun:stun.l.google.com:19302' },
+                        { urls: 'stun:stun1.l.google.com:19302' }
+                    ]
+                };
+                
+                pc = new RTCPeerConnection(configuration);
+                
+                // 设置事件处理器
+                pc.onicecandidate = handleICECandidate;
+                pc.ontrack = handleTrack;
+                pc.oniceconnectionstatechange = handleICEConnectionStateChange;
+                pc.onsignalingstatechange = handleSignalingStateChange;
+                
+                // 创建 Offer
+                const offer = await pc.createOffer({
+                    offerToReceiveAudio: true,
+                    offerToReceiveVideo: true
+                });
+                
+                await pc.setLocalDescription(offer);
+                
+                // 发送 Offer 到服务器
+                await sendOfferToServer(offer, templateId);
+                
+                // 启用控制按钮
+                document.getElementById('startRTCBtn').disabled = true;
+                document.getElementById('stopRTCBtn').disabled = false;
+                document.getElementById('restartRTCBtn').disabled = false;
+                
+                addLog('WebRTC Offer 已发送', 'success');
+                
+                // 启动统计
+                startStatsCollection();
+                
+            } catch (error) {
+                addLog(`WebRTC 连接失败: ${error.message}`, 'error');
+                updateRTCStatus('failed');
+            }
+        }
+
+        async function stopWebRTC() {
+            addLog('停止 WebRTC 连接...', 'info');
+            
+            if (statsInterval) {
+                clearInterval(statsInterval);
+                statsInterval = null;
+            }
+            
+            if (pc) {
+                pc.close();
+                pc = null;
+            }
+            
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+            
+            document.getElementById('remoteVideo').srcObject = null;
+            document.getElementById('rtcPlaceholder').style.display = 'block';
+            
+            updateRTCStatus('disconnected');
+            
+            // 重置按钮状态
+            document.getElementById('startRTCBtn').disabled = false;
+            document.getElementById('stopRTCBtn').disabled = true;
+            document.getElementById('restartRTCBtn').disabled = true;
+            
+            // 隐藏统计信息
+            document.getElementById('rtcStats').style.display = 'none';
+            document.getElementById('iceCandidates').style.display = 'none';
+            
+            addLog('WebRTC 连接已断开', 'info');
+        }
+
+        async function restartWebRTC() {
+            await stopWebRTC();
+            setTimeout(() => startWebRTC(), 1000);
+        }
+
+        async function sendOfferToServer(offer, templateId) {
+            // TODO: 实现发送 Offer 到服务器的逻辑
+            // 这里需要根据实际的服务器 API 进行实现
+            const response = await fetch('/api/webrtc/offer', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    offer: offer,
+                    templateId: templateId
+                })
+            });
+            
+            const data = await response.json();
+            if (data.answer) {
+                await pc.setRemoteDescription(data.answer);
+                addLog('收到 Answer，连接建立中...', 'success');
+            }
+        }
+
+        function handleICECandidate(event) {
+            if (event.candidate) {
+                addLog(`发现 ICE candidate: ${event.candidate.candidate}`, 'info');
+                
+                // 显示 ICE candidates
+                document.getElementById('iceCandidates').style.display = 'block';
+                const list = document.getElementById('candidatesList');
+                const candidateDiv = document.createElement('div');
+                candidateDiv.textContent = event.candidate.candidate;
+                list.appendChild(candidateDiv);
+                
+                // TODO: 发送 ICE candidate 到服务器
+            }
+        }
+
+        function handleTrack(event) {
+            addLog('收到远程媒体流', 'success');
+            document.getElementById('remoteVideo').srcObject = event.streams[0];
+            document.getElementById('rtcPlaceholder').style.display = 'none';
+        }
+
+        function handleICEConnectionStateChange() {
+            const state = pc.iceConnectionState;
+            document.getElementById('iceState').textContent = state;
+            
+            switch(state) {
+                case 'connected':
+                    updateRTCStatus('connected');
+                    addLog('ICE 连接成功', 'success');
+                    break;
+                case 'disconnected':
+                    updateRTCStatus('disconnected');
+                    addLog('ICE 连接断开', 'warning');
+                    break;
+                case 'failed':
+                    updateRTCStatus('failed');
+                    addLog('ICE 连接失败', 'error');
+                    break;
+            }
+        }
+
+        function handleSignalingStateChange() {
+            const state = pc.signalingState;
+            document.getElementById('signalingState').textContent = state;
+        }
+
+        function updateRTCStatus(status) {
+            const statusElement = document.getElementById('rtcStatus');
+            const indicator = document.getElementById('rtcIndicator');
+            
+            switch(status) {
+                case 'connected':
+                    statusElement.textContent = '已连接';
+                    statusElement.className = 'status-value success';
+                    indicator.className = 'connection-indicator connected';
+                    break;
+                case 'connecting':
+                    statusElement.textContent = '连接中...';
+                    statusElement.className = 'status-value warning';
+                    indicator.className = 'connection-indicator connecting';
+                    break;
+                case 'disconnected':
+                    statusElement.textContent = '未连接';
+                    statusElement.className = 'status-value';
+                    indicator.className = 'connection-indicator disconnected';
+                    break;
+                case 'failed':
+                    statusElement.textContent = '连接失败';
+                    statusElement.className = 'status-value error';
+                    indicator.className = 'connection-indicator disconnected';
+                    break;
+            }
+        }
+
+        // 统计信息收集
+        function startStatsCollection() {
+            document.getElementById('rtcStats').style.display = 'grid';
+            
+            statsInterval = setInterval(async () => {
+                if (!pc) return;
+                
+                const stats = await pc.getStats();
+                stats.forEach(report => {
+                    if (report.type === 'inbound-rtp' && report.mediaType === 'video') {
+                        const bitrate = report.bytesReceived ? 
+                            Math.round(report.bytesReceived * 8 / 1000) : 0;
+                        document.getElementById('bitrate').textContent = `${bitrate} kbps`;
+                        
+                        const framerate = report.framesPerSecond || 0;
+                        document.getElementById('framerate').textContent = `${framerate} fps`;
+                        
+                        if (report.frameWidth && report.frameHeight) {
+                            document.getElementById('resolution').textContent = 
+                                `${report.frameWidth}x${report.frameHeight}`;
+                        }
+                    }
+                    
+                    if (report.type === 'candidate-pair' && report.state === 'succeeded') {
+                        const latency = report.currentRoundTripTime ? 
+                            Math.round(report.currentRoundTripTime * 1000) : 0;
+                        document.getElementById('latency').textContent = `${latency} ms`;
+                    }
+                });
+            }, 1000);
+        }
+
+        async function getStats() {
+            if (!pc) {
+                alert('WebRTC 连接未建立');
+                return;
+            }
+            
+            const stats = await pc.getStats();
+            console.log('WebRTC Stats:', stats);
+            addLog('统计信息已输出到控制台', 'info');
+        }
+
+        function toggleAudio() {
+            const video = document.getElementById('remoteVideo');
+            video.muted = !video.muted;
+            addLog(`音频 ${video.muted ? '已静音' : '已开启'}`, 'info');
+        }
+
+        function toggleVideo() {
+            const video = document.getElementById('remoteVideo');
+            if (video.style.display === 'none') {
+                video.style.display = 'block';
+                addLog('视频已显示', 'info');
+            } else {
+                video.style.display = 'none';
+                addLog('视频已隐藏', 'info');
+            }
+        }
+
+        function sendRTCMessage() {
+            const message = document.getElementById('rtcMessage').value;
+            if (!message) return;
+            
+            // TODO: 实现通过 DataChannel 或 WebSocket 发送消息
+            addLog(`发送消息: ${message}`, 'info');
+            document.getElementById('rtcMessage').value = '';
+        }
+
+        // 非实时视频生成相关函数
+        async function generateVideo() {
+            const templateId = document.getElementById('videoTemplateSelect').value;
+            const text = document.getElementById('textInput').value;
+            
+            if (!templateId) {
+                alert('请先选择一个模板');
+                return;
+            }
+            
+            if (!text) {
+                alert('请输入要生成的文本');
+                return;
+            }
+            
+            currentVideoTemplate = templateId;
+            document.getElementById('currentVideoTemplate').textContent = 
+                document.getElementById('videoTemplateSelect').selectedOptions[0].text;
+            
+            const btn = document.getElementById('generateBtn');
+            btn.disabled = true;
+            btn.textContent = '⏳ 生成中...';
+            
+            updateProcessStatus('processing');
+            const startTime = Date.now();
+            
+            try {
+                addLog(`开始生成视频: "${text.substring(0, 30)}..."`, 'info');
+                
+                const response = await fetch('/api/conversation/text', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        templateId: templateId,
+                        text: text,
+                        emotion: 'neutral',
+                        quality: 'medium',
+                        useCache: true
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    const endTime = Date.now();
+                    const processTime = (endTime - startTime) / 1000;
+                    
+                    displayVideo(result.videoUrl);
+                    updateProcessStatus('completed');
+                    document.getElementById('processTime').textContent = `${processTime.toFixed(2)}s`;
+                    document.getElementById('genTime').textContent = `${processTime.toFixed(2)}s`;
+                    document.getElementById('cacheStatus').textContent = result.fromCache ? '命中' : '未命中';
+                    
+                    document.getElementById('videoStats').style.display = 'grid';
+                    
+                    addLog(`视频生成成功，耗时: ${processTime.toFixed(2)}s`, 'success');
+                } else {
+                    updateProcessStatus('failed');
+                    addLog(`视频生成失败: ${result.message}`, 'error');
+                }
+            } catch (error) {
+                updateProcessStatus('failed');
+                addLog(`请求错误: ${error.message}`, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '🎥 生成视频';
+            }
+        }
+
+        async function generateWelcome() {
+            const templateId = document.getElementById('videoTemplateSelect').value;
+            
+            if (!templateId) {
+                alert('请先选择一个模板');
+                return;
+            }
+            
+            currentVideoTemplate = templateId;
+            document.getElementById('currentVideoTemplate').textContent = 
+                document.getElementById('videoTemplateSelect').selectedOptions[0].text;
+            
+            const btn = document.getElementById('welcomeBtn');
+            btn.disabled = true;
+            btn.textContent = '⏳ 生成中...';
+            
+            updateProcessStatus('processing');
+            
+            try {
+                addLog('开始生成欢迎视频...', 'info');
+                
+                const response = await fetch('/api/conversation/welcome', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        templateId: templateId,
+                        quality: 'medium'
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success && result.videoUrl) {
+                    displayVideo(result.videoUrl);
+                    updateProcessStatus('completed');
+                    addLog('欢迎视频生成成功', 'success');
+                } else {
+                    updateProcessStatus('failed');
+                    addLog(`欢迎视频生成失败: ${result.message}`, 'error');
+                }
+            } catch (error) {
+                updateProcessStatus('failed');
+                addLog(`请求错误: ${error.message}`, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '👋 生成欢迎视频';
+            }
+        }
+
+        async function testAudio() {
+            const templateId = document.getElementById('videoTemplateSelect').value;
+            
+            if (!templateId) {
+                alert('请先选择一个模板');
+                return;
+            }
+            
+            const btn = document.getElementById('audioBtn');
+            btn.disabled = true;
+            btn.textContent = '⏳ 测试中...';
+            
+            try {
+                addLog('开始测试音频生成...', 'info');
+                
+                // TODO: 实现音频测试逻辑
+                addLog('音频测试功能待实现', 'warning');
+                
+            } catch (error) {
+                addLog(`音频测试错误: ${error.message}`, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '🎵 测试音频';
+            }
+        }
+
+        function displayVideo(videoUrl) {
+            const video = document.getElementById('generatedVideo');
+            const placeholder = document.getElementById('videoPlaceholder');
+            
+            video.src = videoUrl;
+            video.style.display = 'block';
+            placeholder.style.display = 'none';
+            
+            video.onloadedmetadata = function() {
+                document.getElementById('videoDuration').textContent = 
+                    `${Math.round(video.duration)}s`;
+            };
+            
+            // 获取文件大小
+            fetch(videoUrl, { method: 'HEAD' })
+                .then(response => {
+                    const size = response.headers.get('content-length');
+                    if (size) {
+                        const mb = (parseInt(size) / 1024 / 1024).toFixed(2);
+                        document.getElementById('videoSize').textContent = `${mb} MB`;
+                    }
+                });
+        }
+
+        function downloadVideo() {
+            const video = document.getElementById('generatedVideo');
+            if (!video.src) {
+                alert('没有可下载的视频');
+                return;
+            }
+            
+            const a = document.createElement('a');
+            a.href = video.src;
+            a.download = `digital_human_${Date.now()}.mp4`;
+            a.click();
+            
+            addLog('开始下载视频', 'info');
+        }
+
+        function clearVideo() {
+            const video = document.getElementById('generatedVideo');
+            const placeholder = document.getElementById('videoPlaceholder');
+            
+            video.src = '';
+            video.style.display = 'none';
+            placeholder.style.display = 'flex';
+            
+            document.getElementById('videoStats').style.display = 'none';
+            updateProcessStatus('ready');
+            
+            addLog('视频已清除', 'info');
+        }
+
+        function updateProcessStatus(status) {
+            const element = document.getElementById('processProgress');
+            
+            switch(status) {
+                case 'processing':
+                    element.textContent = '处理中...';
+                    element.className = 'status-value warning';
+                    break;
+                case 'completed':
+                    element.textContent = '完成';
+                    element.className = 'status-value success';
+                    break;
+                case 'failed':
+                    element.textContent = '失败';
+                    element.className = 'status-value error';
+                    break;
+                case 'ready':
+                    element.textContent = '就绪';
+                    element.className = 'status-value';
+                    break;
+            }
+        }
+
+        // 日志函数
+        function addLog(message, type = 'info') {
+            const logs = document.getElementById('systemLogs');
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            
+            const timestamp = new Date().toLocaleTimeString();
+            entry.textContent = `[${timestamp}] ${message}`;
+            
+            logs.appendChild(entry);
+            logs.scrollTop = logs.scrollHeight;
+            
+            // 限制日志条数
+            if (logs.children.length > 50) {
+                logs.removeChild(logs.firstChild);
+            }
+        }
+
+        // 定期检查状态
+        setInterval(checkAPIStatus, 30000);
+    </script>
+</body>
+</html>
