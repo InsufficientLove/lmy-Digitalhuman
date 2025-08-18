@@ -43,7 +43,7 @@ builder.Services.AddSingleton<IPythonEnvironmentService, PythonEnvironmentServic
 builder.Services.AddSingleton<GlobalMuseTalkServiceManager>();  // 全局MuseTalk服务管理器
 builder.Services.AddSingleton<IWhisperNetService, WhisperNetService>();
 builder.Services.AddSingleton<IStreamingTTSService, StreamingTTSService>();
-// 使用极致优化MuseTalk服务 - 专门针对固定模板的4x RTX 4090优化
+// 使用极致优化MuseTalk服务（轻量实现）作为默认 IMuseTalkService
 builder.Services.AddSingleton<IMuseTalkService, OptimizedMuseTalkService>();
 builder.Services.AddSingleton<IMuseTalkCommercialService, MuseTalkCommercialService>();
 builder.Services.AddSingleton<ILocalLLMService, OllamaService>();
