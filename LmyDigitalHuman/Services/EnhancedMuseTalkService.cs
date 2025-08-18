@@ -25,7 +25,7 @@ namespace LmyDigitalHuman.Services
         private readonly IConfiguration _configuration;
         private readonly IServiceProvider _serviceProvider;
         private readonly PersistentMuseTalkClient _persistentClient;
-        private readonly OptimizedMuseTalkService _fallbackService;
+        private readonly IMuseTalkService _fallbackService;
         
         private readonly bool _enablePersistentMode;
         private readonly bool _autoStartService;
@@ -37,7 +37,7 @@ namespace LmyDigitalHuman.Services
             IConfiguration configuration,
             IServiceProvider serviceProvider,
             PersistentMuseTalkClient persistentClient,
-            OptimizedMuseTalkService fallbackService)
+            IMuseTalkService fallbackService)
         {
             _logger = logger;
             _configuration = configuration;
@@ -449,7 +449,10 @@ namespace LmyDigitalHuman.Services
         public void Dispose()
         {
             _persistentClient?.Dispose();
-            _fallbackService?.Dispose();
+            if (_fallbackService is IDisposable disposable)
+            {
+                disposable.Dispose();
+            }
         }
     }
 
