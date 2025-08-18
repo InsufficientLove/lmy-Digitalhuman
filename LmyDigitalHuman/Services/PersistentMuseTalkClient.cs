@@ -137,6 +137,10 @@ namespace LmyDigitalHuman.Services
                 {
                     PropertyNamingPolicy = JsonNamingPolicy.CamelCase
                 });
+                
+                // 添加换行符作为消息结束标记（Python服务端按行读取）
+                requestJson += "\n";
+                
                 var requestBytes = Encoding.UTF8.GetBytes(requestJson);
                 
                 _logger.LogDebug("📤 发送请求: {RequestSize} bytes", requestBytes.Length);
