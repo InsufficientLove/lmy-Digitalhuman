@@ -19,14 +19,21 @@ WORKDIR /opt/musetalk/repo/MuseTalkEngine
 COPY requirements.txt /opt/musetalk/repo/requirements.txt
 
 # 安装依赖（固定为 torch 2.1.0 + cu121；随后安装 OpenMMLab 预编译 mmcv 和相关栈）
-RUN python3 -m pip install --upgrade pip setuptools wheel && \
+# 临时跳过SSL验证（OpenMMLab证书过期问题）
+ENV PYTHONWARNINGS="ignore:Unverified HTTPS request"
+ENV PIP_TRUSTED_HOST="download.openmmlab.com pypi.org files.pythonhosted.org"
+# 设置pip全局配置以跳过SSL验证（临时方案）
+RUN pip config set global.trusted-host "download.openmmlab.com pypi.org files.pythonhosted.org pypi.python.org" && \
+    pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && \
+    python3 -m pip install --upgrade pip setuptools wheel && \
     python3 -m pip install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cu121 \
       torch==2.1.0+cu121 torchvision==0.16.0+cu121 torchaudio==2.1.0+cu121 && \
     python3 -m pip install --no-cache-dir -r /opt/musetalk/repo/requirements.txt && \
     python3 -m pip install --no-cache-dir -U mmengine==0.10.4 && \
     python3 -m pip install --no-cache-dir --no-deps -U xtcocotools==1.14.3 && \
-    (python3 -m pip install --no-cache-dir --only-binary=:all: -f https://download.openmmlab.com/mmcv/dist/cu121/torch2.1.0/index.html mmcv==2.1.0 \
-     || python3 -m pip install --no-cache-dir --only-binary=:all: -f https://download.openmmlab.com/mmcv/dist/cu121/torch2.1/index.html mmcv==2.1.0) && \
+    (python3 -m pip install --no-cache-dir --trusted-host download.openmmlab.com --only-binary=:all: -f https://download.openmmlab.com/mmcv/dist/cu121/torch2.1.0/index.html mmcv==2.1.0 \
+     || python3 -m pip install --no-cache-dir mmcv==2.1.0 \
+     || python3 -m pip install --no-cache-dir mmcv-full==1.7.2) && \
     python3 -m pip install --no-cache-dir --no-deps mmpose==1.3.2 mmdet==3.3.0 && \
     # mmpose/mmdet 运行期的小依赖
     python3 -m pip install --no-cache-dir json-tricks==3.17.3 munkres==1.1.4 chumpy==0.70 pycocotools==2.0.7 shapely==2.0.6 terminaltables==3.1.10 && \
