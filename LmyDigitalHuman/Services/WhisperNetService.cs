@@ -39,16 +39,26 @@ namespace LmyDigitalHuman.Services
 
                 _logger.LogInformation("正在初始化Whisper.NET...");
 
-                // 获取模型路径配置
-                var modelPath = _configuration["RealtimeDigitalHuman:WhisperNet:ModelPath"] ?? "Models/ggml-base.bin";
-                var modelSize = _configuration["RealtimeDigitalHuman:WhisperNet:ModelSize"] ?? "Base";
+                // 获取模型路径配置 - 使用挂载的模型目录
+                var modelSize = _configuration["RealtimeDigitalHuman:WhisperNet:ModelSize"] ?? "Large";
+                var modelFileName = GetModelFileName(modelSize);
+                var modelPath = Path.Combine("/models/whisper", modelFileName);
 
-                // 确保模型文件存在
+                // 检查模型文件是否存在
                 if (!File.Exists(modelPath))
                 {
-                    _logger.LogWarning("Whisper模型文件不存在: {ModelPath}, 尝试下载...", modelPath);
-                    await DownloadModelAsync(modelPath, modelSize);
+                    _logger.LogError("Whisper模型文件不存在: {ModelPath}", modelPath);
+                    _logger.LogError("请手动下载模型文件并放置到宿主机的 /opt/musetalk/models/whisper/ 目录");
+                    _logger.LogError("下载地址: {Url}", GetModelDownloadUrl(modelSize));
+                    _logger.LogError("文件名应为: {FileName}", modelFileName);
+                    
+                    throw new FileNotFoundException(
+                        $"Whisper模型文件不存在: {modelPath}. " +
+                        $"请从 {GetModelDownloadUrl(modelSize)} 下载模型文件，" +
+                        $"并将其放置到宿主机的 /opt/musetalk/models/whisper/{modelFileName}");
                 }
+
+                _logger.LogInformation("找到Whisper模型文件: {ModelPath}", modelPath);
 
                 // 创建Whisper工厂和处理器
                 _whisperFactory = WhisperFactory.FromPath(modelPath);
@@ -57,7 +67,7 @@ namespace LmyDigitalHuman.Services
                     .Build();
 
                 _isInitialized = true;
-                _logger.LogInformation("Whisper.NET 初始化成功");
+                _logger.LogInformation("Whisper.NET 初始化成功，使用模型: {ModelSize} ({ModelPath})", modelSize, modelPath);
                 return true;
             }
             catch (Exception ex)
@@ -237,56 +247,30 @@ namespace LmyDigitalHuman.Services
             return floatArray;
         }
 
-        private async Task DownloadModelAsync(string modelPath, string modelSize)
-        {
-            try
-            {
-                _logger.LogInformation("开始下载Whisper模型: {ModelSize}", modelSize);
-                
-                // 确保目录存在
-                var directory = Path.GetDirectoryName(modelPath);
-                if (!string.IsNullOrEmpty(directory))
-                {
-                    Directory.CreateDirectory(directory);
-                }
+        // 移除了自动下载功能，改为提示用户手动下载模型
+        // 模型应该被放置在宿主机的 /opt/musetalk/models/whisper/ 目录
+        // 容器内映射为 /models/whisper/ 目录
 
-                // 根据模型大小选择下载URL
-                var modelUrl = GetModelDownloadUrl(modelSize);
-                
-                using var httpClient = new HttpClient();
-                httpClient.Timeout = TimeSpan.FromMinutes(30); // 30分钟超时
-                
-                _logger.LogInformation("正在从 {Url} 下载模型...", modelUrl);
-                
-                var response = await httpClient.GetAsync(modelUrl);
-                response.EnsureSuccessStatusCode();
-                
-                await using var fileStream = File.Create(modelPath);
-                await response.Content.CopyToAsync(fileStream);
-                
-                _logger.LogInformation("模型下载完成: {ModelPath}", modelPath);
-            }
-            catch (Exception ex)
+        private string GetModelFileName(string modelSize)
+        {
+            // 根据模型大小返回对应的文件名
+            return modelSize.ToLower() switch
             {
-                _logger.LogError(ex, "下载Whisper模型失败");
-                throw;
-            }
+                "tiny" => "ggml-tiny.bin",
+                "base" => "ggml-base.bin",
+                "small" => "ggml-small.bin",
+                "medium" => "ggml-medium.bin",
+                "large" => "ggml-large-v3.bin",
+                _ => "ggml-base.bin"
+            };
         }
 
         private string GetModelDownloadUrl(string modelSize)
         {
             // Whisper模型下载地址
             var baseUrl = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/";
-            
-            return modelSize.ToLower() switch
-            {
-                "tiny" => $"{baseUrl}ggml-tiny.bin",
-                "base" => $"{baseUrl}ggml-base.bin",
-                "small" => $"{baseUrl}ggml-small.bin",
-                "medium" => $"{baseUrl}ggml-medium.bin",
-                "large" => $"{baseUrl}ggml-large-v3.bin",
-                _ => $"{baseUrl}ggml-base.bin"
-            };
+            var fileName = GetModelFileName(modelSize);
+            return $"{baseUrl}{fileName}";
         }
 
         public void Dispose()
