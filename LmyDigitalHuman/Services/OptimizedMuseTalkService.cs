@@ -45,8 +45,8 @@ namespace LmyDigitalHuman.Services
                     outputPath: outputPath,
                     templateDir: "./wwwroot/templates",
                     fps: request.Fps ?? 25,
-                    bboxShift: request.BboxShift ?? 0,
-                    parsingMode: request.ParsingMode ?? "jaw");
+                    bboxShift: request.BboxShift.HasValue ? (int)Math.Round(request.BboxShift.Value) : 0,
+                    parsingMode: "jaw");
 
                 if (response?.Success == true && File.Exists(outputPath))
                 {
