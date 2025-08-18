@@ -82,6 +82,16 @@ namespace LmyDigitalHuman.Services
             return Task.FromResult(string.Empty);
         }
 
+        public Task<List<QueuedJob>> GetQueueStatusAsync()
+        {
+            return Task.FromResult(new List<QueuedJob>());
+        }
+
+        public Task<bool> CancelQueuedJobAsync(string jobId)
+        {
+            return Task.FromResult(true);
+        }
+
         public Task<DigitalHumanResponse?> GetQueuedVideoResultAsync(string jobId)
         {
             return Task.FromResult<DigitalHumanResponse?>(null);
@@ -107,9 +117,26 @@ namespace LmyDigitalHuman.Services
             return Task.FromResult(true);
         }
 
-        public Task<PreprocessingResult> PreprocessTemplateAsync(string templateId)
+        public async Task<PreprocessingResult> PreprocessTemplateAsync(string templateId)
         {
-            return Task.FromResult(new PreprocessingResult { Success = true, TemplateId = templateId, PreprocessingTime = 0 });
+            try
+            {
+                // 推断模板图片路径
+                var imagePath = Path.Combine(_pathManager.GetWebRootPath(), "templates", $"{templateId}.jpg");
+                var response = await _persistentClient.PreprocessAsync(templateId, imagePath);
+                var success = response?.Success == true;
+                return new PreprocessingResult
+                {
+                    Success = success,
+                    TemplateId = templateId,
+                    PreprocessingTime = (long)((response?.ProcessTime ?? 0) * 1000)
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "PreprocessTemplateAsync failed: {TemplateId}", templateId);
+                return new PreprocessingResult { Success = false, TemplateId = templateId, PreprocessingTime = 0 };
+            }
         }
 
         public Task<bool> WarmupTemplateAsync(string templateId)
