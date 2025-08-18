@@ -139,8 +139,26 @@ namespace LmyDigitalHuman.Services
                     
                     // 进行MuseTalk预处理（永久化模型）
                     // 使用SystemName（英文名）作为文件标识，避免中文路径问题
-                    await _museTalkService.PreprocessTemplateAsync(template.SystemName);
-                    _logger.LogInformation("MuseTalk预处理完成: SystemName={SystemName}", template.SystemName);
+                    var preprocessResult = await _museTalkService.PreprocessTemplateAsync(template.SystemName);
+                    
+                    // 检查预处理结果
+                    if (!preprocessResult.Success)
+                    {
+                        _logger.LogError("MuseTalk预处理失败: SystemName={SystemName}", template.SystemName);
+                        template.Status = "error";
+                        template.UpdatedAt = DateTime.Now;
+                        await SaveTemplateToFileAsync(template);
+                        
+                        return new CreateDigitalHumanTemplateResponse
+                        {
+                            Success = false,
+                            Message = "模板预处理失败，请检查服务连接",
+                            TemplateId = templateId,
+                            ProcessingTime = (DateTime.Now - startTime).TotalMilliseconds.ToString()
+                        };
+                    }
+                    
+                    _logger.LogInformation("MuseTalk预处理成功: SystemName={SystemName}", template.SystemName);
                     
                     // 预处理完成，模板就绪
                     _logger.LogInformation("模板预处理完成，已就绪: DisplayName={DisplayName}", template.DisplayName);
@@ -155,7 +173,7 @@ namespace LmyDigitalHuman.Services
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "模板预处理失败: DisplayName={DisplayName}, SystemName={SystemName}", 
+                    _logger.LogError(ex, "模板预处理异常: DisplayName={DisplayName}, SystemName={SystemName}", 
                         template.DisplayName, template.SystemName);
                     template.Status = "error";
                     template.UpdatedAt = DateTime.Now;
@@ -165,7 +183,7 @@ namespace LmyDigitalHuman.Services
                     return new CreateDigitalHumanTemplateResponse
                     {
                         Success = false,
-                        Message = $"模板预处理失败: {ex.Message}",
+                        Message = $"模板预处理异常: {ex.Message}",
                         TemplateId = templateId,
                         ProcessingTime = (DateTime.Now - startTime).TotalMilliseconds.ToString()
                     };
