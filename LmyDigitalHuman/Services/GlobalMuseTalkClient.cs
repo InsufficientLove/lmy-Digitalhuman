@@ -553,18 +553,23 @@ namespace LmyDigitalHuman.Services
         {
             try
             {
-                // 关键修复：使用WMI获取真实的命令行参数
-                using var searcher = new System.Management.ManagementObjectSearcher(
-                    $"SELECT CommandLine FROM Win32_Process WHERE ProcessId = {process.Id}");
-                    
-                foreach (System.Management.ManagementObject obj in searcher.Get())
+                // 在 Windows 上，使用 WMI 获取真实的命令行参数；其他平台走备用方案
+                if (OperatingSystem.IsWindows())
                 {
-                    var commandLine = obj["CommandLine"]?.ToString() ?? "";
-                    return commandLine;
+                    using var searcher = new System.Management.ManagementObjectSearcher(
+                        $"SELECT CommandLine FROM Win32_Process WHERE ProcessId = {process.Id}");
+
+                    foreach (System.Management.ManagementObject obj in searcher.Get())
+                    {
+                        var commandLine = obj["CommandLine"]?.ToString() ?? string.Empty;
+                        return commandLine;
+                    }
                 }
-                
-                // 备用方案：检查进程名和模块
-                return process.ProcessName + " " + (process.StartInfo.Arguments ?? "");
+
+                // 备用方案：检查进程名与启动参数（在非 Windows 或未取到 WMI 时）
+                var startArgs = string.Empty;
+                try { startArgs = process.StartInfo?.Arguments ?? string.Empty; } catch { /* ignore */ }
+                return process.ProcessName + (string.IsNullOrWhiteSpace(startArgs) ? string.Empty : " " + startArgs);
             }
             catch
             {
