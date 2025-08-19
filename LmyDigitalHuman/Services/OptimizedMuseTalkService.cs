@@ -39,14 +39,25 @@ namespace LmyDigitalHuman.Services
 
                 var outputPath = Path.Combine(videosDir, $"musetalk_{Guid.NewGuid():N}.mp4");
                 // 使用与预处理相同的缓存目录
+                // 确保有有效的TemplateId
+                if (string.IsNullOrEmpty(request.TemplateId))
+                {
+                    _logger.LogError("TemplateId不能为空");
+                    return new DigitalHumanResponse
+                    {
+                        Success = false,
+                        Message = "TemplateId is required"
+                    };
+                }
+                
                 var cacheDir = Path.Combine(
                     "/opt/musetalk/models/templates",
-                    request.TemplateId ?? "default");
+                    request.TemplateId);
                 Directory.CreateDirectory(cacheDir);
 
                 // 尝试通过持久化服务推理（需要服务端支持）
                 var response = await _persistentClient.InferenceAsync(
-                    templateId: request.TemplateId ?? "default",
+                    templateId: request.TemplateId,
                     audioPath: request.AudioPath,
                     outputPath: outputPath,
                     templateDir: "./wwwroot/templates",

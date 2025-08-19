@@ -279,6 +279,7 @@ namespace LmyDigitalHuman.Services
                 metricsStopwatch.Restart();
                 var videoResponse = await _museTalkService.GenerateVideoAsync(new DigitalHumanRequest
                 {
+                    TemplateId = request.TemplateId,  // 传递正确的模板ID
                     AvatarImagePath = template.ImagePath,
                     AudioPath = ttsResult.AudioPath,
                     Quality = request.Quality,
@@ -445,6 +446,7 @@ namespace LmyDigitalHuman.Services
                 metricsStopwatch.Restart();
                 var videoResponse = await _museTalkService.GenerateVideoAsync(new DigitalHumanRequest
                 {
+                    TemplateId = request.TemplateId,  // 传递正确的模板ID
                     AvatarImagePath = template.ImagePath,
                     AudioPath = ttsResult.AudioPath,
                     Quality = request.Quality,
