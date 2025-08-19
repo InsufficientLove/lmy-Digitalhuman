@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   musetalk-python:
     # 暴露Python服务端口

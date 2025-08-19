@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   # 本地测试仅覆盖端口与标签，不改变构建和卷挂载
   musetalk-python:
