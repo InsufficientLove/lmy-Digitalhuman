@@ -8,7 +8,7 @@ namespace LmyDigitalHuman.Services
     /// <summary>
     /// Edge TTS 语音合成服务实现
     /// </summary>
-    public class EdgeTTSService : IEdgeTTSService
+    public class EdgeTTSService : IEdgeTTSService, ITTSService
     {
         private readonly ILogger<EdgeTTSService> _logger;
         private readonly IConfiguration _configuration;
@@ -251,6 +251,24 @@ namespace LmyDigitalHuman.Services
         public async Task<List<VoiceInfo>> GetAvailableVoicesAsync()
         {
             return await Task.FromResult(_chineseVoices);
+        }
+
+        /// <summary>
+        /// 获取可用的语音设置列表（ITTSService接口实现）
+        /// </summary>
+        async Task<List<VoiceSettings>> ITTSService.GetAvailableVoicesAsync()
+        {
+            var voices = await GetAvailableVoicesAsync();
+            return voices.Select(v => new VoiceSettings
+            {
+                Voice = v.Name,
+                VoiceId = v.Name,
+                Rate = "medium",
+                Pitch = "medium",
+                Speed = 1.0f,
+                Volume = 1.0f,
+                Emotion = "neutral"
+            }).ToList();
         }
 
         /// <summary>
