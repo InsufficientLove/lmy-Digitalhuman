@@ -85,5 +85,27 @@ namespace LmyDigitalHuman.Services
             }
             return false;
         }
+
+        public async Task<string> DetectBestPythonEnvironmentAsync()
+        {
+            // 在Docker环境中，直接返回python3
+            return await Task.FromResult(_pythonPath);
+        }
+
+        public async Task<bool> ValidatePythonEnvironmentAsync(string pythonPath, params string[] requiredPackages)
+        {
+            // 简单验证Python是否可用
+            if (pythonPath != _pythonPath)
+            {
+                return false;
+            }
+            return await CheckPythonEnvironmentAsync();
+        }
+
+        public async Task<List<string>> GetAllAvailablePythonEnvironmentsAsync()
+        {
+            // Docker环境中只有一个Python环境
+            return await Task.FromResult(new List<string> { _pythonPath });
+        }
     }
 }
