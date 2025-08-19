@@ -36,7 +36,10 @@ services:
       - ./MuseTalkEngine:/opt/musetalk/repo/MuseTalkEngine
       - ./MuseTalk:/opt/musetalk/repo/MuseTalk
       - ./LmyDigitalHuman:/opt/musetalk/repo/LmyDigitalHuman
-      - /opt/musetalk/models:/models
+      # 关键：将模型目录挂载到MuseTalk期望的位置
+      - /opt/musetalk/models:/opt/musetalk/repo/MuseTalk/models
+      # 模板预处理缓存目录
+      - /opt/musetalk/models:/opt/musetalk/models
       - /opt/musetalk/videos:/videos
       - /opt/musetalk/temp:/temp
     working_dir: /opt/musetalk/repo/MuseTalkEngine
@@ -64,7 +67,8 @@ services:
       - musetalk-python
     volumes:
       - ./LmyDigitalHuman:/opt/musetalk/repo/LmyDigitalHuman
-      - /opt/musetalk/models:/models
+      # 模板预处理缓存目录（C#端需要访问）
+      - /opt/musetalk/models:/opt/musetalk/models
       - /opt/musetalk/videos:/videos
       - /opt/musetalk/temp:/temp
     networks:
