@@ -78,6 +78,7 @@ try
     
     // 注册其他服务
     builder.Services.AddSingleton<IEdgeTTSService, EdgeTTSService>();
+    builder.Services.AddSingleton<ITTSService, SimpleTTSService>(); // 使用简化的TTS服务
     builder.Services.AddSingleton<IAudioPipelineService, AudioPipelineService>();
     builder.Services.AddSingleton<IConversationService, ConversationService>();
     builder.Services.AddSingleton<IDigitalHumanTemplateService, DigitalHumanTemplateService>();

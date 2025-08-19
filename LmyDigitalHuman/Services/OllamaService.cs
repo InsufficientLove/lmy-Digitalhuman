@@ -22,7 +22,7 @@ namespace LmyDigitalHuman.Services
             _configuration = configuration;
             _baseUrl = _configuration["Ollama:BaseUrl"] ?? 
                       _configuration["LocalLLM:BaseUrl"] ?? 
-                      "http://localhost:11434";
+                      "http://host.docker.internal:11434";
             
             // 设置超时时间 - 优先使用Ollama配置，然后是LocalLLM配置
             var timeoutSeconds = _configuration.GetValue<int>("Ollama:Timeout", 
