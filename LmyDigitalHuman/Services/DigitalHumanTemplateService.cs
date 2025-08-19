@@ -380,7 +380,7 @@ namespace LmyDigitalHuman.Services
                 }
 
                 // 强制重新加载模板列表以确保同步
-                await LoadTemplatesAsync();
+                LoadExistingTemplates();
                 
                 _logger.LogInformation("模板删除成功: {TemplateId}", templateId);
                 return true;
