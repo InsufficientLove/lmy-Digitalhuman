@@ -794,6 +794,9 @@ def start_ultra_fast_service(port=28888):
         server_socket.bind(('0.0.0.0', port))
         server_socket.listen(5)
         
+        # 验证监听状态
+        sock_name = server_socket.getsockname()
+        print(f"✅ Socket成功绑定到: {sock_name}")
         print(f"Ultra Fast Service 就绪 - 监听端口: {port}")
         print("毫秒级响应模式已启用")
         
@@ -803,10 +806,13 @@ def start_ultra_fast_service(port=28888):
                 print(f"🔗 客户端连接: {addr}")
                 
                 # 处理请求
-                threading.Thread(
+                thread = threading.Thread(
                     target=handle_client_ultra_fast, 
                     args=(client_socket,)
-                ).start()
+                )
+                thread.daemon = True  # 设置为守护线程
+                thread.start()
+                print(f"启动处理线程: {thread.name}")
                 
             except Exception as e:
                 print(f"连接处理失败: {str(e)}")
