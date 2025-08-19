@@ -1,5 +1,6 @@
-# 使用更新的CUDA版本，更接近宿主机的12.9
-FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
+# 使用CUDA 12.1以匹配PyTorch编译版本（宿主机12.9完全兼容）
+# 可选：12.1/12.2/12.3/12.4都可以，宿主机CUDA 12.9都支持
+FROM nvidia/cuda:12.1.0-cudnn8-runtime-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PIP_DEFAULT_TIMEOUT=300 \
