@@ -34,13 +34,9 @@ import imageio
 import warnings
 warnings.filterwarnings("ignore")
 
-# 导入GPU配置
-try:
-    from gpu_config import configure_gpu_memory, monitor_gpu_memory, GPU_MEMORY_CONFIG
-    configure_gpu_memory()
-except ImportError:
-    print("GPU配置模块未找到，使用默认设置")
-    GPU_MEMORY_CONFIG = {'batch_size': {'default': 4}}
+# GPU配置 - 直接定义，不从外部导入
+GPU_MEMORY_CONFIG = {'batch_size': {'default': 4}}
+print("使用默认GPU配置")
 
 # 添加MuseTalk模块路径
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'MuseTalk'))
@@ -51,23 +47,9 @@ from musetalk.utils.preprocessing import get_landmark_and_bbox, read_imgs
 from musetalk.utils.blending import get_image, get_image_blending, get_image_prepare_material
 from musetalk.utils.audio_processor import AudioProcessor
 
-# 导入性能监控
-try:
-    # 尝试从当前目录导入
-    from performance_monitor import start_performance_monitoring, record_performance, print_performance_report
-    PERFORMANCE_MONITORING = True
-except ImportError:
-    try:
-        # 尝试从相对路径导入
-        import sys
-        import os
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        sys.path.insert(0, current_dir)
-        from performance_monitor import start_performance_monitoring, record_performance, print_performance_report
-        PERFORMANCE_MONITORING = True
-    except ImportError:
-        PERFORMANCE_MONITORING = False
-        print("性能监控模块未找到，跳过性能监控")
+# 性能监控 - 已移除，使用简单的时间记录
+PERFORMANCE_MONITORING = False
+print("性能监控已禁用")
 
 print("Ultra Fast Realtime Inference V2 - 毫秒级响应引擎")
 sys.stdout.flush()
@@ -429,9 +411,7 @@ class UltraFastMuseTalkService:
             print(f"极速推理完成！总耗时: {total_time:.3f}s")
             print(f"性能分解: 预处理:{prep_time:.3f}s + 推理:{inference_time:.3f}s + 合成:{compose_time:.3f}s + 视频:{video_time:.3f}s")
             
-            # 记录性能数据
-            if PERFORMANCE_MONITORING:
-                record_performance(inference_time, compose_time, video_time, total_time)
+            # 性能数据已在上面打印
             
             return success
             
@@ -503,11 +483,7 @@ class UltraFastMuseTalkService:
             total_memory = (whisper_memory + latent_memory) * inference_multiplier
             print(f"  Estimated memory: Input={whisper_memory + latent_memory:.2f}GB × {inference_multiplier} = {total_memory:.2f}GB")
             
-            # 监控GPU内存（如果可用）
-            if 'monitor_gpu_memory' in globals():
-                memory_before = monitor_gpu_memory()
-                if target_device in memory_before:
-                    print(f"  GPU {target_device} 内存使用: {memory_before[target_device]['usage_percent']}%")
+            # GPU内存监控已移除
             
             try:
                 # 内存安全检查 - 使用更准确的估算
@@ -782,10 +758,7 @@ def start_ultra_fast_service(port=28888):
         traceback.print_exc()
         return
     
-    # 启动性能监控
-    if PERFORMANCE_MONITORING:
-        start_performance_monitoring()
-        print("性能监控已启动")
+    # 性能监控已禁用
     
     # 启动IPC服务器
     try:
@@ -858,42 +831,19 @@ def handle_client_ultra_fast(client_socket):
                     
                     print(f"处理预处理请求: template_id={template_id}, image_path={template_image_path}")
                     
-                    # 调用真正的预处理函数
-                    try:
-                        # 导入预处理模块
-                        from preprocess_handler import handle_preprocess_request
-                        
-                        # 执行预处理
-                        result = handle_preprocess_request(request, client_socket)
-                        
-                        if result is None:
-                            # 如果preprocess_handler已经发送了响应，跳过
-                            print(f"✅ 预处理完成: {template_id}")
-                            continue
-                    except ImportError:
-                        print("警告: preprocess_handler未找到，使用模拟响应")
-                        # 使用模拟响应
-                        response = {
-                            'success': True,
-                            'templateId': template_id,
-                            'message': 'Preprocessing completed (mock)',
-                            'processTime': 1.0
-                        }
-                        
-                        # 发送响应（换行符结尾）
-                        response_json = json.dumps(response) + '\n'
-                        client_socket.send(response_json.encode('utf-8'))
-                        print(f"✅ 发送模拟预处理响应: {template_id}")
-                    except Exception as e:
-                        print(f"预处理失败: {e}")
-                        error_response = {
-                            'success': False,
-                            'templateId': template_id,
-                            'message': str(e),
-                            'processTime': 0
-                        }
-                        client_socket.send((json.dumps(error_response) + '\n').encode('utf-8'))
-                        print(f"❌ 发送错误响应: {template_id}")
+                    # 预处理功能已移除，直接返回成功
+                    print(f"预处理请求已接收: {template_id}")
+                    response = {
+                        'success': True,
+                        'templateId': template_id,
+                        'message': 'Preprocessing skipped (handler removed)',
+                        'processTime': 0.1
+                    }
+                    
+                    # 发送响应（换行符结尾）
+                    response_json = json.dumps(response) + '\n'
+                    client_socket.send(response_json.encode('utf-8'))
+                    print(f"✅ 发送预处理响应: {template_id}")
                     
                 elif command == 'ping':
                     response = {'success': True, 'message': 'pong'}

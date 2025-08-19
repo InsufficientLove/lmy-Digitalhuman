@@ -26,15 +26,12 @@ services:
       dockerfile: MuseTalkEngine/Dockerfile
     container_name: musetalk-python
     environment:
-      - CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0,1}
-      - NVIDIA_VISIBLE_DEVICES=all
-      - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:256,garbage_collection_threshold:0.9,expandable_segments:True
+      # 只保留必要的路径配置，不设置CUDA相关变量
       - MUSE_MODELS_DIR=/models
       - MUSE_VIDEOS_DIR=/videos
       - MUSE_TEMP_DIR=/temp
       - MUSE_TALK_DIR=/opt/musetalk/repo/MuseTalk
-      - PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
-      - HF_HOME=/root/.cache/huggingface
+      - CONTAINER_ENV=1  # 标记容器环境
     volumes:
       - ./MuseTalkEngine:/opt/musetalk/repo/MuseTalkEngine
       - ./MuseTalk:/opt/musetalk/repo/MuseTalk
@@ -42,8 +39,6 @@ services:
       - /opt/musetalk/models:/models
       - /opt/musetalk/videos:/videos
       - /opt/musetalk/temp:/temp
-      - /opt/musetalk/models/hf-cache:/root/.cache/huggingface
-      - /opt/musetalk/models/torch-cache:/root/.cache/torch
     working_dir: /opt/musetalk/repo/MuseTalkEngine
     # 需要主机已安装 nvidia-container-toolkit
     deploy:
