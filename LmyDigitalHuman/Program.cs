@@ -96,8 +96,8 @@ try
     builder.Services.AddSingleton<ILocalLLMService, OllamaService>();
     
     // 注册辅助服务
-    builder.Services.AddSingleton<IPathManager, PathManager>();
-    builder.Services.AddSingleton<IPythonEnvironmentService, PythonEnvironmentService>();
+    // IPathManager已在上面注册，这里不需要重复注册
+    // IPythonEnvironmentService已根据环境在上面注册，这里不能重复注册
     builder.Services.AddSingleton<IGPUResourceManager, GPUResourceManager>();
     builder.Services.AddSingleton<GlobalMuseTalkClient>();
 
