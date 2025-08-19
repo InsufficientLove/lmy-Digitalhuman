@@ -82,15 +82,59 @@ namespace LmyDigitalHuman.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "检查edge-tts失败");
-            }
-            return false;
-        }
+                    }
+        return false;
+    }
 
-        public async Task<string> DetectBestPythonEnvironmentAsync()
+    private async Task<string> GetPythonVersionAsync()
+    {
+        try
         {
-            // 在Docker环境中，直接返回python3
-            return await Task.FromResult(_pythonPath);
+            var processInfo = new ProcessStartInfo
+            {
+                FileName = _pythonPath,
+                Arguments = "--version",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            using var process = Process.Start(processInfo);
+            if (process != null)
+            {
+                await process.WaitForExitAsync();
+                if (process.ExitCode == 0)
+                {
+                    var version = await process.StandardOutput.ReadToEndAsync();
+                    if (string.IsNullOrEmpty(version))
+                        version = await process.StandardError.ReadToEndAsync();
+                    return version.Trim();
+                }
+            }
         }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "获取Python版本失败");
+        }
+        return "Unknown";
+    }
+
+    public async Task<PythonEnvironmentInfo> DetectBestPythonEnvironmentAsync()
+    {
+        // 在Docker环境中，直接返回python3
+        var info = new PythonEnvironmentInfo
+        {
+            PythonPath = _pythonPath,
+            Version = await GetPythonVersionAsync(),
+            IsVirtualEnv = false,
+            VirtualEnvPath = "",
+            InstalledPackages = new List<string> { "edge-tts" },
+            IsValid = await CheckPythonEnvironmentAsync(),
+            Priority = 1
+        };
+        return info;
+    }
 
         public async Task<bool> ValidatePythonEnvironmentAsync(string pythonPath, params string[] requiredPackages)
         {
@@ -102,10 +146,20 @@ namespace LmyDigitalHuman.Services
             return await CheckPythonEnvironmentAsync();
         }
 
-        public async Task<List<string>> GetAllAvailablePythonEnvironmentsAsync()
+            public async Task<List<PythonEnvironmentInfo>> GetAllAvailablePythonEnvironmentsAsync()
+    {
+        // Docker环境中只有一个Python环境
+        var info = new PythonEnvironmentInfo
         {
-            // Docker环境中只有一个Python环境
-            return await Task.FromResult(new List<string> { _pythonPath });
-        }
+            PythonPath = _pythonPath,
+            Version = await GetPythonVersionAsync(),
+            IsVirtualEnv = false,
+            VirtualEnvPath = "",
+            InstalledPackages = new List<string> { "edge-tts" },
+            IsValid = await CheckPythonEnvironmentAsync(),
+            Priority = 1
+        };
+        return new List<PythonEnvironmentInfo> { info };
+    }
     }
 }
