@@ -77,8 +77,19 @@ try
     builder.Services.AddSingleton<IMuseTalkService, OptimizedMuseTalkService>();
     
     // 注册其他服务
+    // 在Docker环境中使用专用的Python环境服务
+    if (builder.Environment.EnvironmentName == "Docker")
+    {
+        builder.Services.AddSingleton<IPythonEnvironmentService, DockerPythonEnvironmentService>();
+    }
+    else
+    {
+        builder.Services.AddSingleton<IPythonEnvironmentService, PythonEnvironmentService>();
+    }
+    
+    builder.Services.AddSingleton<IPathManager, PathManager>();
     builder.Services.AddSingleton<IEdgeTTSService, EdgeTTSService>();
-    builder.Services.AddSingleton<ITTSService, SimpleTTSService>(); // 使用简化的TTS服务
+    builder.Services.AddSingleton<ITTSService, EdgeTTSService>(); // 使用真实的EdgeTTS服务
     builder.Services.AddSingleton<IAudioPipelineService, AudioPipelineService>();
     builder.Services.AddSingleton<IConversationService, ConversationService>();
     builder.Services.AddSingleton<IDigitalHumanTemplateService, DigitalHumanTemplateService>();
