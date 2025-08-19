@@ -48,6 +48,5 @@ RUN pip config set global.trusted-host "download.openmmlab.com pypi.org files.py
 COPY MuseTalkEngine /opt/musetalk/repo/MuseTalkEngine
 
 EXPOSE 28888
-COPY MuseTalkEngine/start.sh /usr/local/bin/muse-start
-RUN chmod +x /usr/local/bin/muse-start
-CMD ["muse-start"]
+WORKDIR /opt/musetalk/repo/MuseTalkEngine
+CMD ["python3", "direct_launcher.py"]
