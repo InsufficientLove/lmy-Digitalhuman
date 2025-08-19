@@ -333,24 +333,56 @@ namespace LmyDigitalHuman.Services
         {
             try
             {
+                // 先从内存中移除
                 if (!_templates.TryRemove(templateId, out var template))
                 {
-                    return false;
+                    _logger.LogWarning("模板不在内存中: {TemplateId}", templateId);
+                    // 即使不在内存中，也尝试删除文件
                 }
 
-                // 删除相关文件
+                // 删除JSON文件
                 var templateFile = Path.Combine(_templatesPath, $"{templateId}.json");
                 if (File.Exists(templateFile))
                 {
                     File.Delete(templateFile);
+                    _logger.LogInformation("已删除模板文件: {File}", templateFile);
                 }
 
-                var imageFile = Path.Combine(_templatesPath, $"{templateId}.jpg");
-                if (File.Exists(imageFile))
+                // 删除所有可能的图片格式
+                var imageExtensions = new[] { ".jpg", ".jpeg", ".png", ".webp", ".gif" };
+                foreach (var ext in imageExtensions)
                 {
-                    File.Delete(imageFile);
+                    var imageFile = Path.Combine(_templatesPath, $"{templateId}{ext}");
+                    if (File.Exists(imageFile))
+                    {
+                        File.Delete(imageFile);
+                        _logger.LogInformation("已删除图片文件: {File}", imageFile);
+                    }
+                    
+                    // 也尝试删除以模板名称命名的文件（兼容旧格式）
+                    if (template != null)
+                    {
+                        var nameImageFile = Path.Combine(_templatesPath, $"{template.SystemName}{ext}");
+                        if (File.Exists(nameImageFile) && nameImageFile != imageFile)
+                        {
+                            File.Delete(nameImageFile);
+                            _logger.LogInformation("已删除图片文件(按名称): {File}", nameImageFile);
+                        }
+                    }
                 }
 
+                // 删除预处理相关文件
+                var preprocessDir = Path.Combine("/opt/musetalk/models/templates", templateId);
+                if (Directory.Exists(preprocessDir))
+                {
+                    Directory.Delete(preprocessDir, true);
+                    _logger.LogInformation("已删除预处理目录: {Dir}", preprocessDir);
+                }
+
+                // 强制重新加载模板列表以确保同步
+                await LoadTemplatesAsync();
+                
+                _logger.LogInformation("模板删除成功: {TemplateId}", templateId);
                 return true;
             }
             catch (Exception ex)
