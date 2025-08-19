@@ -1,4 +1,5 @@
-FROM nvidia/cuda:12.1.0-cudnn8-devel-ubuntu22.04
+# 使用更新的CUDA版本，更接近宿主机的12.9
+FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PIP_DEFAULT_TIMEOUT=300 \
