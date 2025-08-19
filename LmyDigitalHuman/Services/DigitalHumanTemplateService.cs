@@ -506,7 +506,7 @@ namespace LmyDigitalHuman.Services
                 // 调用本地大模型获取回复
                 var llmResponse = await _llmService.ChatAsync(new LocalLLMRequest
                 {
-                    ModelName = _configuration["LocalLLM:DefaultModel"] ?? _configuration["Ollama:Model"] ?? "qwen2.5vl:7b",
+                    ModelName = _configuration["LocalLLM:DefaultModel"] ?? _configuration["Ollama:Model"] ?? "qwen2.5:latest",
                     Message = userInput,
                     ConversationId = request.ConversationId,
                     Temperature = 0.7f,
