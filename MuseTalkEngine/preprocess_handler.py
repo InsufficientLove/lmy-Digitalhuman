@@ -22,20 +22,34 @@ def handle_preprocess_request(request, client_socket):
         
         # 尝试调用真正的预处理
         try:
-            # 导入预处理模块
+            # 导入预处理模块 - 先切换到正确的工作目录
             import sys
-            sys.path.insert(0, '/opt/musetalk/repo/MuseTalkEngine')
-            from optimized_preprocessing_v2 import MuseTalkPreprocessor
+            original_cwd = os.getcwd()
             
-            print(f"使用MuseTalkPreprocessor进行真正的预处理...")
-            preprocessor = MuseTalkPreprocessor()
+            # 切换到MuseTalk目录（optimized_preprocessing_v2需要）
+            os.chdir('/opt/musetalk/repo/MuseTalk')
+            sys.path.insert(0, '/opt/musetalk/repo/MuseTalkEngine')
+            sys.path.insert(0, '/opt/musetalk/repo/MuseTalk')
+            
+            from optimized_preprocessing_v2 import OptimizedPreprocessor
+            
+            print(f"使用OptimizedPreprocessor进行真正的预处理...")
+            preprocessor = OptimizedPreprocessor()
+            
+            # 初始化模型
+            if not preprocessor.is_initialized:
+                preprocessor.initialize_models()
             
             # 执行真正的预处理
-            result = preprocessor.preprocess_template(
-                template_id=template_id,
-                image_path=template_path,
-                bbox_shift=bbox_shift
+            template_output_dir = f'/opt/musetalk/models/templates/{template_id}'
+            result = preprocessor.preprocess_template_ultra_fast(
+                template_path=template_path,
+                output_dir=template_output_dir,
+                template_id=template_id
             )
+            
+            # 恢复原始工作目录
+            os.chdir(original_cwd)
             
             if result:
                 # 读取预处理结果信息
