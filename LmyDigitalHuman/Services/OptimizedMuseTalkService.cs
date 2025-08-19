@@ -52,7 +52,9 @@ namespace LmyDigitalHuman.Services
                     templateDir: "./wwwroot/templates",
                     fps: request.Fps ?? 25,
                     bboxShift: request.BboxShift.HasValue ? (int)Math.Round(request.BboxShift.Value) : 0,
-                    parsingMode: "jaw");
+                    parsingMode: "jaw",
+                    cacheDir: cacheDir,
+                    batchSize: 6);
 
                 if (response?.Success == true && File.Exists(outputPath))
                 {
