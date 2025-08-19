@@ -467,8 +467,14 @@ class UltraFastMuseTalkService:
         def process_batch_on_gpu(batch_info):
             batch_idx, (whisper_batch, latent_batch) = batch_info
             
-            # 智能GPU分配
+            # 智能GPU分配 - 确保使用有效的GPU
             target_device = self.devices[batch_idx % self.gpu_count]
+            
+            # 安全检查：确保GPU模型存在
+            if target_device not in self.gpu_models:
+                print(f"⚠️ 批次 {batch_idx}: GPU {target_device} 模型未初始化，跳过")
+                return batch_idx, []
+            
             gpu_models = self.gpu_models[target_device]
             
             print(f"处理批次 {batch_idx} -> GPU {target_device}")
