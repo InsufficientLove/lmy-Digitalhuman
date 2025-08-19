@@ -12,8 +12,12 @@ def handle_preprocess_request(request, client_socket):
         template_path = request.get('templateImagePath') or request.get('template_image_path')
         bbox_shift = request.get('bboxShift', 0) or request.get('bbox_shift', 0)
         
-        # 现在通过Docker卷共享，C#的/app/wwwroot直接映射到Python容器
-        # 不需要路径转换
+        # 路径转换：C#容器发送的是/app/wwwroot/，需要转换为Python容器能访问的路径
+        if template_path and template_path.startswith('/app/wwwroot/'):
+            # 转换为Python容器中的实际路径
+            relative_path = template_path.replace('/app/wwwroot/', '')
+            template_path = f'/opt/musetalk/repo/LmyDigitalHuman/wwwroot/{relative_path}'
+            print(f"路径转换: {request.get('template_image_path')} -> {template_path}")
         
         print(f"开始预处理: template_id={template_id}, path={template_path}")
         

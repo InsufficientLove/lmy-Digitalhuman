@@ -41,7 +41,6 @@ services:
       - ./MuseTalkEngine:/opt/musetalk/repo/MuseTalkEngine
       - ./MuseTalk:/opt/musetalk/repo/MuseTalk
       - ./LmyDigitalHuman:/opt/musetalk/repo/LmyDigitalHuman
-      - ./LmyDigitalHuman/wwwroot:/app/wwwroot  # 共享wwwroot目录
       - /opt/musetalk/models:/models
       - /opt/musetalk/videos:/videos
       - /opt/musetalk/temp:/temp
