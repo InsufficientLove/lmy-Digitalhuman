@@ -5,7 +5,10 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PIP_DEFAULT_TIMEOUT=300 \
     PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple \
     PIP_TRUSTED_HOST=pypi.tuna.tsinghua.edu.cn
-RUN apt-get update && apt-get install -y \
+# 使用阿里云镜像源加速apt-get
+RUN sed -i 's@//.*archive.ubuntu.com@//mirrors.aliyun.com@g' /etc/apt/sources.list && \
+    sed -i 's@//.*security.ubuntu.com@//mirrors.aliyun.com@g' /etc/apt/sources.list && \
+    apt-get update && apt-get install -y \
     python3.10 python3.10-venv python3-pip \
     ca-certificates \
     ffmpeg git curl wget \

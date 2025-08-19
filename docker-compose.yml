@@ -25,13 +25,17 @@ services:
       context: .
       dockerfile: MuseTalkEngine/Dockerfile
     container_name: musetalk-python
+    # 关键：添加nvidia runtime让容器能访问GPU
+    runtime: nvidia
     environment:
-      # 只保留必要的路径配置，不设置CUDA相关变量
-      - MUSE_MODELS_DIR=/models
+      # GPU访问配置
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      # 路径配置
+      - MUSE_MODELS_DIR=/opt/musetalk/models
       - MUSE_VIDEOS_DIR=/videos
       - MUSE_TEMP_DIR=/temp
       - MUSE_TALK_DIR=/opt/musetalk/repo/MuseTalk
-      - CONTAINER_ENV=1  # 标记容器环境
     volumes:
       - ./MuseTalkEngine:/opt/musetalk/repo/MuseTalkEngine
       - ./MuseTalk:/opt/musetalk/repo/MuseTalk
