@@ -50,5 +50,5 @@ COPY MuseTalkEngine /opt/musetalk/repo/MuseTalkEngine
 EXPOSE 28888
 WORKDIR /opt/musetalk/repo/MuseTalkEngine
 
-# 启动优化服务（默认使用单GPU优化版本）
-CMD ["python3", "single_gpu_optimized_service.py", "--port", "28888"]
+# 启动服务
+CMD ["python3", "direct_launcher.py"]

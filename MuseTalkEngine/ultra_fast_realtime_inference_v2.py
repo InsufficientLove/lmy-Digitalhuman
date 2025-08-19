@@ -71,9 +71,14 @@ class UltraFastMuseTalkService:
         if hasattr(self, '_initialized'):
             return
             
-        # 4GPU并行架构
-        self.gpu_count = min(4, torch.cuda.device_count())
-        self.devices = [f'cuda:{i}' for i in range(self.gpu_count)]
+        # GPU架构 - 自动适配单GPU或多GPU
+        self.gpu_count = torch.cuda.device_count() if torch.cuda.is_available() else 0
+        if self.gpu_count == 0:
+            print("❌ 未检测到GPU")
+            self.devices = []
+        else:
+            self.devices = [f'cuda:{i}' for i in range(self.gpu_count)]
+            print(f"🎮 检测到 {self.gpu_count} 个GPU")
         
         # 每个GPU独立的模型实例
         self.gpu_models = {}
@@ -349,9 +354,18 @@ class UltraFastMuseTalkService:
         if device in self.gpu_usage:
             self.gpu_usage[device] = max(0, self.gpu_usage[device] - 1)
     
-    def ultra_fast_inference_parallel(self, template_id, audio_path, output_path, cache_dir, batch_size=6, fps=25):
+    def ultra_fast_inference_parallel(self, template_id, audio_path, output_path, cache_dir, batch_size=None, fps=25):
         """极速并行推理 - 毫秒级响应"""
-        print(f"🔍 ultra_fast_inference_parallel 接收到 batch_size={batch_size}")
+        # 智能批次大小选择
+        if batch_size is None:
+            if self.gpu_count == 1:
+                # 单GPU优化：RTX 4090D 48GB可以处理大批次
+                batch_size = 12  # 默认使用12
+            else:
+                # 多GPU：每个GPU处理较小批次
+                batch_size = 6
+        
+        print(f"🔍 推理配置: GPU数={self.gpu_count}, batch_size={batch_size}")
         
         if not self.is_initialized:
             print("模型未初始化")
