@@ -38,9 +38,9 @@ namespace LmyDigitalHuman.Services
                 Directory.CreateDirectory(videosDir);
 
                 var outputPath = Path.Combine(videosDir, $"musetalk_{Guid.NewGuid():N}.mp4");
-                // 使用与预处理相同的缓存目录
                 var cacheDir = Path.Combine(
-                    "/opt/musetalk/models/templates",
+                    (Environment.GetEnvironmentVariable("PATHS_TEMP") ?? "/temp"),
+                    "model_states",
                     request.TemplateId ?? "default");
                 Directory.CreateDirectory(cacheDir);
 
