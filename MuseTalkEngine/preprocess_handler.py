@@ -12,7 +12,27 @@ def handle_preprocess_request(request, client_socket):
         template_path = request.get('templateImagePath') or request.get('template_image_path')
         bbox_shift = request.get('bboxShift', 0) or request.get('bbox_shift', 0)
         
+        # 修正图片路径 - C#端发送的是容器内路径，需要转换为实际路径
+        if template_path and template_path.startswith('/app/wwwroot/'):
+            # 转换为实际路径
+            relative_path = template_path.replace('/app/wwwroot/', '')
+            template_path = f'/opt/musetalk/repo/LmyDigitalHuman/wwwroot/{relative_path}'
+            print(f"路径转换: {request.get('template_image_path')} -> {template_path}")
+        
         print(f"开始预处理: template_id={template_id}, path={template_path}")
+        
+        # 验证文件是否存在
+        if not os.path.exists(template_path):
+            error_msg = f"图片文件不存在: {template_path}"
+            print(f"❌ {error_msg}")
+            error_response = {
+                'success': False,
+                'templateId': template_id,
+                'message': error_msg,
+                'processTime': 0
+            }
+            client_socket.send((json.dumps(error_response) + '\n').encode('utf-8'))
+            return None
         
         start_time = time.time()
         
@@ -74,38 +94,30 @@ def handle_preprocess_request(request, client_socket):
                 }
                 print(f"✅ 真正的预处理成功，耗时: {process_time:.2f}秒")
             else:
-                raise Exception("预处理返回False")
+                # 预处理失败，不要使用模拟模式
+                error_msg = "预处理失败：模型返回False"
+                print(f"❌ {error_msg}")
+                error_response = {
+                    'success': False,
+                    'templateId': template_id,
+                    'message': error_msg,
+                    'processTime': time.time() - start_time
+                }
+                client_socket.send((json.dumps(error_response) + '\n').encode('utf-8'))
+                os.chdir(original_cwd)  # 恢复工作目录
+                return None
                 
         except ImportError as e:
-            print(f"⚠️ 无法导入预处理模块，使用模拟模式: {e}")
-            # 模拟预处理
-            time.sleep(0.5)
-            (output_dir / 'preprocessed.flag').touch()
-            
-            # 创建模拟的预处理信息
-            info = {
-                'template_id': template_id,
-                'face_detected': True,
-                'bbox_shift': bbox_shift,
-                'timestamp': time.time(),
-                'mode': 'mock'
-            }
-            with open(output_dir / 'preprocessing_info.json', 'w') as f:
-                json.dump(info, f, indent=2)
-            
-            process_time = time.time() - start_time
-            response = {
-                'success': True,
+            print(f"❌ 无法导入预处理模块: {e}")
+            # 不使用模拟模式，直接返回失败
+            error_response = {
+                'success': False,
                 'templateId': template_id,
-                'message': 'Preprocessing completed (mock mode)',
-                'processTime': process_time,
-                'details': {
-                    'faceDetected': True,
-                    'outputPath': str(output_dir),
-                    'mode': 'mock'
-                }
+                'message': f"预处理模块导入失败: {str(e)}",
+                'processTime': time.time() - start_time
             }
-            print(f"⚠️ 使用模拟预处理，耗时: {process_time:.2f}秒")
+            client_socket.send((json.dumps(error_response) + '\n').encode('utf-8'))
+            return None
         
         # 发送响应
         response_json = json.dumps(response) + '\n'
