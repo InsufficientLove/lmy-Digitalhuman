@@ -1,4 +1,4 @@
-FROM nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04
+FROM nvidia/cuda:12.1.0-cudnn8-devel-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PIP_DEFAULT_TIMEOUT=300 \
@@ -31,18 +31,10 @@ RUN pip config set global.trusted-host "download.openmmlab.com pypi.org files.py
     python3 -m pip install --no-cache-dir -r /opt/musetalk/repo/requirements.txt && \
     python3 -m pip install --no-cache-dir -U mmengine==0.10.4 && \
     python3 -m pip install --no-cache-dir --no-deps -U xtcocotools==1.14.3 && \
-<<<<<<< HEAD
-    (python3 -m pip install --no-cache-dir --trusted-host download.openmmlab.com --only-binary=:all: -f https://download.openmmlab.com/mmcv/dist/cu121/torch2.1.0/index.html mmcv==2.1.0 \
+    (python3 -m pip install --no-cache-dir --trusted-host download.openmmlab.com --only-binary=:all: \
+      -f https://download.openmmlab.com/mmcv/dist/cu121/torch2.1.0/index.html mmcv==2.1.0 \
      || python3 -m pip install --no-cache-dir mmcv==2.1.0 \
      || python3 -m pip install --no-cache-dir mmcv-full==1.7.2) && \
-=======
-    # 方案1: 使用--trusted-host绕过SSL验证（临时解决方案）
-    (python3 -m pip install --no-cache-dir --only-binary=:all: --trusted-host download.openmmlab.com \
-      -f https://download.openmmlab.com/mmcv/dist/cu121/torch2.1.0/index.html mmcv==2.1.0 \
-     || python3 -m pip install --no-cache-dir --only-binary=:all: --trusted-host download.openmmlab.com \
-      -f https://download.openmmlab.com/mmcv/dist/cu121/torch2.1/index.html mmcv==2.1.0 \
-     || python3 -m pip install --no-cache-dir mmcv==2.1.0) && \
->>>>>>> 00b779bc8b45d2602894a15290e6168975556882
     python3 -m pip install --no-cache-dir --no-deps mmpose==1.3.2 mmdet==3.3.0 && \
     # mmpose/mmdet 运行期的小依赖
     python3 -m pip install --no-cache-dir json-tricks==3.17.3 munkres==1.1.4 chumpy==0.70 pycocotools==2.0.7 shapely==2.0.6 terminaltables==3.1.10 && \
