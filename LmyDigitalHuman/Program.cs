@@ -1,5 +1,6 @@
 using LmyDigitalHuman.Services;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.FileProviders;
 using Serilog;
 using Serilog.Events;
 using System.Runtime.InteropServices;
@@ -105,6 +106,15 @@ try
 
     // 启用静态文件服务
     app.UseStaticFiles();
+    
+    // 为templates目录单独配置静态文件服务
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        FileProvider = new PhysicalFileProvider(
+            Path.Combine(builder.Environment.ContentRootPath, "wwwroot", "templates")),
+        RequestPath = "/templates"
+    });
+    
     app.UseDirectoryBrowser();
 
     app.UseRouting();
