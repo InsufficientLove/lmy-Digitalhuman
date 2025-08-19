@@ -235,7 +235,9 @@ namespace LmyDigitalHuman.Services
             string templateDir = "./wwwroot/templates",
             int fps = 25,
             int bboxShift = 0,
-            string parsingMode = "jaw")
+            string parsingMode = "jaw",
+            string cacheDir = "./temp/cache",
+            int batchSize = 6)
         {
             _logger.LogInformation("开始持久化推理: TemplateId={TemplateId}", templateId);
             
@@ -250,6 +252,8 @@ namespace LmyDigitalHuman.Services
                     audio_path = audioPath,
                     output_path = outputPath,
                     template_dir = templateDir,
+                    cache_dir = cacheDir,
+                    batch_size = batchSize,
                     fps = fps,
                     bbox_shift = bboxShift,
                     parsing_mode = parsingMode
