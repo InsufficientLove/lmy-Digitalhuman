@@ -19,8 +19,8 @@ RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debia
     python3-pip \
     python3-setuptools \
     && rm -rf /var/lib/apt/lists/* && \
-    # 使用清华大学镜像源加速pip
-    pip3 install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple edge-tts
+    # 使用清华大学镜像源加速pip，添加--break-system-packages解决PEP 668限制
+    pip3 install --break-system-packages --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple edge-tts
 
 COPY --from=build /app/publish .
 ENV ASPNETCORE_URLS=http://0.0.0.0:5000
