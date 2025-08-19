@@ -279,7 +279,7 @@ namespace LmyDigitalHuman.Services
                 metricsStopwatch.Restart();
                 var videoResponse = await _museTalkService.GenerateVideoAsync(new DigitalHumanRequest
                 {
-                    TemplateId = request.TemplateId,  // 传递正确的模板ID
+                    TemplateId = template.SystemName,  // 使用SystemName而不是UUID，因为缓存文件夹使用的是SystemName
                     AvatarImagePath = template.ImagePath,
                     AudioPath = ttsResult.AudioPath,
                     Quality = request.Quality,
