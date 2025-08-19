@@ -64,7 +64,9 @@ services:
     container_name: lmy-digitalhuman
     environment:
       - ASPNETCORE_URLS=http://0.0.0.0:5000
-      - ASPNETCORE_ENVIRONMENT=Linux
+      - ASPNETCORE_ENVIRONMENT=Docker
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - musetalk-python
     volumes:
