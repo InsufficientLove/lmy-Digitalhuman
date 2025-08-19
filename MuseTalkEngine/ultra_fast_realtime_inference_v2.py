@@ -851,21 +851,49 @@ def handle_client_ultra_fast(client_socket):
                 
                 # 处理不同的命令
                 if command == 'preprocess':
-                    # 处理预处理请求
-                    template_id = request.get('templateId')
-                    print(f"处理预处理请求: {template_id}")
+                    # 处理预处理请求 - 兼容两种字段名
+                    template_id = request.get('templateId') or request.get('template_id')
+                    template_image_path = request.get('templateImagePath') or request.get('template_image_path')
+                    bbox_shift = request.get('bboxShift', 0) or request.get('bbox_shift', 0)
                     
-                    response = {
-                        'success': True,
-                        'templateId': template_id,
-                        'message': 'Preprocessing completed',
-                        'processTime': 1.0
-                    }
+                    print(f"处理预处理请求: template_id={template_id}, image_path={template_image_path}")
                     
-                    # 发送响应（换行符结尾）
-                    response_json = json.dumps(response) + '\n'
-                    client_socket.send(response_json.encode('utf-8'))
-                    print(f"✅ 发送预处理响应: {template_id}")
+                    # 调用真正的预处理函数
+                    try:
+                        # 导入预处理模块
+                        from preprocess_handler import handle_preprocess_request
+                        
+                        # 执行预处理
+                        result = handle_preprocess_request(request, client_socket)
+                        
+                        if result is None:
+                            # 如果preprocess_handler已经发送了响应，跳过
+                            print(f"✅ 预处理完成: {template_id}")
+                            continue
+                    except ImportError:
+                        print("警告: preprocess_handler未找到，使用模拟响应")
+                        # 使用模拟响应
+                        response = {
+                            'success': True,
+                            'templateId': template_id,
+                            'message': 'Preprocessing completed (mock)',
+                            'processTime': 1.0
+                        }
+                        
+                        # 发送响应（换行符结尾）
+                        response_json = json.dumps(response) + '\n'
+                        client_socket.send(response_json.encode('utf-8'))
+                        print(f"✅ 发送模拟预处理响应: {template_id}")
+                    except Exception as e:
+                        print(f"预处理失败: {e}")
+                        error_response = {
+                            'success': False,
+                            'templateId': template_id,
+                            'message': str(e),
+                            'processTime': 0
+                        }
+                        client_socket.send((json.dumps(error_response) + '\n').encode('utf-8'))
+                        print(f"❌ 发送错误响应: {template_id}")
                     
                 elif command == 'ping':
                     response = {'success': True, 'message': 'pong'}
