@@ -28,9 +28,14 @@ services:
     # 关键：添加nvidia runtime让容器能访问GPU
     runtime: nvidia
     environment:
-      # GPU访问配置
-      - NVIDIA_VISIBLE_DEVICES=all
+      # GPU访问配置 - 只使用GPU 0
+      - CUDA_VISIBLE_DEVICES=0
+      - NVIDIA_VISIBLE_DEVICES=0
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      # 缓存目录配置
+      - TORCH_HOME=/opt/musetalk/cache/torch
+      - HF_HOME=/opt/musetalk/cache/huggingface
+      - TRANSFORMERS_CACHE=/opt/musetalk/cache/transformers
       # 路径配置
       - MUSE_MODELS_DIR=/opt/musetalk/models
       - MUSE_VIDEOS_DIR=/videos
@@ -44,6 +49,8 @@ services:
       - /opt/musetalk/models:/opt/musetalk/repo/MuseTalk/models
       # 模板预处理缓存目录
       - /opt/musetalk/models:/opt/musetalk/models
+      # 缓存目录（避免重复下载）
+      - /opt/musetalk/cache:/opt/musetalk/cache
       - /opt/musetalk/videos:/videos
       - /opt/musetalk/temp:/temp
     working_dir: /opt/musetalk/repo/MuseTalkEngine
