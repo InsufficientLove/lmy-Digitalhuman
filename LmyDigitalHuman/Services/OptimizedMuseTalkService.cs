@@ -14,6 +14,7 @@ namespace LmyDigitalHuman.Services
         private readonly ILogger<OptimizedMuseTalkService> _logger;
         private readonly PersistentMuseTalkClient _persistentClient;
         private readonly IPathManager _pathManager;
+        private readonly IConfiguration _configuration;
 
         public OptimizedMuseTalkService(
             ILogger<OptimizedMuseTalkService> logger,
@@ -23,6 +24,7 @@ namespace LmyDigitalHuman.Services
         {
             _logger = logger;
             _pathManager = pathManager;
+            _configuration = configuration;
             _persistentClient = new PersistentMuseTalkClient(
                 loggerFactory.CreateLogger<PersistentMuseTalkClient>(),
                 configuration
