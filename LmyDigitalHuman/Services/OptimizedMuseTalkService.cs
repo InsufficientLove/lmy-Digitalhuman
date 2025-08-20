@@ -145,8 +145,8 @@ namespace LmyDigitalHuman.Services
         {
             try
             {
-                // 推断模板图片路径
-                var imagePath = Path.Combine(_pathManager.GetWebRootPath(), "templates", $"{templateId}.jpg");
+                // 使用共享目录路径，Python容器可以访问
+                var imagePath = $"/opt/musetalk/templates/{templateId}.jpg";
                 var response = await _persistentClient.PreprocessAsync(templateId, imagePath);
                 var success = response?.Success == true;
                 return new PreprocessingResult

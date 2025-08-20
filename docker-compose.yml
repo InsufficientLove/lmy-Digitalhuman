@@ -53,6 +53,8 @@ services:
       - /opt/musetalk/models:/opt/musetalk/repo/MuseTalk/models
       # 统一的模板预处理缓存目录（持久化）
       - /opt/musetalk/template_cache:/opt/musetalk/template_cache
+      # 共享模板文件目录（C#上传的图片，Python需要访问）
+      - /opt/musetalk/templates:/opt/musetalk/templates
       # 缓存目录（避免重复下载）
       - /opt/musetalk/cache:/opt/musetalk/cache
       - /opt/musetalk/videos:/videos
@@ -90,6 +92,8 @@ services:
       - /opt/musetalk/models:/models
       # 统一的模板预处理缓存目录（持久化）- 与Python端使用相同的宿主机目录
       - /opt/musetalk/template_cache:/opt/musetalk/template_cache
+      # 共享模板文件目录 - 映射到C#的wwwroot/templates
+      - /opt/musetalk/templates:/app/wwwroot/templates
       - /opt/musetalk/videos:/videos
       - /opt/musetalk/temp:/temp
     networks:
