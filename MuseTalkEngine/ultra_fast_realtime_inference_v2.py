@@ -854,13 +854,23 @@ class UltraFastMuseTalkService:
         return video_frames
     
     def extract_audio_features_ultra_fast(self, audio_path, fps):
-        """极速音频特征提取"""
+        """极速音频特征提取 - 优化版"""
         try:
+            import time
+            start = time.time()
+            
             # 检查AudioProcessor是否可用
             if self.shared_audio_processor is None:
                 raise ValueError("AudioProcessor未初始化")
+            
+            # 音频特征缓存（基于文件路径）
+            audio_cache_key = f"{audio_path}_{fps}"
+            if audio_cache_key in self.audio_feature_cache:
+                print(f"✅ 使用缓存的音频特征")
+                return self.audio_feature_cache[audio_cache_key]
                 
             whisper_input_features, librosa_length = self.shared_audio_processor.get_audio_feature(audio_path)
+            print(f"音频加载耗时: {time.time() - start:.3f}s")
             
             # 确保Whisper使用正确的数据类型
             # Whisper模型始终使用float32，不支持half precision
