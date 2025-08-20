@@ -481,7 +481,7 @@ class UltraFastMuseTalkService:
         if device in self.gpu_usage:
             self.gpu_usage[device] = max(0, self.gpu_usage[device] - 1)
     
-    def ultra_fast_inference_parallel(self, template_id, audio_path, output_path, cache_dir=None, batch_size=None, fps=25, auto_adjust=True, streaming=False):
+    def ultra_fast_inference_parallel(self, template_id, audio_path, output_path, cache_dir=None, batch_size=None, fps=25, auto_adjust=True, streaming=False, skip_frames=1):
         """极速并行推理 - 毫秒级响应
         
         Args:
@@ -582,11 +582,29 @@ class UltraFastMuseTalkService:
             prep_time = time.time() - total_start
             print(f"并行预处理完成: {prep_time:.3f}s")
             
-            # 2. 多GPU并行推理
+            # 2. 多GPU并行推理（支持跳帧加速）
             inference_start = time.time()
-            res_frame_list = self.execute_4gpu_parallel_inference(
-                whisper_chunks, cache_data, batch_size
-            )
+            
+            # 跳帧处理：只推理部分帧，其余插值
+            if skip_frames > 1:
+                print(f"⚡ 跳帧模式：每{skip_frames}帧推理1次")
+                # 只取需要推理的帧
+                selected_indices = list(range(0, len(whisper_chunks), skip_frames))
+                selected_whisper = [whisper_chunks[i] for i in selected_indices]
+                
+                # 推理选中的帧
+                key_frames = self.execute_4gpu_parallel_inference(
+                    selected_whisper, cache_data, batch_size
+                )
+                
+                # 插值生成中间帧
+                res_frame_list = self.interpolate_frames(key_frames, len(whisper_chunks), skip_frames)
+                print(f"推理{len(key_frames)}关键帧，插值生成{len(res_frame_list)}帧")
+            else:
+                res_frame_list = self.execute_4gpu_parallel_inference(
+                    whisper_chunks, cache_data, batch_size
+                )
+            
             inference_time = time.time() - inference_start
             print(f"{self.gpu_count}GPU并行推理完成: {inference_time:.3f}s, {len(res_frame_list)}帧")
             
