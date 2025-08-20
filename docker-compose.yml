@@ -37,7 +37,7 @@ services:
       # 缓存目录配置
       - TORCH_HOME=/opt/musetalk/cache/torch
       - HF_HOME=/opt/musetalk/cache/huggingface
-      - TRANSFORMERS_CACHE=/opt/musetalk/cache/transformers
+      # TRANSFORMERS_CACHE已弃用，使用HF_HOME代替
       # 路径配置
       - MUSE_MODELS_DIR=/opt/musetalk/models
       - MUSE_VIDEOS_DIR=/videos
