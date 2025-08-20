@@ -14,6 +14,59 @@ os.environ['PYTHONUNBUFFERED'] = '1'
 sys.stdout.reconfigure(line_buffering=True)
 sys.stderr.reconfigure(line_buffering=True)
 
+def init_templates():
+    """初始化模板目录结构和软链接"""
+    try:
+        print("🔧 初始化模板目录结构...")
+        
+        # 创建必要的目录
+        os.makedirs("/opt/musetalk/models/templates", exist_ok=True)
+        os.makedirs("/opt/musetalk/repo/MuseTalk/models", exist_ok=True)
+        
+        # 软链接路径
+        link_path = "/opt/musetalk/repo/MuseTalk/models/templates"
+        target_path = "/opt/musetalk/models/templates"
+        
+        # 如果链接已存在且正确，跳过
+        if os.path.islink(link_path):
+            if os.readlink(link_path) == target_path:
+                print(f"✅ 软链接已存在: {link_path} -> {target_path}")
+                return
+            else:
+                # 删除错误的链接
+                os.unlink(link_path)
+        elif os.path.exists(link_path):
+            # 如果是目录，尝试删除（如果为空）
+            try:
+                os.rmdir(link_path)
+            except:
+                print(f"⚠️ 无法删除目录: {link_path}")
+                return
+        
+        # 创建软链接
+        os.symlink(target_path, link_path)
+        print(f"✅ 创建软链接: {link_path} -> {target_path}")
+        
+        # 列出现有模板
+        print("📋 现有模板：")
+        if os.path.exists(target_path):
+            for item in os.listdir(target_path):
+                item_path = os.path.join(target_path, item)
+                if os.path.isdir(item_path):
+                    pkl_file = os.path.join(item_path, f"{item}_preprocessed.pkl")
+                    if os.path.exists(pkl_file):
+                        size_mb = os.path.getsize(pkl_file) / 1024 / 1024
+                        print(f"  ✅ {item} ({size_mb:.2f} MB)")
+                    else:
+                        print(f"  ⚠️ {item} (未预处理)")
+        else:
+            print("  (空)")
+            
+    except Exception as e:
+        print(f"⚠️ 模板初始化失败: {e}")
+        # 不阻止服务启动
+        pass
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--port', type=int, default=28888)
@@ -21,6 +74,9 @@ def main():
     parser.add_argument('--multi_gpu', action='store_true')
     parser.add_argument('--gpu_id', type=int, default=0)
     args = parser.parse_args()
+    
+    # 初始化模板目录结构
+    init_templates()
     
     # 设置路径（支持通过环境变量 MUSE_TALK_DIR 覆盖）
     script_dir = Path(__file__).parent
