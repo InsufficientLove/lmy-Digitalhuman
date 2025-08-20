@@ -198,23 +198,8 @@ class UltraFastMuseTalkService:
                     
                     print(f"GPU{device_id} 半精度转换完成")
                     
-                    # 关键优化：模型编译加速 (仅在Linux上启用)
-                    import platform
-                    if hasattr(torch, 'compile') and platform.system() != 'Windows':
-                        try:
-                            print(f"GPU{device_id} 开始模型编译...")
-                            unet.model = torch.compile(unet.model, mode="reduce-overhead")
-                            vae.vae = torch.compile(vae.vae, mode="reduce-overhead")
-                            pe = torch.compile(pe, mode="reduce-overhead")
-                            print(f"GPU{device_id} 模型编译优化完成")
-                        except Exception as compile_error:
-                            print(f"GPU{device_id} 模型编译失败: {compile_error}")
-                            print(f"GPU{device_id} 使用原始模型")
-                    else:
-                        if platform.system() == 'Windows':
-                            print(f"GPU{device_id} 跳过模型编译 (Windows不支持)")
-                        else:
-                            print(f"GPU{device_id} 跳过模型编译 (torch.compile不可用)")
+                    # 跳过模型编译 - 导致CUDA图错误
+                    print(f"GPU{device_id} 跳过模型编译（避免CUDA图错误）")
                     
                     self.gpu_models[device] = {
                         'vae': vae,
@@ -562,31 +547,23 @@ class UltraFastMuseTalkService:
             
             gpu_models = self.gpu_models[target_device]
             
-            print(f"处理批次 {batch_idx} -> GPU {target_device}")
-            print(f"  Whisper batch shape: {whisper_batch.shape}")
-            print(f"  Latent batch shape: {latent_batch.shape}")
-            
-            # 显存估算（whisper_batch实际是音频特征，不是原始音频）
-            # whisper_batch: [batch_size, 50, 384] - 音频特征
-            # latent_batch: [batch_size, 8, 247, 164] - VAE编码的图像特征
-            audio_feature_memory = whisper_batch.numel() * 2 / (1024**3)  # float16
-            latent_memory = latent_batch.numel() * 2 / (1024**3)    # float16
-            
-            # 基于实测：batch_size=6约需要8-10GB显存（包括中间激活）
-            # 您有43GB可用显存，完全足够
-            batch_size_actual = whisper_batch.shape[0]
-            estimated_per_frame = 1.5  # GB per frame（实测值）
-            total_memory = batch_size_actual * estimated_per_frame
-            
-            print(f"  音频特征: {audio_feature_memory:.3f}GB, 图像latent: {latent_memory:.3f}GB")
-            print(f"  推理预计: {batch_size_actual}帧 × {estimated_per_frame}GB/帧 = {total_memory:.1f}GB")
+            # 实时监控显存使用率
+            with torch.cuda.device(target_device):
+                free_mem_before = torch.cuda.mem_get_info()[0] / (1024**3)
+                total_mem = torch.cuda.mem_get_info()[1] / (1024**3)
+                used_mem_before = total_mem - free_mem_before
+                usage_percent = (used_mem_before / total_mem) * 100
+                
+                print(f"处理批次 {batch_idx} -> GPU {target_device}")
+                print(f"  批次大小: {whisper_batch.shape[0]}帧")
+                print(f"  显存使用: {used_mem_before:.1f}/{total_mem:.1f}GB ({usage_percent:.1f}%)")
+                
+                # 如果显存使用超过90%，跳过批次避免OOM
+                if usage_percent > 90:
+                    print(f"⚠️ GPU {target_device} 显存使用率过高({usage_percent:.1f}%)，跳过批次")
+                    return batch_idx, []
             
             try:
-                # 移除不必要的内存检查 - 您有43GB可用显存
-                # 只在显存真的不足时才跳过
-                if total_memory > 40:  # 只有超过40GB才跳过（您有43GB）
-                    print(f"⚠️ 批次 {batch_idx} 内存需求过大 ({total_memory:.1f}GB > 40GB)，跳过")
-                    return batch_idx, []
                 
                 # 关键：数据移动到目标GPU
                 with torch.cuda.device(target_device):
@@ -1017,9 +994,12 @@ def handle_client_ultra_fast(client_socket):
                     # 推理请求
                     print(f"📨 极速推理请求: {request.get('template_id')}")
                     
-                    # 调试：打印接收到的batch_size
-                    received_batch_size = request.get('batch_size', 6)
-                    print(f"📊 接收到的batch_size: {received_batch_size}")
+                    # 不要强制使用batch_size，让系统自动优化
+                    received_batch_size = request.get('batch_size', None)  # None让系统自动选择
+                    if received_batch_size:
+                        print(f"📊 使用指定的batch_size: {received_batch_size}")
+                    else:
+                        print(f"📊 将根据显存自动选择batch_size")
                     
                     # 极速推理
                     start_time = time.time()
