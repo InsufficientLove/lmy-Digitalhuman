@@ -256,29 +256,42 @@ class UltraFastMuseTalkService:
                                 print(f"  所有编译策略都失败，跳过编译")
                                 raise RuntimeError("无法找到可用的编译策略")
                             
-                            # 只在GPU0上编译，避免多GPU冲突
-                            if device_id == 0:
-                                # 只编译最耗时的UNet
-                                if hasattr(unet, 'model'):
-                                    # 使用torch.jit.script代替torch.compile避免FX追踪问题
-                                    try:
-                                        # 先尝试torch.compile
-                                        unet.model = torch.compile(unet.model, **compile_options)
-                                        print(f"  ✅ GPU0 UNet编译完成")
-                                    except Exception as e:
-                                        print(f"  ⚠️ UNet torch.compile失败: {e}")
-                                        print(f"  使用原始模型")
-                                
-                                # VAE解码也很耗时
-                                if hasattr(vae, 'vae'):
-                                    try:
-                                        vae.vae.decoder = torch.compile(vae.vae.decoder, **compile_options)
-                                        print(f"  ✅ GPU0 VAE解码器编译完成")
-                                    except Exception as e:
-                                        print(f"  ⚠️ VAE torch.compile失败: {e}")
-                            else:
-                                # GPU1不编译，使用原始模型避免FX追踪错误
-                                print(f"  GPU{device_id} 跳过编译（避免多GPU冲突）")
+                            # 每个GPU独立编译，避免共享冲突
+                            # 关键：使用backend="inductor"明确指定后端，避免FX追踪问题
+                            safe_compile_options = {
+                                "backend": "inductor",  # 明确使用inductor后端
+                                "mode": "default",      # 使用默认模式
+                                "fullgraph": False,     # 允许图分割
+                                "disable": False,       # 确保启用
+                            }
+                            
+                            # 为每个GPU创建独立的编译实例
+                            print(f"  GPU{device_id} 开始独立编译...")
+                            
+                            # UNet编译（最重要）
+                            if hasattr(unet, 'model'):
+                                try:
+                                    # 创建模型的深拷贝，避免共享问题
+                                    import copy
+                                    unet_copy = copy.deepcopy(unet.model)
+                                    unet_copy = unet_copy.to(device)
+                                    
+                                    # 编译拷贝的模型
+                                    compiled_unet = torch.compile(unet_copy, **safe_compile_options)
+                                    unet.model = compiled_unet
+                                    print(f"  ✅ GPU{device_id} UNet独立编译完成")
+                                except Exception as e:
+                                    print(f"  ⚠️ GPU{device_id} UNet编译失败: {str(e)[:100]}")
+                                    # 失败则使用原始模型
+                            
+                            # VAE编译（次要）
+                            if hasattr(vae, 'vae') and hasattr(vae.vae, 'decoder'):
+                                try:
+                                    # VAE解码器较小，可以尝试编译
+                                    vae.vae.decoder = torch.compile(vae.vae.decoder, **safe_compile_options)
+                                    print(f"  ✅ GPU{device_id} VAE解码器编译完成")
+                                except Exception as e:
+                                    print(f"  ⚠️ GPU{device_id} VAE编译失败: {str(e)[:100]}")
                             
                             # PE相对较快，可选编译
                             # pe = torch.compile(pe, **compile_options)
