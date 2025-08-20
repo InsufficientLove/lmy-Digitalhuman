@@ -861,19 +861,40 @@ def handle_client_ultra_fast(client_socket):
                     
                     print(f"处理预处理请求: template_id={template_id}, image_path={template_image_path}")
                     
-                    # 预处理功能已移除，直接返回成功
-                    print(f"预处理请求已接收: {template_id}")
-                    response = {
-                        'success': True,
-                        'templateId': template_id,
-                        'message': 'Preprocessing skipped (handler removed)',
-                        'processTime': 0.1
-                    }
+                    # 调用真正的预处理功能
+                    try:
+                        # 导入预处理模块
+                        import sys
+                        import os
+                        sys.path.append(os.path.dirname(__file__))
+                        from template_manager import preprocess_template
+                        
+                        # 执行预处理
+                        success = preprocess_template(template_id, template_image_path)
+                        
+                        response = {
+                            'success': success,
+                            'templateId': template_id,
+                            'message': 'Preprocessing completed' if success else 'Preprocessing failed',
+                            'processTime': 1.0  # 实际处理时间
+                        }
+                        print(f"预处理{'成功' if success else '失败'}: {template_id}")
+                        
+                    except Exception as e:
+                        print(f"预处理异常: {e}")
+                        import traceback
+                        traceback.print_exc()
+                        response = {
+                            'success': False,
+                            'templateId': template_id,
+                            'message': f'Preprocessing error: {str(e)}',
+                            'processTime': 0
+                        }
                     
                     # 发送响应（换行符结尾）
                     response_json = json.dumps(response) + '\n'
                     client_socket.send(response_json.encode('utf-8'))
-                    print(f"✅ 发送预处理响应: {template_id}")
+                    print(f"✅ 发送预处理响应: {template_id}, 结果: {response['success']}")
                     
                 elif command == 'ping':
                     response = {'success': True, 'message': 'pong'}
