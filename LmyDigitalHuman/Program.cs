@@ -131,7 +131,7 @@ try
         if (!Directory.Exists(path))
         {
             Directory.CreateDirectory(path);
-            logger.LogInformation("Created directory: {Path}", path);
+            Log.Information("Created directory: {Path}", path);
         }
     }
     
