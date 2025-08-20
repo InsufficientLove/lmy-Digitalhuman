@@ -223,6 +223,20 @@ class UltraFastMuseTalkService:
                         'device': device
                     }
                     
+                    # 显存监控 - 验证模型是否真正加载
+                    with torch.cuda.device(device):
+                        torch.cuda.synchronize()
+                        allocated = torch.cuda.memory_allocated() / (1024**3)
+                        reserved = torch.cuda.memory_reserved() / (1024**3)
+                        free = torch.cuda.mem_get_info()[0] / (1024**3)
+                        total = torch.cuda.mem_get_info()[1] / (1024**3)
+                        print(f"GPU{device_id} 显存状态:")
+                        print(f"  - 已分配: {allocated:.2f}GB")
+                        print(f"  - 已预留: {reserved:.2f}GB")
+                        print(f"  - 可用: {free:.2f}GB")
+                        print(f"  - 总量: {total:.2f}GB")
+                        print(f"  - 模型占用: ~{reserved:.2f}GB")
+                    
                     print(f"GPU{device_id} 模型加载完成")
                     return device_id
             

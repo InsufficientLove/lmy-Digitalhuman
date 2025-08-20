@@ -30,9 +30,9 @@ services:
     # 关键：添加nvidia runtime让容器能访问GPU
     runtime: nvidia
     environment:
-      # GPU访问配置 - 只使用GPU 1
-      - CUDA_VISIBLE_DEVICES=1
-      - NVIDIA_VISIBLE_DEVICES=1
+      # GPU访问配置 - 使用所有GPU（0和1）
+      - CUDA_VISIBLE_DEVICES=0,1
+      - NVIDIA_VISIBLE_DEVICES=0,1
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
       # 缓存目录配置
       - TORCH_HOME=/opt/musetalk/cache/torch
