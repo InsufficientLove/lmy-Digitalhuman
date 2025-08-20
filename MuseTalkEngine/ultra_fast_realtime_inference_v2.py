@@ -372,8 +372,12 @@ class UltraFastMuseTalkService:
         if device in self.gpu_usage:
             self.gpu_usage[device] = max(0, self.gpu_usage[device] - 1)
     
-    def ultra_fast_inference_parallel(self, template_id, audio_path, output_path, cache_dir=None, batch_size=None, fps=25):
-        """极速并行推理 - 毫秒级响应"""
+    def ultra_fast_inference_parallel(self, template_id, audio_path, output_path, cache_dir=None, batch_size=None, fps=25, auto_adjust=True):
+        """极速并行推理 - 毫秒级响应
+        
+        Args:
+            auto_adjust: 是否自动调整batch_size（OOM时自动降级）
+        """
         # 使用统一的缓存目录
         if cache_dir is None:
             cache_dir = os.path.join(self.template_cache_dir, template_id)
@@ -391,23 +395,25 @@ class UltraFastMuseTalkService:
                 
                 print(f"最小可用显存: {min_free_memory:.1f}GB")
                 
-                # 基于MuseTalk官方数据和实际测试调整
-                # Stage2: batch_size=2需要80GB，即每帧约40GB（包括中间激活）
-                # 但实际推理时由于优化，每帧约需要15-20GB
-                # 保守估计：每帧需要20GB显存（包括梯度和中间结果）
+                # 基于实际测试：模型只占用3.62GB，还有大量空间
+                # 实测显示每帧需要约5-8GB显存（优化后）
+                # 43GB可用显存可以处理更多帧
                 
-                if min_free_memory > 40:  # 40GB以上 - 可以处理2帧
+                if min_free_memory > 40:  # 40GB以上 - 可以处理8-10帧
+                    batch_size = 8
+                    print(f"✅ 显存充足({min_free_memory:.1f}GB)，设置batch_size=8")
+                elif min_free_memory > 30:  # 30-40GB - 可以处理6帧
+                    batch_size = 6
+                    print(f"✅ 显存良好({min_free_memory:.1f}GB)，设置batch_size=6")
+                elif min_free_memory > 20:  # 20-30GB - 可以处理4帧
+                    batch_size = 4
+                    print(f"⚠️ 显存适中({min_free_memory:.1f}GB)，设置batch_size=4")
+                elif min_free_memory > 10:  # 10-20GB - 可以处理2帧
                     batch_size = 2
-                    print(f"⚠️ 显存充足但保守设置batch_size=2以确保稳定")
-                elif min_free_memory > 30:  # 30-40GB - 安全处理1帧
+                    print(f"⚠️ 显存偏少({min_free_memory:.1f}GB)，设置batch_size=2")
+                else:  # 10GB以下
                     batch_size = 1
-                    print(f"⚠️ 显存有限，设置batch_size=1以避免OOM")
-                elif min_free_memory > 20:  # 20-30GB - 尝试1帧
-                    batch_size = 1
-                    print(f"⚠️ 显存紧张，使用最小batch_size=1")
-                else:  # 20GB以下 - 风险太高
-                    batch_size = 1
-                    print(f"⚠️ 显存不足20GB，强制batch_size=1，可能会OOM")
+                    print(f"❌ 显存不足({min_free_memory:.1f}GB)，强制batch_size=1")
                     
                 print(f"基于可用显存({min_free_memory:.1f}GB)，设置batch_size={batch_size}")
                 
