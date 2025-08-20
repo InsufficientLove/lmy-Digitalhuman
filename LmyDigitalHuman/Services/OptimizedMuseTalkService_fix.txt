@@ -1,4 +1,0 @@
-                // 使用与预处理相同的缓存目录
-                var cacheDir = Path.Combine(
-                    "/opt/musetalk/models/templates",
-                    request.TemplateId ?? "default");

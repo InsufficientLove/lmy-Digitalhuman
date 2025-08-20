@@ -1099,7 +1099,7 @@ def handle_client_ultra_fast(client_socket):
                     # 调用真正的预处理功能
                     try:
                         # 导入预处理模块
-                        from optimized_preprocessing_v2 import OptimizedPreprocessor
+                        from core.preprocessing import OptimizedPreprocessor
                         
                         # 获取缓存目录
                         cache_dir = os.environ.get('MUSE_TEMPLATE_CACHE_DIR', '/opt/musetalk/template_cache')
