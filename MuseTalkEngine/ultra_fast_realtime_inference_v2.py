@@ -213,22 +213,22 @@ class UltraFastMuseTalkService:
                             
                             # 尝试不同的编译策略
                             compile_strategies = [
-                                # 策略1：禁用CUDA图（最安全）
-                                {
-                                    "mode": "max-autotune-no-cudagraphs",
-                                    "fullgraph": False,
-                                    "dynamic": True,
-                                },
-                                # 策略2：默认模式（平衡）
+                                # 策略1：默认模式（快速编译，适中优化）
                                 {
                                     "mode": "default",
                                     "fullgraph": False,
                                 },
-                                # 策略3：仅减少开销（快速）
+                                # 策略2：减少开销（最快编译）
                                 {
                                     "mode": "reduce-overhead",
                                     "fullgraph": False,
-                                    "disable_cudagraphs": True,  # 显式禁用CUDA图
+                                    "disable_cudagraphs": True,
+                                },
+                                # 策略3：最大调优（慢编译，最优性能）- 备选
+                                {
+                                    "mode": "max-autotune-no-cudagraphs",
+                                    "fullgraph": False,
+                                    "dynamic": True,
                                 },
                             ]
                             
