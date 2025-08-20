@@ -24,7 +24,7 @@ def preprocess_template(template_id, image_path, output_dir=None):
         print(f"🔄 开始预处理模板: {template_id}")
         
         # 导入预处理模块
-        from optimized_preprocessing_v2 import preprocess_image_ultra_fast
+        from optimized_preprocessing_v2 import OptimizedPreprocessor
         
         # 使用默认目录如果未指定
         if output_dir is None:
@@ -43,10 +43,12 @@ def preprocess_template(template_id, image_path, output_dir=None):
             shutil.copy2(cache_file, backup_file)
             print(f"📦 备份现有缓存: {backup_file}")
         
-        # 调用预处理函数
-        success = preprocess_image_ultra_fast(
-            image_path=image_path,
-            output_path=cache_file,
+        # 创建预处理器实例并调用预处理
+        preprocessor = OptimizedPreprocessor()
+        preprocessor.initialize_models()  # 初始化模型
+        success = preprocessor.preprocess_template_ultra_fast(
+            template_path=image_path,
+            output_dir=output_dir,
             template_id=template_id
         )
         
