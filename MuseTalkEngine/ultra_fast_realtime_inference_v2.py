@@ -364,31 +364,56 @@ class UltraFastMuseTalkService:
         if cache_dir is None:
             cache_dir = os.path.join(self.template_cache_dir, template_id)
         
-        # 智能批次大小选择 - 基于可用显存
+        # 智能批次大小选择 - 基于可用显存和实际测试
         if batch_size is None:
-            # 获取第一个GPU的可用显存
+            # 获取所有GPU的可用显存
             try:
-                torch.cuda.set_device(0)
-                free_memory = torch.cuda.mem_get_info()[0] / (1024**3)  # 转换为GB
-                print(f"GPU 0 可用显存: {free_memory:.1f}GB")
+                min_free_memory = float('inf')
+                for gpu_id in range(self.gpu_count):
+                    torch.cuda.set_device(gpu_id)
+                    free_memory = torch.cuda.mem_get_info()[0] / (1024**3)  # 转换为GB
+                    min_free_memory = min(min_free_memory, free_memory)
+                    print(f"GPU {gpu_id} 可用显存: {free_memory:.1f}GB")
                 
-                # 根据可用显存动态调整batch_size
-                # 每个batch大约需要2-3GB显存
-                if free_memory > 40:  # 40GB以上
-                    batch_size = 16
-                elif free_memory > 30:  # 30-40GB
-                    batch_size = 12
-                elif free_memory > 20:  # 20-30GB
-                    batch_size = 8
-                elif free_memory > 10:  # 10-20GB
-                    batch_size = 6
-                else:  # 10GB以下
-                    batch_size = 4
+                print(f"最小可用显存: {min_free_memory:.1f}GB")
+                
+                # 基于MuseTalk官方数据和实际测试调整
+                # Stage2: batch_size=2需要80GB，即每帧约40GB（包括中间激活）
+                # 但实际推理时由于优化，每帧约需要15-20GB
+                # 保守估计：每帧需要20GB显存（包括梯度和中间结果）
+                
+                if min_free_memory > 40:  # 40GB以上 - 可以处理2帧
+                    batch_size = 2
+                    print(f"⚠️ 显存充足但保守设置batch_size=2以确保稳定")
+                elif min_free_memory > 30:  # 30-40GB - 安全处理1帧
+                    batch_size = 1
+                    print(f"⚠️ 显存有限，设置batch_size=1以避免OOM")
+                elif min_free_memory > 20:  # 20-30GB - 尝试1帧
+                    batch_size = 1
+                    print(f"⚠️ 显存紧张，使用最小batch_size=1")
+                else:  # 20GB以下 - 风险太高
+                    batch_size = 1
+                    print(f"⚠️ 显存不足20GB，强制batch_size=1，可能会OOM")
                     
-                print(f"基于可用显存({free_memory:.1f}GB)，自动设置batch_size={batch_size}")
-            except:
-                # 如果检测失败，使用保守值
-                batch_size = 6 if self.gpu_count > 1 else 8
+                print(f"基于可用显存({min_free_memory:.1f}GB)，设置batch_size={batch_size}")
+                
+                # 双卡优化提示
+                if self.gpu_count > 1:
+                    total_frames = 361  # 示例帧数
+                    batches_needed = (total_frames + batch_size - 1) // batch_size
+                    batches_per_gpu = batches_needed // self.gpu_count
+                    print(f"📊 双GPU并行处理方案：")
+                    print(f"   - 总帧数: {total_frames}")
+                    print(f"   - 每批次: {batch_size}帧")
+                    print(f"   - 总批次: {batches_needed}")
+                    print(f"   - 每GPU处理: ~{batches_per_gpu}批次")
+                    print(f"   - 预计推理次数: {batches_needed}次")
+                    
+            except Exception as e:
+                print(f"显存检测失败: {e}")
+                # 如果检测失败，使用最保守值
+                batch_size = 1
+                print(f"使用最保守batch_size=1")
         
         print(f"🔍 推理配置: GPU数={self.gpu_count}, batch_size={batch_size}")
         
