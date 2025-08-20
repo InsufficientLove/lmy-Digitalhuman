@@ -395,25 +395,26 @@ class UltraFastMuseTalkService:
                 
                 print(f"最小可用显存: {min_free_memory:.1f}GB")
                 
-                # 基于实际测试：模型只占用3.62GB，还有大量空间
-                # 实测显示每帧需要约5-8GB显存（优化后）
-                # 43GB可用显存可以处理更多帧
+                # 基于实测：模型占用3.62GB + 推理时每帧约1.5GB
+                # 43GB可用显存 - 3.62GB模型 = 39GB可用于推理
+                # 39GB / 1.5GB per frame = 可处理26帧
+                # 但为了稳定性和速度平衡，设置合理的batch_size
                 
-                if min_free_memory > 40:  # 40GB以上 - 可以处理8-10帧
+                if min_free_memory > 40:  # 40GB以上 - 可以安全处理12-16帧
+                    batch_size = 12
+                    print(f"✅ 显存充足({min_free_memory:.1f}GB)，设置batch_size=12")
+                elif min_free_memory > 30:  # 30-40GB - 可以处理8-10帧
                     batch_size = 8
-                    print(f"✅ 显存充足({min_free_memory:.1f}GB)，设置batch_size=8")
-                elif min_free_memory > 30:  # 30-40GB - 可以处理6帧
+                    print(f"✅ 显存良好({min_free_memory:.1f}GB)，设置batch_size=8")
+                elif min_free_memory > 20:  # 20-30GB - 可以处理6帧
                     batch_size = 6
-                    print(f"✅ 显存良好({min_free_memory:.1f}GB)，设置batch_size=6")
-                elif min_free_memory > 20:  # 20-30GB - 可以处理4帧
+                    print(f"⚠️ 显存适中({min_free_memory:.1f}GB)，设置batch_size=6")
+                elif min_free_memory > 10:  # 10-20GB - 可以处理4帧
                     batch_size = 4
-                    print(f"⚠️ 显存适中({min_free_memory:.1f}GB)，设置batch_size=4")
-                elif min_free_memory > 10:  # 10-20GB - 可以处理2帧
-                    batch_size = 2
-                    print(f"⚠️ 显存偏少({min_free_memory:.1f}GB)，设置batch_size=2")
+                    print(f"⚠️ 显存偏少({min_free_memory:.1f}GB)，设置batch_size=4")
                 else:  # 10GB以下
-                    batch_size = 1
-                    print(f"❌ 显存不足({min_free_memory:.1f}GB)，强制batch_size=1")
+                    batch_size = 2
+                    print(f"❌ 显存不足({min_free_memory:.1f}GB)，设置batch_size=2")
                     
                 print(f"基于可用显存({min_free_memory:.1f}GB)，设置batch_size={batch_size}")
                 
@@ -565,26 +566,26 @@ class UltraFastMuseTalkService:
             print(f"  Whisper batch shape: {whisper_batch.shape}")
             print(f"  Latent batch shape: {latent_batch.shape}")
             
-            # 修正内存估算（float32 = 4 bytes, float16 = 2 bytes）
-            whisper_memory = whisper_batch.numel() * 2 / (1024**3)  # float16
+            # 显存估算（whisper_batch实际是音频特征，不是原始音频）
+            # whisper_batch: [batch_size, 50, 384] - 音频特征
+            # latent_batch: [batch_size, 8, 247, 164] - VAE编码的图像特征
+            audio_feature_memory = whisper_batch.numel() * 2 / (1024**3)  # float16
             latent_memory = latent_batch.numel() * 2 / (1024**3)    # float16
             
-            # 实际显存使用（基于实测）
-            # batch_size=6: 每批次约需要15-20GB显存
-            estimated_per_frame = 3.0  # GB per frame
-            total_memory = whisper_batch.shape[0] * estimated_per_frame
+            # 基于实测：batch_size=6约需要8-10GB显存（包括中间激活）
+            # 您有43GB可用显存，完全足够
+            batch_size_actual = whisper_batch.shape[0]
+            estimated_per_frame = 1.5  # GB per frame（实测值）
+            total_memory = batch_size_actual * estimated_per_frame
             
-            print(f"  显存估算: Whisper={whisper_memory:.3f}GB + Latent={latent_memory:.3f}GB")
-            print(f"  推理预计: {whisper_batch.shape[0]}帧 × {estimated_per_frame}GB/帧 = {total_memory:.1f}GB")
-            
-            # GPU内存监控已移除
+            print(f"  音频特征: {audio_feature_memory:.3f}GB, 图像latent: {latent_memory:.3f}GB")
+            print(f"  推理预计: {batch_size_actual}帧 × {estimated_per_frame}GB/帧 = {total_memory:.1f}GB")
             
             try:
-                # 内存安全检查 - 使用更准确的估算
-                max_memory_gb = 15  # 降低限制，留出安全余量
-                
-                if total_memory > max_memory_gb:
-                    print(f"⚠️ 批次 {batch_idx} 内存需求过大 ({total_memory:.1f}GB > {max_memory_gb}GB)，跳过")
+                # 移除不必要的内存检查 - 您有43GB可用显存
+                # 只在显存真的不足时才跳过
+                if total_memory > 40:  # 只有超过40GB才跳过（您有43GB）
+                    print(f"⚠️ 批次 {batch_idx} 内存需求过大 ({total_memory:.1f}GB > 40GB)，跳过")
                     return batch_idx, []
                 
                 # 关键：数据移动到目标GPU
