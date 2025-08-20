@@ -223,8 +223,10 @@ class OptimizedPreprocessor:
             start_time = time.time()
             print(f"开始极速预处理: {template_id}")
             
-            # 确保输出目录存在
-            os.makedirs(output_dir, exist_ok=True)
+            # 创建模板专属的子目录
+            template_output_dir = os.path.join(output_dir, template_id)
+            os.makedirs(template_output_dir, exist_ok=True)
+            print(f"使用缓存目录: {template_output_dir}")
             
             # 1. 并行读取和处理图像
             print("读取模板图像...")
@@ -416,8 +418,8 @@ class OptimizedPreprocessor:
                 'mask_list_cycle': mask_list_cycle,
             }
             
-            # 保存缓存文件
-            cache_file = os.path.join(output_dir, f"{template_id}_preprocessed.pkl")
+            # 保存缓存文件到模板子目录
+            cache_file = os.path.join(template_output_dir, f"{template_id}_preprocessed.pkl")
             with open(cache_file, 'wb') as f:
                 pickle.dump(cache_data, f)
             
