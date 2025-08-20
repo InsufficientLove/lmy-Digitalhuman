@@ -198,8 +198,81 @@ class UltraFastMuseTalkService:
                     
                     print(f"GPU{device_id} 半精度转换完成")
                     
-                    # 跳过模型编译 - 导致CUDA图错误
-                    print(f"GPU{device_id} 跳过模型编译（避免CUDA图错误）")
+                    # 智能模型编译 - 使用更安全的编译模式
+                    import platform
+                    if hasattr(torch, 'compile') and platform.system() != 'Windows':
+                        try:
+                            print(f"GPU{device_id} 开始模型优化编译...")
+                            
+                            # 使用更安全的编译模式，避免CUDA图错误
+                            # mode选项：
+                            # - "default": 平衡模式
+                            # - "reduce-overhead": 最激进优化（可能导致错误）
+                            # - "max-autotune": 最大性能但编译慢
+                            # - "max-autotune-no-cudagraphs": 禁用CUDA图，避免TLS错误
+                            
+                            # 尝试不同的编译策略
+                            compile_strategies = [
+                                # 策略1：禁用CUDA图（最安全）
+                                {
+                                    "mode": "max-autotune-no-cudagraphs",
+                                    "fullgraph": False,
+                                    "dynamic": True,
+                                },
+                                # 策略2：默认模式（平衡）
+                                {
+                                    "mode": "default",
+                                    "fullgraph": False,
+                                },
+                                # 策略3：仅减少开销（快速）
+                                {
+                                    "mode": "reduce-overhead",
+                                    "fullgraph": False,
+                                    "disable_cudagraphs": True,  # 显式禁用CUDA图
+                                },
+                            ]
+                            
+                            # 尝试找到可用的编译策略
+                            compile_options = None
+                            for idx, strategy in enumerate(compile_strategies):
+                                try:
+                                    # 测试编译一个小模型
+                                    test_model = torch.nn.Linear(10, 10).to(device)
+                                    torch.compile(test_model, **strategy)
+                                    compile_options = strategy
+                                    print(f"  使用编译策略 {idx+1}: {strategy['mode']}")
+                                    break
+                                except:
+                                    continue
+                            
+                            if compile_options is None:
+                                print(f"  所有编译策略都失败，跳过编译")
+                                raise RuntimeError("无法找到可用的编译策略")
+                            
+                            # 只编译最耗时的UNet
+                            if hasattr(unet, 'model'):
+                                unet.model = torch.compile(unet.model, **compile_options)
+                                print(f"  ✅ UNet编译完成")
+                            
+                            # VAE解码也很耗时
+                            if hasattr(vae, 'vae'):
+                                vae.vae.decoder = torch.compile(vae.vae.decoder, **compile_options)
+                                print(f"  ✅ VAE解码器编译完成")
+                            
+                            # PE相对较快，可选编译
+                            # pe = torch.compile(pe, **compile_options)
+                            
+                            print(f"GPU{device_id} 模型编译优化完成（安全模式）")
+                            
+                        except Exception as compile_error:
+                            print(f"GPU{device_id} 模型编译失败: {compile_error}")
+                            print(f"GPU{device_id} 使用原始模型（未优化）")
+                            # 编译失败不影响运行，继续使用原始模型
+                    else:
+                        if platform.system() == 'Windows':
+                            print(f"GPU{device_id} 跳过编译（Windows不支持）")
+                        else:
+                            print(f"GPU{device_id} 跳过编译（torch.compile不可用）")
                     
                     self.gpu_models[device] = {
                         'vae': vae,
