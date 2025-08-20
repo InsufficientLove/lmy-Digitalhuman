@@ -861,16 +861,29 @@ def handle_client_ultra_fast(client_socket):
                     
                     print(f"处理预处理请求: template_id={template_id}, image_path={template_image_path}")
                     
+                    # 修正路径：C#容器的路径需要转换为Python容器能访问的路径
+                    # /app/wwwroot/templates/xxx.jpg -> /opt/musetalk/repo/LmyDigitalHuman/wwwroot/templates/xxx.jpg
+                    if template_image_path and '/app/wwwroot/templates/' in template_image_path:
+                        filename = os.path.basename(template_image_path)
+                        template_image_path = f"/opt/musetalk/repo/LmyDigitalHuman/wwwroot/templates/{filename}"
+                        print(f"修正图片路径: {template_image_path}")
+                    
                     # 调用真正的预处理功能
                     try:
                         # 导入预处理模块
-                        import sys
-                        import os
-                        sys.path.append(os.path.dirname(__file__))
-                        from template_manager import preprocess_template
+                        from optimized_preprocessing_v2 import OptimizedPreprocessor
                         
-                        # 执行预处理
-                        success = preprocess_template(template_id, template_image_path)
+                        # 获取缓存目录
+                        cache_dir = os.environ.get('MUSE_TEMPLATE_CACHE_DIR', '/opt/musetalk/template_cache')
+                        
+                        # 创建预处理器并执行
+                        preprocessor = OptimizedPreprocessor()
+                        preprocessor.initialize_models()
+                        success = preprocessor.preprocess_template_ultra_fast(
+                            template_path=template_image_path,
+                            output_dir=cache_dir,
+                            template_id=template_id
+                        )
                         
                         response = {
                             'success': success,
