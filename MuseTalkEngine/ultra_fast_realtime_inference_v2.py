@@ -200,7 +200,14 @@ class UltraFastMuseTalkService:
                     
                     # 智能模型编译 - 使用更安全的编译模式
                     import platform
-                    if hasattr(torch, 'compile') and platform.system() != 'Windows':
+                    import os
+                    
+                    # 检查是否禁用torch.compile
+                    disable_compile = os.environ.get('DISABLE_TORCH_COMPILE', '0') == '1'
+                    
+                    if disable_compile:
+                        print(f"GPU{device_id} torch.compile已禁用（DISABLE_TORCH_COMPILE=1）")
+                    elif hasattr(torch, 'compile') and platform.system() != 'Windows':
                         try:
                             print(f"GPU{device_id} 开始模型优化编译...")
                             
@@ -249,15 +256,29 @@ class UltraFastMuseTalkService:
                                 print(f"  所有编译策略都失败，跳过编译")
                                 raise RuntimeError("无法找到可用的编译策略")
                             
-                            # 只编译最耗时的UNet
-                            if hasattr(unet, 'model'):
-                                unet.model = torch.compile(unet.model, **compile_options)
-                                print(f"  ✅ UNet编译完成")
-                            
-                            # VAE解码也很耗时
-                            if hasattr(vae, 'vae'):
-                                vae.vae.decoder = torch.compile(vae.vae.decoder, **compile_options)
-                                print(f"  ✅ VAE解码器编译完成")
+                            # 只在GPU0上编译，避免多GPU冲突
+                            if device_id == 0:
+                                # 只编译最耗时的UNet
+                                if hasattr(unet, 'model'):
+                                    # 使用torch.jit.script代替torch.compile避免FX追踪问题
+                                    try:
+                                        # 先尝试torch.compile
+                                        unet.model = torch.compile(unet.model, **compile_options)
+                                        print(f"  ✅ GPU0 UNet编译完成")
+                                    except Exception as e:
+                                        print(f"  ⚠️ UNet torch.compile失败: {e}")
+                                        print(f"  使用原始模型")
+                                
+                                # VAE解码也很耗时
+                                if hasattr(vae, 'vae'):
+                                    try:
+                                        vae.vae.decoder = torch.compile(vae.vae.decoder, **compile_options)
+                                        print(f"  ✅ GPU0 VAE解码器编译完成")
+                                    except Exception as e:
+                                        print(f"  ⚠️ VAE torch.compile失败: {e}")
+                            else:
+                                # GPU1不编译，使用原始模型避免FX追踪错误
+                                print(f"  GPU{device_id} 跳过编译（避免多GPU冲突）")
                             
                             # PE相对较快，可选编译
                             # pe = torch.compile(pe, **compile_options)
