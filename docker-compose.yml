@@ -34,6 +34,11 @@ services:
       - CUDA_VISIBLE_DEVICES=0,1
       - NVIDIA_VISIBLE_DEVICES=0,1
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      # torch.compile优化配置（仅在容器内生效，不影响宿主机）
+      - TORCH_CUDNN_V8_API_ENABLED=1  # 使用新的cuDNN API
+      - TORCH_COMPILE_DISABLE_CUDAGRAPHS=1  # 禁用CUDA图避免多线程TLS错误
+      - TORCHINDUCTOR_CACHE_DIR=/tmp/torch_compile_cache  # 编译缓存在容器内
+      - TORCH_LOGS=-dynamo  # 减少编译日志输出
       # 缓存目录配置
       - TORCH_HOME=/opt/musetalk/cache/torch
       - HF_HOME=/opt/musetalk/cache/huggingface
