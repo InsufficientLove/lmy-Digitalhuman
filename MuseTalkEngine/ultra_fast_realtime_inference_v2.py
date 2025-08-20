@@ -259,18 +259,28 @@ class UltraFastMuseTalkService:
                                 print(f"  所有编译策略都失败，跳过编译")
                                 raise RuntimeError("无法找到可用的编译策略")
                             
-                            # 编译选项：编译时可以用最优设置，因为是单线程
-                            # 但编译的模型会在多线程推理中使用，所以必须禁用CUDA图
-                            realtime_compile_options = {
-                                "backend": "inductor",          # 使用inductor后端
-                                "mode": "reduce-overhead",      # 不使用CUDA图的模式
-                                "fullgraph": False,             # 允许图分割
-                                "disable": False,               # 确保启用
-                            }
+                            # 编译选项：可以启用CUDA图了！
+                            # 因为我们会使用专用线程池，每个GPU一个线程
+                            use_cuda_graphs = os.environ.get('ENABLE_CUDA_GRAPHS', '0') == '1'
                             
-                            # 或者完全跳过deepcopy，直接在原模型上编译
-                            # 这样每个GPU有完全独立的模型实例
-                            print(f"  GPU{device_id} 使用多线程安全编译（无CUDA图）")
+                            if use_cuda_graphs:
+                                # 启用CUDA图的最优配置
+                                realtime_compile_options = {
+                                    "backend": "inductor",
+                                    "mode": "max-autotune",     # 最激进优化
+                                    "fullgraph": False,
+                                    "disable": False,
+                                }
+                                print(f"  GPU{device_id} 使用最大优化编译（含CUDA图）")
+                            else:
+                                # 保守模式（兼容现有多线程）
+                                realtime_compile_options = {
+                                    "backend": "inductor",
+                                    "mode": "reduce-overhead",  # 无CUDA图
+                                    "fullgraph": False,
+                                    "disable": False,
+                                }
+                                print(f"  GPU{device_id} 使用安全编译（无CUDA图）")
                             
                             # 为每个GPU创建独立的编译实例
                             print(f"  GPU{device_id} 开始独立编译...")
