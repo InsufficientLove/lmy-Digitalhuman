@@ -259,15 +259,20 @@ class UltraFastMuseTalkService:
                                 print(f"  所有编译策略都失败，跳过编译")
                                 raise RuntimeError("无法找到可用的编译策略")
                             
-                            # 为实时通讯极致优化：使用最激进的编译策略
-                            # WebRTC + SingaIR需要毫秒级响应
-                            # 注意：不能同时指定mode和options，选择使用mode
+                            # 使用安全的编译选项，避免CUDA图TLS错误
+                            # 多线程环境下必须禁用CUDA图
                             realtime_compile_options = {
                                 "backend": "inductor",          # 使用inductor后端
-                                "mode": "max-autotune",         # 最大性能优化（首次慢但之后最快）
+                                "mode": "default",              # 使用默认模式，避免CUDA图
                                 "fullgraph": False,             # 允许图分割
                                 "disable": False,               # 确保启用
                             }
+                            
+                            # 如果环境变量明确要求禁用CUDA图，使用更保守的设置
+                            if os.environ.get('TORCH_COMPILE_DISABLE_CUDAGRAPHS', '1') == '1':
+                                # 明确禁用CUDA图的模式
+                                realtime_compile_options["mode"] = "reduce-overhead"
+                                print(f"  GPU{device_id} 使用无CUDA图模式（多线程安全）")
                             
                             # 为每个GPU创建独立的编译实例
                             print(f"  GPU{device_id} 开始独立编译...")

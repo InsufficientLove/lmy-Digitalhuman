@@ -31,7 +31,7 @@ def init_templates():
         # 如果链接已存在且正确，跳过
         if os.path.islink(link_path):
             if os.readlink(link_path) == target_path:
-                print(f"✅ 软链接已存在: {link_path} -> {target_path}")
+                # 软链接存在但不再需要，静默跳过
                 return
             else:
                 # 删除错误的链接
