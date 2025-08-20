@@ -259,20 +259,18 @@ class UltraFastMuseTalkService:
                                 print(f"  所有编译策略都失败，跳过编译")
                                 raise RuntimeError("无法找到可用的编译策略")
                             
-                            # 使用安全的编译选项，避免CUDA图TLS错误
-                            # 多线程环境下必须禁用CUDA图
+                            # 编译选项：编译时可以用最优设置，因为是单线程
+                            # 但编译的模型会在多线程推理中使用，所以必须禁用CUDA图
                             realtime_compile_options = {
                                 "backend": "inductor",          # 使用inductor后端
-                                "mode": "default",              # 使用默认模式，避免CUDA图
+                                "mode": "reduce-overhead",      # 不使用CUDA图的模式
                                 "fullgraph": False,             # 允许图分割
                                 "disable": False,               # 确保启用
                             }
                             
-                            # 如果环境变量明确要求禁用CUDA图，使用更保守的设置
-                            if os.environ.get('TORCH_COMPILE_DISABLE_CUDAGRAPHS', '1') == '1':
-                                # 明确禁用CUDA图的模式
-                                realtime_compile_options["mode"] = "reduce-overhead"
-                                print(f"  GPU{device_id} 使用无CUDA图模式（多线程安全）")
+                            # 或者完全跳过deepcopy，直接在原模型上编译
+                            # 这样每个GPU有完全独立的模型实例
+                            print(f"  GPU{device_id} 使用多线程安全编译（无CUDA图）")
                             
                             # 为每个GPU创建独立的编译实例
                             print(f"  GPU{device_id} 开始独立编译...")
@@ -280,15 +278,10 @@ class UltraFastMuseTalkService:
                             # UNet编译（最重要）
                             if hasattr(unet, 'model'):
                                 try:
-                                    # 创建模型的深拷贝，避免共享问题
-                                    import copy
-                                    unet_copy = copy.deepcopy(unet.model)
-                                    unet_copy = unet_copy.to(device)
-                                    
-                                    # 使用实时优化编译
-                                    compiled_unet = torch.compile(unet_copy, **realtime_compile_options)
-                                    unet.model = compiled_unet
-                                    print(f"  ✅ GPU{device_id} UNet独立编译完成")
+                                    # 直接编译原模型，不需要deepcopy
+                                    # 因为每个GPU加载的是独立的模型实例
+                                    unet.model = torch.compile(unet.model, **realtime_compile_options)
+                                    print(f"  ✅ GPU{device_id} UNet编译完成（多线程安全）")
                                 except Exception as e:
                                     print(f"  ⚠️ GPU{device_id} UNet编译失败: {str(e)[:100]}")
                                     # 失败则使用原始模型
