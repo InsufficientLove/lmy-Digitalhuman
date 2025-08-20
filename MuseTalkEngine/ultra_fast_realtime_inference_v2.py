@@ -261,18 +261,12 @@ class UltraFastMuseTalkService:
                             
                             # 为实时通讯极致优化：使用最激进的编译策略
                             # WebRTC + SingaIR需要毫秒级响应
+                            # 注意：不能同时指定mode和options，选择使用mode
                             realtime_compile_options = {
                                 "backend": "inductor",          # 使用inductor后端
                                 "mode": "max-autotune",         # 最大性能优化（首次慢但之后最快）
                                 "fullgraph": False,             # 允许图分割
                                 "disable": False,               # 确保启用
-                                "options": {
-                                    "triton.cudagraphs": True,  # 启用CUDA图（单GPU内安全）
-                                    "triton.autotune_pointwise": True,  # 点操作自动调优
-                                    "triton.autotune_gemm": True,        # 矩阵乘法调优
-                                    "shape_padding": True,               # 形状填充优化
-                                    "max_autotune_gemm_backends": "TRITON,ATEN",  # GEMM后端
-                                }
                             }
                             
                             # 为每个GPU创建独立的编译实例
