@@ -25,6 +25,8 @@ services:
       context: .
       dockerfile: MuseTalkEngine/Dockerfile
     container_name: musetalk-python
+    ports:
+      - "28888:28888"  # 添加端口映射
     # 关键：添加nvidia runtime让容器能访问GPU
     runtime: nvidia
     environment:
@@ -69,6 +71,8 @@ services:
       context: .
       dockerfile: LmyDigitalHuman/Dockerfile
     container_name: lmy-digitalhuman
+    ports:
+      - "5000:5000"  # 添加端口映射
     environment:
       - ASPNETCORE_URLS=http://0.0.0.0:5000
       - ASPNETCORE_ENVIRONMENT=Docker
