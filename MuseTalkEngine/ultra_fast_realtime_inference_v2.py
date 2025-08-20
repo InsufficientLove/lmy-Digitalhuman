@@ -844,11 +844,13 @@ def handle_client_ultra_fast(client_socket):
                 print("收到空数据，跳过")
                 continue
                 
-            print(f"收到数据: {repr(data[:200])}")
-            
             try:
                 request = json.loads(data)
                 command = request.get('command', '')
+                
+                # 只打印非ping命令的日志
+                if command != 'ping':
+                    print(f"收到数据: {repr(data[:200])}")
                 
                 # 处理不同的命令
                 if command == 'preprocess':
@@ -876,7 +878,8 @@ def handle_client_ultra_fast(client_socket):
                 elif command == 'ping':
                     response = {'success': True, 'message': 'pong'}
                     client_socket.send((json.dumps(response) + '\n').encode('utf-8'))
-                    print("✅ 发送pong响应")
+                    # 注释掉ping日志，避免刷屏
+                    # print("✅ 发送pong响应")
                     
                 elif command == 'inference' or 'template_id' in request:
                     # 推理请求
