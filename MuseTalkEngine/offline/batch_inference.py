@@ -39,7 +39,7 @@ GPU_MEMORY_CONFIG = {'batch_size': {'default': 4}}
 print("使用默认GPU配置")
 
 # 添加MuseTalk模块路径
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'MuseTalk'))
+sys.path.append('/opt/musetalk/repo/MuseTalk')
 
 from musetalk.utils.face_parsing import FaceParsing
 from musetalk.utils.utils import datagen, load_all_model
@@ -1099,7 +1099,9 @@ def handle_client_ultra_fast(client_socket):
                     # 调用真正的预处理功能
                     try:
                         # 导入预处理模块
-                        from core.preprocessing import OptimizedPreprocessor
+                        # 导入预处理器
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from core.preprocessing import OptimizedPreprocessor
                         
                         # 获取缓存目录
                         cache_dir = os.environ.get('MUSE_TEMPLATE_CACHE_DIR', '/opt/musetalk/template_cache')
@@ -1195,11 +1197,16 @@ def handle_client_ultra_fast(client_socket):
     finally:
         client_socket.close()
 
-if __name__ == "__main__":
+def main():
+    """主入口函数"""
     import argparse
     
     parser = argparse.ArgumentParser()
     parser.add_argument('--port', type=int, default=28888, help='服务端口')
     args = parser.parse_args()
     
+    # 启动服务
     start_ultra_fast_service(args.port)
+
+if __name__ == "__main__":
+    main()

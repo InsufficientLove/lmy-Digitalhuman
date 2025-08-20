@@ -4,7 +4,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text.Json;
 
-namespace LmyDigitalHuman.Services
+namespace LmyDigitalHuman.Services.Core
 {
     public class ConversationService : IConversationService
     {

@@ -1,6 +1,6 @@
 using System.Diagnostics;
 
-namespace LmyDigitalHuman.Services
+namespace LmyDigitalHuman.Services.Core
 {
     /// <summary>
     /// Docker环境中的Python环境服务

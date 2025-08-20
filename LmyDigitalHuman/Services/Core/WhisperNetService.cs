@@ -2,7 +2,7 @@ using Whisper.net;
 using LmyDigitalHuman.Models;
 using System.Diagnostics;
 
-namespace LmyDigitalHuman.Services
+namespace LmyDigitalHuman.Services.Core
 {
     public interface IWhisperNetService
     {

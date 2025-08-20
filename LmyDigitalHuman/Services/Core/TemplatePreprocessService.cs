@@ -4,7 +4,7 @@ using System.IO;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
-namespace LmyDigitalHuman.Services
+namespace LmyDigitalHuman.Services.Core
 {
     public interface ITemplatePreprocessService
     {

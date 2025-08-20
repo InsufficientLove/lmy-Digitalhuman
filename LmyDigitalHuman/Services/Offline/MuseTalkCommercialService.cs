@@ -2,7 +2,7 @@ using LmyDigitalHuman.Models;
 using System.Diagnostics;
 using System.Text.Json;
 
-namespace LmyDigitalHuman.Services
+namespace LmyDigitalHuman.Services.Offline
 {
     public interface IMuseTalkCommercialService
     {

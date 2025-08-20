@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Hosting;
 
-namespace LmyDigitalHuman.Services
+namespace LmyDigitalHuman.Services.Core
 {
     /// <summary>
     /// 统一路径管理服务，解决开发环境和生产环境路径不一致问题

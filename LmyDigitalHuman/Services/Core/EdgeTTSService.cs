@@ -3,7 +3,7 @@ using System.Text;
 using LmyDigitalHuman.Models;
 using LmyDigitalHuman.Services.Extensions;
 
-namespace LmyDigitalHuman.Services
+namespace LmyDigitalHuman.Services.Core
 {
     /// <summary>
     /// Edge TTS 语音合成服务实现

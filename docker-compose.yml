@@ -26,7 +26,8 @@ services:
       dockerfile: MuseTalkEngine/Dockerfile
     container_name: musetalk-python
     ports:
-      - "28888:28888"  # 添加端口映射
+      - "28888:28888"  # HTTP API端口
+      - "8766:8766"    # WebSocket端口（流式处理）
     # 关键：添加nvidia runtime让容器能访问GPU
     runtime: nvidia
     environment:

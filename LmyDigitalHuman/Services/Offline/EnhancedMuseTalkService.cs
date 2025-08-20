@@ -8,7 +8,7 @@ using System.IO;
 using System;
 using System.Threading.Tasks;
 
-namespace LmyDigitalHuman.Services
+namespace LmyDigitalHuman.Services.Offline
 {
     /// <summary>
     /// 增强版MuseTalk服务

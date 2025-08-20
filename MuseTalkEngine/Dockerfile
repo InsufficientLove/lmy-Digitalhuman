@@ -1,59 +1,66 @@
-# 使用CUDA 12.1以匹配PyTorch编译版本（宿主机12.9完全兼容）
-# 可选：12.1/12.2/12.3/12.4都可以，宿主机CUDA 12.9都支持
-FROM nvidia/cuda:12.1.0-cudnn8-runtime-ubuntu22.04
+FROM nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04
 
-ENV DEBIAN_FRONTEND=noninteractive \
-    PIP_DEFAULT_TIMEOUT=300 \
-    PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple \
-    PIP_TRUSTED_HOST=pypi.tuna.tsinghua.edu.cn
-# 使用阿里云镜像源加速apt-get
-RUN sed -i 's@//.*archive.ubuntu.com@//mirrors.aliyun.com@g' /etc/apt/sources.list && \
-    sed -i 's@//.*security.ubuntu.com@//mirrors.aliyun.com@g' /etc/apt/sources.list && \
-    apt-get update && apt-get install -y \
-    python3.10 python3.10-venv python3-pip \
-    ca-certificates \
-    ffmpeg git curl wget \
-    libgl1 libglib2.0-0 libsndfile1 \
-    build-essential pkg-config \
-  && update-ca-certificates \
-  && rm -rf /var/lib/apt/lists/*
+# 设置环境变量
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONUNBUFFERED=1
+ENV CUDA_HOME=/usr/local/cuda
+ENV PATH=${CUDA_HOME}/bin:${PATH}
+ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
 
+# 安装系统依赖
+RUN apt-get update && apt-get install -y \
+    python3.10 \
+    python3-pip \
+    ffmpeg \
+    git \
+    wget \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgomp1 \
+    libglib2.0-0 \
+    libsm6 \
+    libxrender1 \
+    libxext6 \
+    && rm -rf /var/lib/apt/lists/*
+
+# 创建工作目录
 WORKDIR /opt/musetalk/repo/MuseTalkEngine
 
-# 仅复制依赖文件用于缓存
-COPY requirements.txt /opt/musetalk/repo/requirements.txt
+# 先复制requirements.txt并安装依赖（利用Docker缓存）
+COPY requirements.txt .
+RUN pip3 install --no-cache-dir torch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2 --index-url https://download.pytorch.org/whl/cu118
+RUN pip3 install --no-cache-dir \
+    transformers==4.30.2 \
+    opencv-python==4.8.0.74 \
+    numpy==1.24.3 \
+    scipy==1.10.1 \
+    librosa==0.10.0 \
+    soundfile==0.12.1 \
+    imageio==2.31.1 \
+    imageio-ffmpeg==0.4.8 \
+    websockets==11.0.3
 
-# 安装依赖（固定为 torch 2.1.0 + cu121；随后安装 OpenMMLab 预编译 mmcv 和相关栈）
-# 临时跳过SSL验证（OpenMMLab证书过期问题）
-ENV PYTHONWARNINGS="ignore:Unverified HTTPS request"
-ENV PIP_TRUSTED_HOST="download.openmmlab.com pypi.org files.pythonhosted.org"
-# 设置pip全局配置以跳过SSL验证（临时方案）
-RUN pip config set global.trusted-host "download.openmmlab.com pypi.org files.pythonhosted.org pypi.python.org" && \
-    pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && \
-    python3 -m pip install --upgrade pip setuptools wheel && \
-    python3 -m pip install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cu121 \
-      torch==2.1.0+cu121 torchvision==0.16.0+cu121 torchaudio==2.1.0+cu121 && \
-    python3 -m pip install --no-cache-dir -r /opt/musetalk/repo/requirements.txt && \
-    python3 -m pip install --no-cache-dir -U mmengine==0.10.4 && \
-    python3 -m pip install --no-cache-dir --no-deps -U xtcocotools==1.14.3 && \
-    (python3 -m pip install --no-cache-dir --trusted-host download.openmmlab.com --only-binary=:all: \
-      -f https://download.openmmlab.com/mmcv/dist/cu121/torch2.1.0/index.html mmcv==2.1.0 \
-     || python3 -m pip install --no-cache-dir mmcv==2.1.0 \
-     || python3 -m pip install --no-cache-dir mmcv-full==1.7.2) && \
-    python3 -m pip install --no-cache-dir --no-deps mmpose==1.3.2 mmdet==3.3.0 && \
-    # mmpose/mmdet 运行期的小依赖
-    python3 -m pip install --no-cache-dir json-tricks==3.17.3 munkres==1.1.4 chumpy==0.70 pycocotools==2.0.7 shapely==2.0.6 terminaltables==3.1.10 && \
-    # 文本/语音相关依赖
-    python3 -m pip install --no-cache-dir transformers==4.41.2 huggingface_hub==0.34.4 && \
-    python3 -m pip install --no-cache-dir diffusers==0.30.2 accelerate==0.28.0 tokenizers==0.19.1 safetensors==0.6.2 && \
-    # 最终钉死与二进制兼容的数值栈，避免被间接升级
-    python3 -m pip install --no-cache-dir --force-reinstall --no-deps numpy==1.26.4 scipy==1.11.4 Pillow==10.0.1 opencv-python-headless==4.9.0.80
+# 复制应用代码（新的目录结构）
+COPY core /opt/musetalk/repo/MuseTalkEngine/core/
+COPY offline /opt/musetalk/repo/MuseTalkEngine/offline/
+COPY streaming /opt/musetalk/repo/MuseTalkEngine/streaming/
+COPY main.py /opt/musetalk/repo/MuseTalkEngine/
 
-# 再复制代码（避免代码改动触发依赖重装）
-COPY MuseTalkEngine /opt/musetalk/repo/MuseTalkEngine
+# 创建必要的目录
+RUN mkdir -p /opt/musetalk/template_cache \
+    /opt/musetalk/cache/torch_compile \
+    /opt/musetalk/templates \
+    /opt/musetalk/repo/MuseTalk \
+    /temp
 
-EXPOSE 28888
-WORKDIR /opt/musetalk/repo/MuseTalkEngine
+# 设置Python路径
+ENV PYTHONPATH=/opt/musetalk/repo/MuseTalkEngine:/opt/musetalk/repo/MuseTalk:$PYTHONPATH
 
-# 启动服务
-CMD ["python3", "direct_launcher.py"]
+# 暴露端口
+EXPOSE 8000 8766
+
+# 启动命令
+CMD ["python3", "main.py", "--mode", "hybrid"]

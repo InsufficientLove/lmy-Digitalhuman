@@ -4,7 +4,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
 
-namespace LmyDigitalHuman.Services
+namespace LmyDigitalHuman.Services.Offline
 {
     /// <summary>
     /// 持久化MuseTalk客户端

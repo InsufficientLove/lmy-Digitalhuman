@@ -8,7 +8,7 @@ using System.Diagnostics;
 using System.Text;
 using System.Threading.Channels;
 
-namespace LmyDigitalHuman.Services
+namespace LmyDigitalHuman.Services.Core
 {
     public class AudioPipelineService : IAudioPipelineService
     {

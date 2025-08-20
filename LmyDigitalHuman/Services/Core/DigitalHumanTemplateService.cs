@@ -6,7 +6,7 @@ using System.Text.RegularExpressions;
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Caching.Memory;
 
-namespace LmyDigitalHuman.Services
+namespace LmyDigitalHuman.Services.Core
 {
     public class DigitalHumanTemplateService : IDigitalHumanTemplateService
     {

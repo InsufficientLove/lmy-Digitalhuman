@@ -14,6 +14,18 @@ os.environ['PYTHONUNBUFFERED'] = '1'
 sys.stdout.reconfigure(line_buffering=True)
 sys.stderr.reconfigure(line_buffering=True)
 
+def init_cache_dirs():
+    """初始化缓存目录"""
+    dirs = [
+        '/opt/musetalk/template_cache',
+        '/opt/musetalk/cache/torch_compile',
+        '/opt/musetalk/templates',
+        '/temp'
+    ]
+    for dir_path in dirs:
+        os.makedirs(dir_path, exist_ok=True)
+    print("✅ 缓存目录初始化完成")
+
 def init_templates():
     """初始化模板目录结构和软链接"""
     try:
