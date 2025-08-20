@@ -134,6 +134,9 @@ class UltraFastMuseTalkService:
             
             # 并行初始化所有GPU模型
             def init_gpu_model(device_id):
+                import os  # Fix: import os at function start
+                import platform
+                import copy
                 device = f'cuda:{device_id}'
                 print(f"🎮 GPU{device_id} 开始初始化...")
                 
