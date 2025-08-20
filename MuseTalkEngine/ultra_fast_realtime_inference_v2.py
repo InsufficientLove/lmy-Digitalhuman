@@ -565,13 +565,17 @@ class UltraFastMuseTalkService:
             print(f"  Whisper batch shape: {whisper_batch.shape}")
             print(f"  Latent batch shape: {latent_batch.shape}")
             
-            # 修正内存估算（float16 = 2 bytes per element）
-            whisper_memory = whisper_batch.numel() * 2 / 1024**3
-            latent_memory = latent_batch.numel() * 2 / 1024**3
-            # UNet推理需要额外的内存，通常是输入的3-4倍
-            inference_multiplier = 4.0
-            total_memory = (whisper_memory + latent_memory) * inference_multiplier
-            print(f"  Estimated memory: Input={whisper_memory + latent_memory:.2f}GB × {inference_multiplier} = {total_memory:.2f}GB")
+            # 修正内存估算（float32 = 4 bytes, float16 = 2 bytes）
+            whisper_memory = whisper_batch.numel() * 2 / (1024**3)  # float16
+            latent_memory = latent_batch.numel() * 2 / (1024**3)    # float16
+            
+            # 实际显存使用（基于实测）
+            # batch_size=6: 每批次约需要15-20GB显存
+            estimated_per_frame = 3.0  # GB per frame
+            total_memory = whisper_batch.shape[0] * estimated_per_frame
+            
+            print(f"  显存估算: Whisper={whisper_memory:.3f}GB + Latent={latent_memory:.3f}GB")
+            print(f"  推理预计: {whisper_batch.shape[0]}帧 × {estimated_per_frame}GB/帧 = {total_memory:.1f}GB")
             
             # GPU内存监控已移除
             
@@ -587,10 +591,23 @@ class UltraFastMuseTalkService:
                 with torch.cuda.device(target_device):
                     whisper_batch = whisper_batch.to(target_device, dtype=self.weight_dtype, non_blocking=True)
                     latent_batch = latent_batch.to(target_device, dtype=self.weight_dtype, non_blocking=True)
-                    timesteps = self.timesteps.to(target_device)
+                    # 确保timesteps在正确的设备上
+                    if self.timesteps is not None:
+                        timesteps = self.timesteps.to(target_device)
+                    else:
+                        # 如果timesteps未初始化，创建一个
+                        timesteps = torch.tensor([0], device=target_device, dtype=torch.long)
                     
                     # 核心推理 - 使用独立的GPU模型
                     with torch.no_grad():
+                        # 调试：检查模型是否存在
+                        if 'pe' not in gpu_models or gpu_models['pe'] is None:
+                            raise ValueError(f"PE模型在{target_device}上未初始化")
+                        if 'unet' not in gpu_models or gpu_models['unet'] is None:
+                            raise ValueError(f"UNet模型在{target_device}上未初始化")
+                        if 'vae' not in gpu_models or gpu_models['vae'] is None:
+                            raise ValueError(f"VAE模型在{target_device}上未初始化")
+                        
                         # 现在预处理直接生成8通道latent，不需要再进行通道数检查和转换
                         audio_features = gpu_models['pe'](whisper_batch)
                         pred_latents = gpu_models['unet'].model(
@@ -614,9 +631,27 @@ class UltraFastMuseTalkService:
                     
                     return batch_idx, result_frames
                     
+            except torch.cuda.OutOfMemoryError as oom_error:
+                print(f"❌ 批次 {batch_idx} GPU {target_device} OOM错误!")
+                print(f"   错误详情: {str(oom_error)}")
+                # 获取当前显存状态
+                with torch.cuda.device(target_device):
+                    free_mem = torch.cuda.mem_get_info()[0] / (1024**3)
+                    total_mem = torch.cuda.mem_get_info()[1] / (1024**3)
+                    allocated = torch.cuda.memory_allocated() / (1024**3)
+                    print(f"   GPU {target_device} 显存: 已用{allocated:.1f}GB / 可用{free_mem:.1f}GB / 总量{total_mem:.1f}GB")
+                    torch.cuda.empty_cache()
+                    torch.cuda.synchronize()
+                return batch_idx, []
+                
             except Exception as e:
-                print(f"批次 {batch_idx} GPU {target_device} 失败: {str(e)}")
-                # 失败时清理GPU内存，但不强制同步
+                print(f"❌ 批次 {batch_idx} GPU {target_device} 失败!")
+                print(f"   错误类型: {type(e).__name__}")
+                print(f"   错误详情: {str(e)}")
+                # 打印堆栈跟踪
+                import traceback
+                traceback.print_exc()
+                # 失败时清理GPU内存
                 with torch.cuda.device(target_device):
                     torch.cuda.empty_cache()
                 return batch_idx, []
