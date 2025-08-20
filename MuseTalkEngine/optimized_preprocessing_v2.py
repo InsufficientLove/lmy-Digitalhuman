@@ -434,12 +434,12 @@ class OptimizedPreprocessor:
                 'color_correction': self.color_correction
             }
             
-            metadata_file = os.path.join(output_dir, f"{template_id}_metadata.json")
+            metadata_file = os.path.join(template_output_dir, f"{template_id}_metadata.json")
             with open(metadata_file, 'w', encoding='utf-8') as f:
                 json.dump(metadata, f, indent=2, ensure_ascii=False)
             
             # 保存简化的状态文件（兼容性）
-            state_file = os.path.join(output_dir, "model_state.pkl")
+            state_file = os.path.join(template_output_dir, "model_state.pkl")
             with open(state_file, 'wb') as f:
                 pickle.dump({'status': 'completed', 'template_id': template_id}, f)
             
