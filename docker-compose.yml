@@ -28,9 +28,9 @@ services:
     # 关键：添加nvidia runtime让容器能访问GPU
     runtime: nvidia
     environment:
-      # GPU访问配置 - 只使用GPU 0
-      - CUDA_VISIBLE_DEVICES=0
-      - NVIDIA_VISIBLE_DEVICES=0
+      # GPU访问配置 - 只使用GPU 1
+      - CUDA_VISIBLE_DEVICES=1
+      - NVIDIA_VISIBLE_DEVICES=1
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
       # 缓存目录配置
       - TORCH_HOME=/opt/musetalk/cache/torch
@@ -78,6 +78,8 @@ services:
       - musetalk-python
     volumes:
       - ./LmyDigitalHuman:/opt/musetalk/repo/LmyDigitalHuman
+      # 模型目录 - C#期望在/models路径
+      - /opt/musetalk/models:/models
       # 模板预处理缓存目录（C#端需要访问）
       - /opt/musetalk/models:/opt/musetalk/models
       - /opt/musetalk/videos:/videos
