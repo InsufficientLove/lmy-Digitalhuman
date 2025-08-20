@@ -119,11 +119,26 @@ try
     // 启用静态文件服务
     app.UseStaticFiles();
     
+    // 确保必要的目录存在
+    var wwwrootPath = Path.Combine(builder.Environment.ContentRootPath, "wwwroot");
+    var templatesPath = Path.Combine(wwwrootPath, "templates");
+    var videosPath = Path.Combine(wwwrootPath, "videos");
+    var audioPath = Path.Combine(wwwrootPath, "audio");
+    
+    // 创建所有必要的目录
+    foreach (var path in new[] { wwwrootPath, templatesPath, videosPath, audioPath })
+    {
+        if (!Directory.Exists(path))
+        {
+            Directory.CreateDirectory(path);
+            logger.LogInformation("Created directory: {Path}", path);
+        }
+    }
+    
     // 为templates目录单独配置静态文件服务
     app.UseStaticFiles(new StaticFileOptions
     {
-        FileProvider = new PhysicalFileProvider(
-            Path.Combine(builder.Environment.ContentRootPath, "wwwroot", "templates")),
+        FileProvider = new PhysicalFileProvider(templatesPath),
         RequestPath = "/templates"
     });
     
