@@ -256,13 +256,20 @@ class UltraFastMuseTalkService:
                                 print(f"  所有编译策略都失败，跳过编译")
                                 raise RuntimeError("无法找到可用的编译策略")
                             
-                            # 每个GPU独立编译，避免共享冲突
-                            # 关键：使用backend="inductor"明确指定后端，避免FX追踪问题
-                            safe_compile_options = {
-                                "backend": "inductor",  # 明确使用inductor后端
-                                "mode": "default",      # 使用默认模式
-                                "fullgraph": False,     # 允许图分割
-                                "disable": False,       # 确保启用
+                            # 为实时通讯极致优化：使用最激进的编译策略
+                            # WebRTC + SingaIR需要毫秒级响应
+                            realtime_compile_options = {
+                                "backend": "inductor",          # 使用inductor后端
+                                "mode": "max-autotune",         # 最大性能优化（首次慢但之后最快）
+                                "fullgraph": False,             # 允许图分割
+                                "disable": False,               # 确保启用
+                                "options": {
+                                    "triton.cudagraphs": True,  # 启用CUDA图（单GPU内安全）
+                                    "triton.autotune_pointwise": True,  # 点操作自动调优
+                                    "triton.autotune_gemm": True,        # 矩阵乘法调优
+                                    "shape_padding": True,               # 形状填充优化
+                                    "max_autotune_gemm_backends": "TRITON,ATEN",  # GEMM后端
+                                }
                             }
                             
                             # 为每个GPU创建独立的编译实例
@@ -276,8 +283,8 @@ class UltraFastMuseTalkService:
                                     unet_copy = copy.deepcopy(unet.model)
                                     unet_copy = unet_copy.to(device)
                                     
-                                    # 编译拷贝的模型
-                                    compiled_unet = torch.compile(unet_copy, **safe_compile_options)
+                                    # 使用实时优化编译
+                                    compiled_unet = torch.compile(unet_copy, **realtime_compile_options)
                                     unet.model = compiled_unet
                                     print(f"  ✅ GPU{device_id} UNet独立编译完成")
                                 except Exception as e:
@@ -287,14 +294,19 @@ class UltraFastMuseTalkService:
                             # VAE编译（次要）
                             if hasattr(vae, 'vae') and hasattr(vae.vae, 'decoder'):
                                 try:
-                                    # VAE解码器较小，可以尝试编译
-                                    vae.vae.decoder = torch.compile(vae.vae.decoder, **safe_compile_options)
+                                    # VAE解码器也要极致优化
+                                    vae.vae.decoder = torch.compile(vae.vae.decoder, **realtime_compile_options)
                                     print(f"  ✅ GPU{device_id} VAE解码器编译完成")
                                 except Exception as e:
                                     print(f"  ⚠️ GPU{device_id} VAE编译失败: {str(e)[:100]}")
                             
-                            # PE相对较快，可选编译
-                            # pe = torch.compile(pe, **compile_options)
+                            # PE也要编译以减少延迟
+                            if hasattr(pe, 'forward'):
+                                try:
+                                    pe = torch.compile(pe, **realtime_compile_options)
+                                    print(f"  ✅ GPU{device_id} PE音频编码器编译完成")
+                                except Exception as e:
+                                    print(f"  ⚠️ GPU{device_id} PE编译失败: {str(e)[:100]}")
                             
                             print(f"GPU{device_id} 模型编译优化完成（安全模式）")
                             
@@ -464,11 +476,12 @@ class UltraFastMuseTalkService:
         if device in self.gpu_usage:
             self.gpu_usage[device] = max(0, self.gpu_usage[device] - 1)
     
-    def ultra_fast_inference_parallel(self, template_id, audio_path, output_path, cache_dir=None, batch_size=None, fps=25, auto_adjust=True):
+    def ultra_fast_inference_parallel(self, template_id, audio_path, output_path, cache_dir=None, batch_size=None, fps=25, auto_adjust=True, streaming=False):
         """极速并行推理 - 毫秒级响应
         
         Args:
             auto_adjust: 是否自动调整batch_size（OOM时自动降级）
+            streaming: 是否启用流式推理（WebRTC实时通讯）
         """
         # 使用统一的缓存目录
         if cache_dir is None:
