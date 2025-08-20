@@ -78,6 +78,10 @@ class GlobalMuseTalkService:
         self.server_socket = None
         self.is_server_running = False
         
+        # 获取统一的模板缓存目录
+        self.template_cache_dir = os.environ.get('MUSE_TEMPLATE_CACHE_DIR', '/opt/musetalk/template_cache')
+        print(f"使用模板缓存目录: {self.template_cache_dir}")
+        
         self._initialized = True
         print("全局MuseTalk服务实例已创建")
     
@@ -247,8 +251,12 @@ class GlobalMuseTalkService:
             print(f"加载模板缓存失败: {str(e)}")
             return None
     
-    def ultra_fast_inference(self, template_id, audio_path, output_path, cache_dir, batch_size=6, fps=25):
+    def ultra_fast_inference(self, template_id, audio_path, output_path, cache_dir=None, batch_size=6, fps=25):
         """超快速推理 - 复用全局模型，无需重复加载"""
+        # 使用统一的缓存目录
+        if cache_dir is None:
+            cache_dir = os.path.join(self.template_cache_dir, template_id)
+        
         if not self.is_initialized:
             print("全局模型未初始化")
             return False

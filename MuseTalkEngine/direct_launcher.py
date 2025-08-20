@@ -20,12 +20,13 @@ def init_templates():
         print("🔧 初始化模板目录结构...")
         
         # 创建必要的目录
-        os.makedirs("/opt/musetalk/models/templates", exist_ok=True)
+        template_cache_dir = os.environ.get('MUSE_TEMPLATE_CACHE_DIR', '/opt/musetalk/template_cache')
+        os.makedirs(template_cache_dir, exist_ok=True)
         os.makedirs("/opt/musetalk/repo/MuseTalk/models", exist_ok=True)
         
-        # 软链接路径
+        # 软链接路径 - 为了兼容性，创建指向统一缓存目录的链接
         link_path = "/opt/musetalk/repo/MuseTalk/models/templates"
-        target_path = "/opt/musetalk/models/templates"
+        target_path = template_cache_dir
         
         # 如果链接已存在且正确，跳过
         if os.path.islink(link_path):

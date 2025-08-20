@@ -15,7 +15,10 @@ from pathlib import Path
 # 添加MuseTalk路径
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'MuseTalk'))
 
-def preprocess_template(template_id, image_path, output_dir="/opt/musetalk/models/templates"):
+# 获取统一的模板缓存目录
+DEFAULT_TEMPLATE_CACHE_DIR = os.environ.get('MUSE_TEMPLATE_CACHE_DIR', '/opt/musetalk/template_cache')
+
+def preprocess_template(template_id, image_path, output_dir=None):
     """预处理模板，生成缓存文件"""
     try:
         print(f"🔄 开始预处理模板: {template_id}")
@@ -23,6 +26,10 @@ def preprocess_template(template_id, image_path, output_dir="/opt/musetalk/model
         # 导入预处理模块
         from optimized_preprocessing_v2 import preprocess_image_ultra_fast
         
+        # 使用默认目录如果未指定
+        if output_dir is None:
+            output_dir = DEFAULT_TEMPLATE_CACHE_DIR
+            
         # 创建输出目录
         template_dir = os.path.join(output_dir, template_id)
         os.makedirs(template_dir, exist_ok=True)
@@ -67,11 +74,15 @@ def preprocess_template(template_id, image_path, output_dir="/opt/musetalk/model
         traceback.print_exc()
         return False
 
-def delete_template(template_id, templates_dir="/opt/musetalk/models/templates"):
+def delete_template(template_id, templates_dir=None):
     """删除模板及其所有缓存文件"""
     try:
         print(f"🗑️ 删除模板: {template_id}")
         
+        # 使用默认目录如果未指定
+        if templates_dir is None:
+            templates_dir = DEFAULT_TEMPLATE_CACHE_DIR
+            
         template_dir = os.path.join(templates_dir, template_id)
         
         if not os.path.exists(template_dir):
@@ -98,11 +109,15 @@ def delete_template(template_id, templates_dir="/opt/musetalk/models/templates")
         print(f"❌ 删除失败: {e}")
         return False
 
-def verify_template(template_id, templates_dir="/opt/musetalk/models/templates"):
+def verify_template(template_id, templates_dir=None):
     """验证模板缓存是否完整"""
     try:
         print(f"🔍 验证模板: {template_id}")
         
+        # 使用默认目录如果未指定
+        if templates_dir is None:
+            templates_dir = DEFAULT_TEMPLATE_CACHE_DIR
+            
         template_dir = os.path.join(templates_dir, template_id)
         cache_file = os.path.join(template_dir, f"{template_id}_preprocessed.pkl")
         
@@ -152,9 +167,13 @@ def verify_template(template_id, templates_dir="/opt/musetalk/models/templates")
         print(f"❌ 验证异常: {e}")
         return False
 
-def list_templates(templates_dir="/opt/musetalk/models/templates"):
+def list_templates(templates_dir=None):
     """列出所有模板"""
     try:
+        # 使用默认目录如果未指定
+        if templates_dir is None:
+            templates_dir = DEFAULT_TEMPLATE_CACHE_DIR
+            
         print(f"📋 模板列表 ({templates_dir}):")
         
         if not os.path.exists(templates_dir):
@@ -191,8 +210,8 @@ def main():
     parser.add_argument('--template_id', type=str, help='模板ID')
     parser.add_argument('--image_path', type=str, help='模板图片路径')
     parser.add_argument('--output_dir', type=str, 
-                       default="/opt/musetalk/models/templates",
-                       help='输出目录')
+                       default=None,
+                       help='输出目录（默认使用环境变量MUSE_TEMPLATE_CACHE_DIR）')
     
     args = parser.parse_args()
     

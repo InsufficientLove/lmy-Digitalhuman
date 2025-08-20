@@ -50,9 +50,12 @@ namespace LmyDigitalHuman.Services
                     };
                 }
                 
-                var cacheDir = Path.Combine(
-                    "/opt/musetalk/models/templates",
-                    request.TemplateId);
+                // 使用统一的缓存目录
+                var templateCacheDir = Environment.GetEnvironmentVariable("MUSE_TEMPLATE_CACHE_DIR") 
+                    ?? _configuration["Paths:TemplateCache"] 
+                    ?? "/opt/musetalk/template_cache";
+                    
+                var cacheDir = Path.Combine(templateCacheDir, request.TemplateId);
                 Directory.CreateDirectory(cacheDir);
 
                 // 尝试通过持久化服务推理（需要服务端支持）

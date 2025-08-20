@@ -111,6 +111,10 @@ class UltraFastMuseTalkService:
         self.is_initialized = False
         self._initialized = True
         
+        # 获取统一的模板缓存目录
+        self.template_cache_dir = os.environ.get('MUSE_TEMPLATE_CACHE_DIR', '/opt/musetalk/template_cache')
+        print(f"使用模板缓存目录: {self.template_cache_dir}")
+        
         print(f"Ultra Fast Service 初始化完成 - {self.gpu_count}GPU并行架构")
         sys.stdout.flush()
     
@@ -354,8 +358,12 @@ class UltraFastMuseTalkService:
         if device in self.gpu_usage:
             self.gpu_usage[device] = max(0, self.gpu_usage[device] - 1)
     
-    def ultra_fast_inference_parallel(self, template_id, audio_path, output_path, cache_dir, batch_size=None, fps=25):
+    def ultra_fast_inference_parallel(self, template_id, audio_path, output_path, cache_dir=None, batch_size=None, fps=25):
         """极速并行推理 - 毫秒级响应"""
+        # 使用统一的缓存目录
+        if cache_dir is None:
+            cache_dir = os.path.join(self.template_cache_dir, template_id)
+        
         # 智能批次大小选择
         if batch_size is None:
             if self.gpu_count == 1:
