@@ -371,12 +371,28 @@ namespace LmyDigitalHuman.Services
                     }
                 }
 
-                // 删除预处理相关文件
-                var preprocessDir = Path.Combine("/opt/musetalk/models/templates", templateId);
+                // 删除预处理相关文件 - 使用统一的缓存目录
+                // 优先使用环境变量，如果没有则使用配置文件，最后使用默认值
+                var templateCacheDir = Environment.GetEnvironmentVariable("MUSE_TEMPLATE_CACHE_DIR") 
+                    ?? _configuration["Paths:TemplateCache"] 
+                    ?? "/opt/musetalk/template_cache";
+                    
+                // 使用SystemName作为目录名（如果template存在）
+                var preprocessDirName = template?.SystemName ?? templateId;
+                var preprocessDir = Path.Combine(templateCacheDir, preprocessDirName);
+                
                 if (Directory.Exists(preprocessDir))
                 {
                     Directory.Delete(preprocessDir, true);
                     _logger.LogInformation("已删除预处理目录: {Dir}", preprocessDir);
+                }
+                
+                // 也尝试用templateId删除（兼容旧数据）
+                var preprocessDirById = Path.Combine(templateCacheDir, templateId);
+                if (preprocessDirById != preprocessDir && Directory.Exists(preprocessDirById))
+                {
+                    Directory.Delete(preprocessDirById, true);
+                    _logger.LogInformation("已删除预处理目录(按ID): {Dir}", preprocessDirById);
                 }
 
                 // 强制重新加载模板列表以确保同步

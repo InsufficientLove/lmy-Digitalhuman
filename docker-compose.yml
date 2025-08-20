@@ -43,14 +43,16 @@ services:
       - MUSE_VIDEOS_DIR=/videos
       - MUSE_TEMP_DIR=/temp
       - MUSE_TALK_DIR=/opt/musetalk/repo/MuseTalk
+      # 统一的模板缓存目录
+      - MUSE_TEMPLATE_CACHE_DIR=/opt/musetalk/template_cache
     volumes:
       - ./MuseTalkEngine:/opt/musetalk/repo/MuseTalkEngine
       - ./MuseTalk:/opt/musetalk/repo/MuseTalk
       - ./LmyDigitalHuman:/opt/musetalk/repo/LmyDigitalHuman
       # 关键：将模型目录挂载到MuseTalk期望的位置
       - /opt/musetalk/models:/opt/musetalk/repo/MuseTalk/models
-      # 模板预处理缓存目录
-      - /opt/musetalk/models:/opt/musetalk/models
+      # 统一的模板预处理缓存目录（持久化）
+      - /opt/musetalk/template_cache:/opt/musetalk/template_cache
       # 缓存目录（避免重复下载）
       - /opt/musetalk/cache:/opt/musetalk/cache
       - /opt/musetalk/videos:/videos
@@ -76,6 +78,8 @@ services:
     environment:
       - ASPNETCORE_URLS=http://0.0.0.0:5000
       - ASPNETCORE_ENVIRONMENT=Docker
+      # 统一的模板缓存目录
+      - MUSE_TEMPLATE_CACHE_DIR=/opt/musetalk/template_cache
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
@@ -84,8 +88,8 @@ services:
       - ./LmyDigitalHuman:/opt/musetalk/repo/LmyDigitalHuman
       # 模型目录 - C#期望在/models路径
       - /opt/musetalk/models:/models
-      # 模板预处理缓存目录（C#端需要访问）
-      - /opt/musetalk/models:/opt/musetalk/models
+      # 统一的模板预处理缓存目录（持久化）- 与Python端使用相同的宿主机目录
+      - /opt/musetalk/template_cache:/opt/musetalk/template_cache
       - /opt/musetalk/videos:/videos
       - /opt/musetalk/temp:/temp
     networks:

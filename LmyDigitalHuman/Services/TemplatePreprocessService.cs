@@ -16,18 +16,23 @@ namespace LmyDigitalHuman.Services
     public class TemplatePreprocessService : ITemplatePreprocessService
     {
         private readonly ILogger<TemplatePreprocessService> _logger;
+        private readonly IConfiguration _configuration;
         private readonly string _pythonPath;
         private readonly string _scriptPath;
         private readonly string _templatesDir;
 
-        public TemplatePreprocessService(ILogger<TemplatePreprocessService> logger)
+        public TemplatePreprocessService(ILogger<TemplatePreprocessService> logger, IConfiguration configuration)
         {
             _logger = logger;
+            _configuration = configuration;
             
             // Docker环境路径
             _pythonPath = "python3";
             _scriptPath = "/opt/musetalk/repo/MuseTalkEngine/template_manager.py";
-            _templatesDir = "/opt/musetalk/models/templates";
+            // 使用统一的缓存目录
+            _templatesDir = Environment.GetEnvironmentVariable("MUSE_TEMPLATE_CACHE_DIR") 
+                ?? configuration["Paths:TemplateCache"] 
+                ?? "/opt/musetalk/template_cache";
         }
 
         public async Task<bool> PreprocessTemplateAsync(string templateId, string imagePath)
