@@ -364,14 +364,31 @@ class UltraFastMuseTalkService:
         if cache_dir is None:
             cache_dir = os.path.join(self.template_cache_dir, template_id)
         
-        # 智能批次大小选择
+        # 智能批次大小选择 - 基于可用显存
         if batch_size is None:
-            if self.gpu_count == 1:
-                # 单GPU优化：RTX 4090D 48GB可以处理大批次
-                batch_size = 12  # 默认使用12
-            else:
-                # 多GPU：每个GPU处理较小批次
-                batch_size = 6
+            # 获取第一个GPU的可用显存
+            try:
+                torch.cuda.set_device(0)
+                free_memory = torch.cuda.mem_get_info()[0] / (1024**3)  # 转换为GB
+                print(f"GPU 0 可用显存: {free_memory:.1f}GB")
+                
+                # 根据可用显存动态调整batch_size
+                # 每个batch大约需要2-3GB显存
+                if free_memory > 40:  # 40GB以上
+                    batch_size = 16
+                elif free_memory > 30:  # 30-40GB
+                    batch_size = 12
+                elif free_memory > 20:  # 20-30GB
+                    batch_size = 8
+                elif free_memory > 10:  # 10-20GB
+                    batch_size = 6
+                else:  # 10GB以下
+                    batch_size = 4
+                    
+                print(f"基于可用显存({free_memory:.1f}GB)，自动设置batch_size={batch_size}")
+            except:
+                # 如果检测失败，使用保守值
+                batch_size = 6 if self.gpu_count > 1 else 8
         
         print(f"🔍 推理配置: GPU数={self.gpu_count}, batch_size={batch_size}")
         
@@ -409,13 +426,13 @@ class UltraFastMuseTalkService:
             prep_time = time.time() - total_start
             print(f"并行预处理完成: {prep_time:.3f}s")
             
-            # 2. 极速4GPU并行推理
+            # 2. 多GPU并行推理
             inference_start = time.time()
             res_frame_list = self.execute_4gpu_parallel_inference(
                 whisper_chunks, cache_data, batch_size
             )
             inference_time = time.time() - inference_start
-            print(f"4GPU并行推理完成: {inference_time:.3f}s, {len(res_frame_list)}帧")
+            print(f"{self.gpu_count}GPU并行推理完成: {inference_time:.3f}s, {len(res_frame_list)}帧")
             
             # 3. 极速并行图像合成
             compose_start = time.time()
@@ -444,10 +461,10 @@ class UltraFastMuseTalkService:
             return False
     
     def execute_4gpu_parallel_inference(self, whisper_chunks, cache_data, batch_size):
-        """真正的4GPU并行推理 - 无锁设计"""
+        """多GPU并行推理 - 动态适配GPU数量"""
         from musetalk.utils.utils import datagen
         
-        print(f"⚙️ 执行4GPU并行推理，batch_size={batch_size}")
+        print(f"⚙️ 执行{self.gpu_count}GPU并行推理，batch_size={batch_size}")
         
         # 推理前清理所有GPU内存
         for device in self.devices:
@@ -483,7 +500,7 @@ class UltraFastMuseTalkService:
         all_batches = list(gen)
         total_batches = len(all_batches)
         
-        print(f"4GPU并行处理 {total_batches} 批次...")
+        print(f"{self.gpu_count}GPU并行处理 {total_batches} 批次...")
         
         # 关键优化：每个GPU处理独立的批次，无需同步
         def process_batch_on_gpu(batch_info):
