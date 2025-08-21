@@ -1,4 +1,3 @@
-using LmyDigitalHuman.Services;
 using Whisper.net;
 using LmyDigitalHuman.Models;
 using System.Diagnostics;

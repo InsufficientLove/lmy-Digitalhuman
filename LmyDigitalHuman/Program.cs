@@ -1,7 +1,4 @@
 using LmyDigitalHuman.Services;
-using LmyDigitalHuman.Services.Core;
-using LmyDigitalHuman.Services.Offline;
-using LmyDigitalHuman.Services.Streaming;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.FileProviders;
 using Serilog;
@@ -77,7 +74,7 @@ try
     builder.Services.AddSingleton<PersistentMuseTalkClient>();
     
     // 使用极致优化MuseTalk服务（轻量实现）作为默认 IMuseTalkService
-    builder.Services.AddSingleton<IMuseTalkService, OptimizedMuseTalkService>();
+    builder.Services.AddSingleton<IMuseTalkService, Offline.OptimizedMuseTalkService>();
     
     // 注册其他服务
     // 在Docker环境中使用专用的Python环境服务
