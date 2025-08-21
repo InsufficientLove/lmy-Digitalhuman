@@ -32,10 +32,11 @@ class TrueRealtimeMuseTalk:
         
     def load_models(self):
         """预加载所有模型到GPU"""
-        # 模型始终在GPU，永不移动
-        self.unet = load_unet().cuda().eval()
-        self.vae = load_vae().cuda().eval()
-        self.pe = load_pe().cuda().eval()
+        # 模型加载逻辑（需要实际实现）
+        # self.unet = load_unet().cuda().eval()
+        # self.vae = load_vae().cuda().eval()
+        # self.pe = load_pe().cuda().eval()
+        pass  # 实际实现时需要加载具体模型
         
         # 预分配GPU内存
         self.latent_buffer = torch.zeros(1, 8, 32, 32).cuda()
@@ -44,7 +45,8 @@ class TrueRealtimeMuseTalk:
     def load_template_cache(self):
         """加载模板缓存"""
         # 一次性加载，永久保存在GPU
-        self.template_features = load_template(self.template_id).cuda()
+        # self.template_features = load_template(self.template_id).cuda()
+        pass  # 实际实现时需要加载模板
         
     def process_audio_chunk(self, audio_chunk):
         """处理音频块（25ms = 1帧）"""
@@ -105,11 +107,15 @@ class TrueRealtimeMuseTalk:
     def fast_audio_encoder(self, audio_chunk):
         """快速音频编码器（替代Whisper）"""
         # 方案1：直接使用mel频谱
-        mel = compute_mel_spectrogram(audio_chunk)
-        return mel
+        # mel = compute_mel_spectrogram(audio_chunk)
+        # return mel
         
         # 方案2：使用轻量级编码器
         # return self.lightweight_encoder(audio_chunk)
+        
+        # 临时返回模拟数据
+        import numpy as np
+        return np.zeros((1, 384))  # 返回模拟的音频特征
 
 
 class OptimizedMuseTalkPipeline:
