@@ -39,6 +39,8 @@ RUN pip3 install --no-cache-dir \
     -i https://mirrors.aliyun.com/pypi/simple/ \
     --trusted-host mirrors.aliyun.com \
     transformers==4.30.2 \
+    diffusers==0.24.0 \
+    accelerate==0.25.0 \
     numpy==1.24.3 \
     scipy==1.10.1
 
@@ -59,6 +61,8 @@ RUN pip3 install --no-cache-dir \
     matplotlib==3.7.1 \
     Pillow==10.0.0 \
     einops==0.7.0 \
+    omegaconf==2.3.0 \
+    facexlib==0.3.0 \
     fastapi==0.104.1 \
     uvicorn==0.24.0 \
     python-multipart==0.0.6
