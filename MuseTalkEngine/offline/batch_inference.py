@@ -1100,8 +1100,8 @@ def handle_client_ultra_fast(client_socket):
                     try:
                         # 导入预处理模块
                         # 导入预处理器
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from core.preprocessing import OptimizedPreprocessor
+                        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+                        from core.preprocessing import OptimizedPreprocessor
                         
                         # 获取缓存目录
                         cache_dir = os.environ.get('MUSE_TEMPLATE_CACHE_DIR', '/opt/musetalk/template_cache')
