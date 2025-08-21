@@ -168,17 +168,8 @@ namespace LmyDigitalHuman.Services.Core
                 {
                     SessionId = sessionId,
                     IsActive = session.IsActive,
-                    StartTime = session.StartTime,
-                    Duration = DateTime.UtcNow - session.StartTime,
-                    AudioGpuId = session.AudioGpuId,
-                    LLMGpuId = session.LLMGpuId,
-                    VideoGpuId = session.VideoGpuId,
-                    ProcessedAudioChunks = session.ProcessedAudioChunks,
-                    ProcessedTextChunks = session.ProcessedTextChunks,
-                    ProcessedTTSChunks = session.ProcessedTTSChunks,
-                    ProcessedVideoChunks = session.ProcessedVideoChunks,
-                    AverageLatency = session.GetAverageLatency(),
-                    LastActivity = session.LastActivity
+                    ProcessedFrames = session.ProcessedVideoChunks,
+                    ProcessingTime = (DateTime.UtcNow - session.StartTime).TotalSeconds
                 };
             }
 

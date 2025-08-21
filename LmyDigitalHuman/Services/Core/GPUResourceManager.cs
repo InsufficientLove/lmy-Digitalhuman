@@ -4,14 +4,6 @@ using System.Diagnostics;
 
 namespace LmyDigitalHuman.Services.Core
 {
-    public interface IGPUResourceManager
-    {
-        Task<int> AllocateGPUAsync(GPUWorkloadType workloadType);
-        Task ReleaseGPUAsync(int gpuId, GPUWorkloadType workloadType);
-        Task<GPUStatus[]> GetGPUStatusAsync();
-        Task<GPUResourceInfo> GetOptimalGPUAsync(GPUWorkloadType workloadType);
-    }
-
     public class GPUResourceManager : IGPUResourceManager
     {
         private readonly ILogger<GPUResourceManager> _logger;

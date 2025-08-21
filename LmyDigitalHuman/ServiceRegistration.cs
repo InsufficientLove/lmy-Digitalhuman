@@ -47,7 +47,7 @@ namespace LmyDigitalHuman
             services.AddSingleton<IRealtimePipelineService, RealtimePipelineService>();
             
             // ========== MuseTalk服务和客户端 ==========
-            services.AddSingleton<IMuseTalkService, OptimizedMuseTalkService>();
+            services.AddSingleton<IMuseTalkService, Offline.OptimizedMuseTalkService>();
             services.AddSingleton<PersistentMuseTalkClient>();
             services.AddSingleton<GlobalMuseTalkClient>();
             

@@ -381,7 +381,7 @@ namespace LmyDigitalHuman.Services.Core
             if (string.IsNullOrEmpty(pythonPath))
                 return false;
 
-            var (success, _, _) = await ExecutePythonCommandAsync(pythonPath, "--version");
+            var (success, _, _) = await RunPythonCommandAsync(pythonPath, "--version");
             return success;
         }
 
@@ -403,7 +403,7 @@ namespace LmyDigitalHuman.Services.Core
             if (string.IsNullOrEmpty(pythonPath))
                 return "Unknown";
 
-            var (success, output, error) = await ExecutePythonCommandAsync(pythonPath, "--version");
+            var (success, output, error) = await RunPythonCommandAsync(pythonPath, "--version");
             if (success)
             {
                 return output.Trim();
@@ -418,7 +418,7 @@ namespace LmyDigitalHuman.Services.Core
                 return false;
 
             var checkScript = "import torch; print(torch.cuda.is_available())";
-            var (success, output, _) = await ExecutePythonCommandAsync(pythonPath, "-c", $"\"{checkScript}\"");
+            var (success, output, _) = await RunPythonCommandAsync(pythonPath, "-c \"" + checkScript + "\"");
             
             if (success && output.Contains("True", StringComparison.OrdinalIgnoreCase))
             {

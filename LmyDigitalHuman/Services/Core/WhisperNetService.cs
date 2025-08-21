@@ -166,7 +166,7 @@ namespace LmyDigitalHuman.Services.Core
                     Confidence = avgConfidence,
                     ProcessingTime = stopwatch.ElapsedMilliseconds,
                     Language = language,
-                    Segments = segments
+                    Segments = segments.Select(s => new SpeechSegment { Text = s }).ToList()
                 };
             }
             catch (Exception ex)
