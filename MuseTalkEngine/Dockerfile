@@ -70,6 +70,21 @@ RUN pip3 install --no-cache-dir \
     uvicorn==0.24.0 \
     python-multipart==0.0.6
 
+# 安装MMCV和MMPose（MuseTalk人体姿态检测需要）
+RUN pip3 install --no-cache-dir \
+    -i https://mirrors.aliyun.com/pypi/simple/ \
+    --trusted-host mirrors.aliyun.com \
+    mmcv-full==1.7.1 \
+    mmpose==0.29.0 \
+    mmdet==2.28.2
+
+# 安装人脸处理库
+RUN pip3 install --no-cache-dir \
+    -i https://mirrors.aliyun.com/pypi/simple/ \
+    --trusted-host mirrors.aliyun.com \
+    facexlib==0.3.0 \
+    gfpgan==1.3.8
+
 # 复制应用代码（新的目录结构）
 COPY MuseTalkEngine/core /opt/musetalk/repo/MuseTalkEngine/core/
 COPY MuseTalkEngine/offline /opt/musetalk/repo/MuseTalkEngine/offline/
