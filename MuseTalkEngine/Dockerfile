@@ -34,24 +34,27 @@ COPY MuseTalkEngine/requirements.txt .
 # 安装PyTorch（使用官方源）
 RUN pip3 install --no-cache-dir torch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2 --index-url https://download.pytorch.org/whl/cu118
 
-# 使用阿里云镜像源安装其他依赖
+# 使用阿里云镜像源安装Hugging Face生态（版本兼容组）
 RUN pip3 install --no-cache-dir \
     -i https://mirrors.aliyun.com/pypi/simple/ \
     --trusted-host mirrors.aliyun.com \
     huggingface-hub==0.16.4 \
     transformers==4.30.2 \
-    diffusers==0.21.0 \
-    accelerate==0.21.0 \
-    numpy==1.24.3 \
-    scipy==1.10.1
+    diffusers==0.18.2 \
+    accelerate==0.20.3
 
+# 安装科学计算和音频处理
 RUN pip3 install --no-cache-dir \
     -i https://mirrors.aliyun.com/pypi/simple/ \
     --trusted-host mirrors.aliyun.com \
+    numpy==1.24.3 \
+    scipy==1.10.1 \
     opencv-python==4.8.0.74 \
-    librosa==0.10.0 \
+    opencv-contrib-python==4.8.0.74 \
+    librosa==0.10.0.post2 \
     soundfile==0.12.1
 
+# 安装其他依赖
 RUN pip3 install --no-cache-dir \
     -i https://mirrors.aliyun.com/pypi/simple/ \
     --trusted-host mirrors.aliyun.com \
@@ -63,7 +66,6 @@ RUN pip3 install --no-cache-dir \
     Pillow==10.0.0 \
     einops==0.7.0 \
     omegaconf==2.3.0 \
-    facexlib==0.3.0 \
     fastapi==0.104.1 \
     uvicorn==0.24.0 \
     python-multipart==0.0.6
