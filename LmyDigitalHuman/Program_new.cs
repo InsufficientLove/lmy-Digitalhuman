@@ -3,6 +3,7 @@ using Microsoft.Extensions.FileProviders;
 using Serilog;
 using Serilog.Events;
 using System.Runtime.InteropServices;
+using LmyDigitalHuman;
 
 // 配置 Serilog
 Log.Logger = new LoggerConfiguration()
