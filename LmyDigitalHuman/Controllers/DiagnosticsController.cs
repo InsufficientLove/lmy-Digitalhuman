@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using LmyDigitalHuman.Services;
+using LmyDigitalHuman.Services.Core;
 
 namespace LmyDigitalHuman.Controllers
 {
@@ -7,11 +8,11 @@ namespace LmyDigitalHuman.Controllers
     [Route("api/[controller]")]
     public class DiagnosticsController : ControllerBase
     {
-        private readonly IPythonEnvironmentService _pythonEnvironmentService;
+        private readonly Core.IPythonEnvironmentService _pythonEnvironmentService;
         private readonly ILogger<DiagnosticsController> _logger;
 
         public DiagnosticsController(
-            IPythonEnvironmentService pythonEnvironmentService,
+            Core.IPythonEnvironmentService pythonEnvironmentService,
             ILogger<DiagnosticsController> logger)
         {
             _pythonEnvironmentService = pythonEnvironmentService;

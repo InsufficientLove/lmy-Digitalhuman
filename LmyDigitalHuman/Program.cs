@@ -1,4 +1,6 @@
 using LmyDigitalHuman.Services;
+using LmyDigitalHuman.Services.Core;
+using LmyDigitalHuman.Services.Offline;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.FileProviders;
 using Serilog;
@@ -67,39 +69,39 @@ try
     builder.Services.AddMemoryCache();
 
     // 注册核心服务
-    builder.Services.AddSingleton<IWhisperNetService, WhisperNetService>();
+    builder.Services.AddSingleton<Core.IWhisperNetService, Core.WhisperNetService>();
     builder.Services.AddSingleton<IStreamingTTSService, StreamingTTSService>();
     
     // 持久化MuseTalk客户端（与 musetalk-python 通信）
-    builder.Services.AddSingleton<PersistentMuseTalkClient>();
+    builder.Services.AddSingleton<Offline.PersistentMuseTalkClient>();
     
     // 使用极致优化MuseTalk服务（轻量实现）作为默认 IMuseTalkService
-    builder.Services.AddSingleton<IMuseTalkService, Offline.OptimizedMuseTalkService>();
+    builder.Services.AddSingleton<IMuseTalkService, OptimizedMuseTalkService>();
     
     // 注册其他服务
     // 在Docker环境中使用专用的Python环境服务
     if (builder.Environment.EnvironmentName == "Docker")
     {
-        builder.Services.AddSingleton<IPythonEnvironmentService, DockerPythonEnvironmentService>();
+        builder.Services.AddSingleton<Core.IPythonEnvironmentService, Core.DockerPythonEnvironmentService>();
     }
     else
     {
-        builder.Services.AddSingleton<IPythonEnvironmentService, PythonEnvironmentService>();
+        builder.Services.AddSingleton<Core.IPythonEnvironmentService, Core.PythonEnvironmentService>();
     }
     
-    builder.Services.AddSingleton<IPathManager, PathManager>();
-    builder.Services.AddSingleton<IEdgeTTSService, EdgeTTSService>();
-    builder.Services.AddSingleton<ITTSService, EdgeTTSService>(); // 使用真实的EdgeTTS服务
-    builder.Services.AddSingleton<IAudioPipelineService, AudioPipelineService>();
-    builder.Services.AddSingleton<IConversationService, ConversationService>();
-    builder.Services.AddSingleton<IDigitalHumanTemplateService, DigitalHumanTemplateService>();
-    builder.Services.AddSingleton<ILocalLLMService, OllamaService>();
+    builder.Services.AddSingleton<Core.IPathManager, Core.PathManager>();
+    builder.Services.AddSingleton<IEdgeTTSService, Core.EdgeTTSService>();
+    builder.Services.AddSingleton<ITTSService, Core.EdgeTTSService>(); // 使用真实的EdgeTTS服务
+    builder.Services.AddSingleton<IAudioPipelineService, Core.AudioPipelineService>();
+    builder.Services.AddSingleton<IConversationService, Core.ConversationService>();
+    builder.Services.AddSingleton<IDigitalHumanTemplateService, Core.DigitalHumanTemplateService>();
+    builder.Services.AddSingleton<ILocalLLMService, Core.OllamaService>();
     
     // 注册辅助服务
     // IPathManager已在上面注册，这里不需要重复注册
     // IPythonEnvironmentService已根据环境在上面注册，这里不能重复注册
-    builder.Services.AddSingleton<IGPUResourceManager, GPUResourceManager>();
-    builder.Services.AddSingleton<GlobalMuseTalkClient>();
+    builder.Services.AddSingleton<Core.IGPUResourceManager, Core.GPUResourceManager>();
+    builder.Services.AddSingleton<Offline.GlobalMuseTalkClient>();
 
     // 配置静态文件目录
     builder.Services.AddDirectoryBrowser();
@@ -156,7 +158,7 @@ try
     // 初始化服务
     using (var scope = app.Services.CreateScope())
     {
-        var whisperService = scope.ServiceProvider.GetRequiredService<IWhisperNetService>();
+        var whisperService = scope.ServiceProvider.GetRequiredService<Core.IWhisperNetService>();
         var initTask = whisperService.InitializeAsync();
         initTask.Wait();
         

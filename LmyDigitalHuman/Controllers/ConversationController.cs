@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using LmyDigitalHuman.Services;
+using LmyDigitalHuman.Services.Core;
 using LmyDigitalHuman.Models;
 using System.ComponentModel.DataAnnotations;
 
