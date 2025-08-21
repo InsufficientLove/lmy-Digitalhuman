@@ -8,11 +8,11 @@ namespace LmyDigitalHuman.Controllers
     [Route("api/[controller]")]
     public class DiagnosticsController : ControllerBase
     {
-        private readonly Core.IPythonEnvironmentService _pythonEnvironmentService;
+        private readonly IPythonEnvironmentService _pythonEnvironmentService;
         private readonly ILogger<DiagnosticsController> _logger;
 
         public DiagnosticsController(
-            Core.IPythonEnvironmentService pythonEnvironmentService,
+            IPythonEnvironmentService pythonEnvironmentService,
             ILogger<DiagnosticsController> logger)
         {
             _pythonEnvironmentService = pythonEnvironmentService;

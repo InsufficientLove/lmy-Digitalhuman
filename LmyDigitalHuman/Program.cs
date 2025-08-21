@@ -69,8 +69,8 @@ try
     builder.Services.AddMemoryCache();
 
     // 注册核心服务
-    builder.Services.AddSingleton<Core.IWhisperNetService, Core.WhisperNetService>();
-    builder.Services.AddSingleton<IStreamingTTSService, StreamingTTSService>();
+    builder.Services.AddSingleton<IWhisperNetService, Core.WhisperNetService>();
+    builder.Services.AddSingleton<IStreamingTTSService, Streaming.StreamingTTSService>();
     
     // 持久化MuseTalk客户端（与 musetalk-python 通信）
     builder.Services.AddSingleton<Offline.PersistentMuseTalkClient>();
@@ -82,14 +82,14 @@ try
     // 在Docker环境中使用专用的Python环境服务
     if (builder.Environment.EnvironmentName == "Docker")
     {
-        builder.Services.AddSingleton<Core.IPythonEnvironmentService, Core.DockerPythonEnvironmentService>();
+        builder.Services.AddSingleton<IPythonEnvironmentService, Core.DockerPythonEnvironmentService>();
     }
     else
     {
-        builder.Services.AddSingleton<Core.IPythonEnvironmentService, Core.PythonEnvironmentService>();
+        builder.Services.AddSingleton<IPythonEnvironmentService, Core.PythonEnvironmentService>();
     }
     
-    builder.Services.AddSingleton<Core.IPathManager, Core.PathManager>();
+    builder.Services.AddSingleton<IPathManager, Core.PathManager>();
     builder.Services.AddSingleton<IEdgeTTSService, Core.EdgeTTSService>();
     builder.Services.AddSingleton<ITTSService, Core.EdgeTTSService>(); // 使用真实的EdgeTTS服务
     builder.Services.AddSingleton<IAudioPipelineService, Core.AudioPipelineService>();
@@ -100,7 +100,7 @@ try
     // 注册辅助服务
     // IPathManager已在上面注册，这里不需要重复注册
     // IPythonEnvironmentService已根据环境在上面注册，这里不能重复注册
-    builder.Services.AddSingleton<Core.IGPUResourceManager, Core.GPUResourceManager>();
+    builder.Services.AddSingleton<IGPUResourceManager, Core.GPUResourceManager>();
     builder.Services.AddSingleton<Offline.GlobalMuseTalkClient>();
 
     // 配置静态文件目录
@@ -158,7 +158,7 @@ try
     // 初始化服务
     using (var scope = app.Services.CreateScope())
     {
-        var whisperService = scope.ServiceProvider.GetRequiredService<Core.IWhisperNetService>();
+        var whisperService = scope.ServiceProvider.GetRequiredService<IWhisperNetService>();
         var initTask = whisperService.InitializeAsync();
         initTask.Wait();
         

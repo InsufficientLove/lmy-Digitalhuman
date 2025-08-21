@@ -1,29 +1,11 @@
 using Microsoft.AspNetCore.Hosting;
+using LmyDigitalHuman.Services;
 
 namespace LmyDigitalHuman.Services.Core
 {
     /// <summary>
-    /// 统一路径管理服务，解决开发环境和生产环境路径不一致问题
+    /// 统一路径管理服务实现
     /// </summary>
-    public interface IPathManager
-    {
-        string GetContentRootPath();
-        string GetWebRootPath();
-        string GetTemplatesPath();
-        string GetVideosPath();
-        string GetTempPath();
-        string GetModelsPath();
-        string GetScriptsPath();
-        string ResolvePath(string relativePath);
-        string ResolveWebPath(string webPath);
-        string ResolveImagePath(string imagePath);
-        string ResolveAudioPath(string audioPath);
-        string ResolveVideoPath(string videoPath);
-        string CreateTempAudioPath(string extension = "wav");
-        string CreateTempVideoPath(string extension = "mp4");
-        bool EnsureDirectoryExists(string path);
-    }
-
     public class PathManager : IPathManager
     {
         private readonly IWebHostEnvironment _environment;
