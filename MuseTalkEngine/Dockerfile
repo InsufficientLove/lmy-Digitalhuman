@@ -131,7 +131,7 @@ RUN mkdir -p /opt/musetalk/template_cache \
     /temp
 
 # 设置Python路径
-ENV PYTHONPATH=/opt/musetalk/repo/MuseTalkEngine:/opt/musetalk/repo/MuseTalk:$PYTHONPATH
+ENV PYTHONPATH=/opt/musetalk/repo/MuseTalkEngine:/opt/musetalk/repo/MuseTalk:${PYTHONPATH:-}
 
 # 暴露端口
 EXPOSE 8000 8766 28888
