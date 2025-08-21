@@ -411,15 +411,11 @@ namespace LmyDigitalHuman.Services.Core
         }
     }
 
-    // 使用IRealtimePipelineService中定义的RealtimePipelineConfig = string.Empty;
-        public string VoiceId { get; set; } = "zh-CN-XiaoxiaoNeural";
-        public int MaxLatencyMs { get; set; } = 500;
-        public int AudioChunkSizeMs { get; set; } = 1000;
-        public bool EnableVideoOutput { get; set; } = true;
-        public int VideoResolution { get; set; } = 256;
-    }
+    // 使用IRealtimePipelineService中定义的RealtimePipelineConfig
 
-     = Array.Empty<byte>();
+    public class AudioChunk
+    {
+        public byte[] Data { get; set; } = Array.Empty<byte>();
         public DateTime Timestamp { get; set; }
         public string ChunkId { get; set; } = string.Empty;
     }

@@ -273,17 +273,4 @@ namespace LmyDigitalHuman.Services.Core
             _isInitialized = false;
         }
     }
-
-    // 扩展的响应模型
-    public class SpeechToTextResponse
-    {
-        public bool Success { get; set; }
-        public string Text { get; set; } = string.Empty;
-        public float Confidence { get; set; }
-        public long ProcessingTime { get; set; }
-        public string Language { get; set; } = "zh";
-        public string Error { get; set; } = string.Empty;
-        public List<string> Segments { get; set; } = new();
-        public double Duration { get; internal set; }
-    }
 }
