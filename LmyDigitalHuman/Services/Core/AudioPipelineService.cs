@@ -185,7 +185,7 @@ namespace LmyDigitalHuman.Services.Core
                         Success = true,
                         Text = whisperResult.Text,
                         Confidence = 0.95f, // Whisper通常有较高的准确率
-                        Duration = TimeSpan.FromSeconds((double)whisperResult.Duration),
+                        Duration = whisperResult.Duration,
                         ProcessingTime = stopwatch.ElapsedMilliseconds,
                         Language = "zh-CN",
                         Segments = ParseWhisperSegments(whisperResult.Text)

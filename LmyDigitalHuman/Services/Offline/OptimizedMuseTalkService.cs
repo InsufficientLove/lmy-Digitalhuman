@@ -7,7 +7,7 @@ using LmyDigitalHuman.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
 
-namespace LmyDigitalHuman.Services.Offline.Offline
+namespace LmyDigitalHuman.Services.Offline
 {
     // 轻量占位实现，委托给持久化客户端或直接返回错误，用于恢复编译通过
     public class OptimizedMuseTalkService : IMuseTalkService

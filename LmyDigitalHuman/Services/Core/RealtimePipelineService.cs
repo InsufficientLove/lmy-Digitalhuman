@@ -306,10 +306,14 @@ namespace LmyDigitalHuman.Services.Core
                     var startTime = DateTime.UtcNow;
 
                     // 使用MuseTalk生成视频
-                    // TODO: 需要实现GenerateRealtimeVideoAsync方法
-                    var videoPath = await _museTalkService.GenerateVideoAsync(
-                        session.Config.TemplateId, 
-                        videoChunk.AudioPath);
+                    var videoRequest = new DigitalHumanRequest
+                    {
+                        TemplateId = session.Config.TemplateId,
+                        AudioPath = videoChunk.AudioPath,
+                        Text = videoChunk.Text
+                    };
+                    var videoResponse = await _museTalkService.GenerateVideoAsync(videoRequest);
+                    var videoPath = videoResponse.VideoPath;
 
                     var result = new RealtimeResult
                     {
