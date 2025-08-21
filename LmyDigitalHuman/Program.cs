@@ -26,15 +26,11 @@ try
     // 使用 Serilog
     builder.Host.UseSerilog();
 
-    // 加载环境特定的配置
+    // 加载Docker环境配置
     var environment = builder.Environment.EnvironmentName;
-    if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-    {
-        builder.Configuration.AddJsonFile("appsettings.Linux.json", optional: true, reloadOnChange: true);
-    }
     if (environment == "Docker")
     {
-        builder.Configuration.AddJsonFile("appsettings.Docker.json", optional: true, reloadOnChange: true);
+        builder.Configuration.AddJsonFile("appsettings.Docker.json", optional: false, reloadOnChange: true);
     }
 
     // 注册所有服务（使用扩展方法）
