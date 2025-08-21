@@ -144,6 +144,80 @@ namespace LmyDigitalHuman.Services.Core
             }).ToArray());
         }
 
+        // 新增接口方法实现
+        public async Task<GPUInfo> GetGPUInfoAsync()
+        {
+            var gpuInfo = new GPUInfo
+            {
+                Count = _gpuResources.Count,
+                Devices = _gpuResources.Values.Select(gpu => new GPUDevice
+                {
+                    Index = gpu.Id,
+                    Name = gpu.Name,
+                    TotalMemory = gpu.TotalMemoryMB * 1024L * 1024L, // 转换为字节
+                    UsedMemory = gpu.MemoryUsedMB * 1024L * 1024L,
+                    FreeMemory = (gpu.TotalMemoryMB - gpu.MemoryUsedMB) * 1024L * 1024L,
+                    Utilization = gpu.GetLoadPercentage()
+                }).ToList()
+            };
+            return await Task.FromResult(gpuInfo);
+        }
+
+        public async Task<bool> CheckGPUAvailabilityAsync()
+        {
+            return await Task.FromResult(_gpuResources.Count > 0);
+        }
+
+        public async Task<int> GetAvailableGPUCountAsync()
+        {
+            return await Task.FromResult(_gpuResources.Count);
+        }
+
+        public async Task<long> GetAvailableGPUMemoryAsync(int gpuIndex = 0)
+        {
+            if (_gpuResources.TryGetValue(gpuIndex, out var gpu))
+            {
+                return await Task.FromResult((gpu.TotalMemoryMB - gpu.MemoryUsedMB) * 1024L * 1024L);
+            }
+            return 0;
+        }
+
+        public async Task<double> GetGPUUtilizationAsync(int gpuIndex = 0)
+        {
+            if (_gpuResources.TryGetValue(gpuIndex, out var gpu))
+            {
+                return await Task.FromResult(gpu.GetLoadPercentage());
+            }
+            return 0;
+        }
+
+        // 修改AllocateGPUAsync签名以匹配接口
+        public async Task<int> AllocateGPUAsync(int preferredGpu, GPUWorkloadType workloadType)
+        {
+            // 如果指定了首选GPU且可用，优先使用
+            if (preferredGpu >= 0 && _gpuResources.TryGetValue(preferredGpu, out var preferredGpuResource))
+            {
+                if (preferredGpuResource.CurrentTasks < preferredGpuResource.MaxConcurrentTasks)
+                {
+                    await _allocationLock.WaitAsync();
+                    try
+                    {
+                        preferredGpuResource.CurrentTasks++;
+                        preferredGpuResource.LastAllocatedTime = DateTime.UtcNow;
+                        _logger.LogDebug($"分配指定GPU {preferredGpu} 用于 {workloadType}");
+                        return preferredGpu;
+                    }
+                    finally
+                    {
+                        _allocationLock.Release();
+                    }
+                }
+            }
+            
+            // 否则使用原有逻辑
+            return await AllocateGPUAsync(workloadType);
+        }
+
         public async Task<GPUResourceInfo> GetOptimalGPUAsync(GPUWorkloadType workloadType)
         {
             var statuses = await GetGPUStatusAsync();
