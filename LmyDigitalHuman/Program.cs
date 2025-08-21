@@ -101,6 +101,8 @@ try
     // IPathManager已在上面注册，这里不需要重复注册
     // IPythonEnvironmentService已根据环境在上面注册，这里不能重复注册
     builder.Services.AddSingleton<IGPUResourceManager, Core.GPUResourceManager>();
+    builder.Services.AddSingleton<ITemplatePreprocessService, Core.TemplatePreprocessService>();
+    builder.Services.AddSingleton<IRealtimePipelineService, Core.RealtimePipelineService>();
     builder.Services.AddSingleton<Offline.GlobalMuseTalkClient>();
 
     // 配置静态文件目录
