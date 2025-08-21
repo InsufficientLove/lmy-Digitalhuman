@@ -53,6 +53,11 @@ services:
       - MUSE_TALK_DIR=/opt/musetalk/repo/MuseTalk
       # 统一的模板缓存目录
       - MUSE_TEMPLATE_CACHE_DIR=/opt/musetalk/template_cache
+      # 流式处理配置
+      - STREAMING_MODE=integrated  # integrated/realtime/basic
+      - SEGMENT_DURATION=1.0  # 音频分段长度（秒）
+      - SKIP_FRAMES=2  # 跳帧数（1=不跳帧，2=隔帧，3=每3帧1次）
+      - INTERPOLATION_METHOD=optical_flow  # linear/optical_flow/rife
     volumes:
       - ./MuseTalkEngine:/opt/musetalk/repo/MuseTalkEngine
       - ./MuseTalk:/opt/musetalk/repo/MuseTalk

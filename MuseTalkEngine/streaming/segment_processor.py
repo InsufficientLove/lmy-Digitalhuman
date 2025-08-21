@@ -23,8 +23,10 @@ class SegmentProcessor:
     def __init__(self):
         self.service = None
         self.template_cache = {}
-        self.segment_duration = 2.0  # 每段最长2秒
-        self.min_segment_duration = 0.5  # 最短0.5秒
+        # 优化的分段参数 - 更短的段以降低延迟
+        self.segment_duration = 1.0  # 每段标准1秒（平衡延迟和效率）
+        self.max_segment_duration = 1.5  # 最长1.5秒
+        self.min_segment_duration = 0.3  # 最短0.3秒（避免太碎片化）
         
     def initialize(self):
         """初始化服务"""
@@ -88,33 +90,41 @@ class SegmentProcessor:
         segment_info: Dict,
         skip_frames: int = 1
     ) -> Dict:
-        """处理单个音频片段"""
+        """处理单个音频片段 - 优化版"""
         try:
             start_time = time.time()
             
-            # 确定批次大小
+            # 优化的批次大小策略
             num_frames = segment_info['frames']
-            if num_frames <= 25:  # 1秒以内
-                batch_size = num_frames
+            if num_frames <= 12:  # 0.5秒以内 - 极速模式
+                batch_size = min(num_frames, 6)
                 skip_frames = 1
-            elif num_frames <= 50:  # 2秒以内
-                batch_size = 25
-                skip_frames = skip_frames or 2
-            else:
-                batch_size = 25
-                skip_frames = skip_frames or 3
+            elif num_frames <= 25:  # 1秒以内 - 快速模式
+                batch_size = min(num_frames, 12)
+                skip_frames = 2
+            elif num_frames <= 50:  # 2秒以内 - 标准模式
+                batch_size = 16
+                skip_frames = 2
+            else:  # 2秒以上 - 跳帧模式
+                batch_size = 20
+                skip_frames = 3
             
             # 生成输出路径
             output_path = f"/tmp/segment_{template_id}_{segment_info['index']}.mp4"
+            
+            # 获取缓存目录
+            cache_dir = os.environ.get('MUSE_TEMPLATE_CACHE_DIR', '/opt/musetalk/template_cache')
             
             # 调用离线推理（复用所有优化）
             success = self.service.ultra_fast_inference_parallel(
                 template_id=template_id,
                 audio_path=segment_info['path'],
                 output_path=output_path,
+                cache_dir=cache_dir,
                 batch_size=batch_size,
                 skip_frames=skip_frames,
-                streaming=True  # 标记为流式模式
+                streaming=True,  # 标记为流式模式
+                auto_adjust=True  # 自动调整避免OOM
             )
             
             process_time = time.time() - start_time
