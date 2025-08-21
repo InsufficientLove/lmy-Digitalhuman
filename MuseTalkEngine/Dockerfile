@@ -30,7 +30,7 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /opt/musetalk/repo/MuseTalkEngine
 
 # 先复制requirements.txt并安装依赖（利用Docker缓存）
-COPY requirements.txt .
+COPY MuseTalkEngine/requirements.txt .
 RUN pip3 install --no-cache-dir torch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2 --index-url https://download.pytorch.org/whl/cu118
 RUN pip3 install --no-cache-dir \
     transformers==4.30.2 \
@@ -44,10 +44,10 @@ RUN pip3 install --no-cache-dir \
     websockets==11.0.3
 
 # 复制应用代码（新的目录结构）
-COPY core /opt/musetalk/repo/MuseTalkEngine/core/
-COPY offline /opt/musetalk/repo/MuseTalkEngine/offline/
-COPY streaming /opt/musetalk/repo/MuseTalkEngine/streaming/
-COPY main.py /opt/musetalk/repo/MuseTalkEngine/
+COPY MuseTalkEngine/core /opt/musetalk/repo/MuseTalkEngine/core/
+COPY MuseTalkEngine/offline /opt/musetalk/repo/MuseTalkEngine/offline/
+COPY MuseTalkEngine/streaming /opt/musetalk/repo/MuseTalkEngine/streaming/
+COPY MuseTalkEngine/main.py /opt/musetalk/repo/MuseTalkEngine/
 
 # 创建必要的目录
 RUN mkdir -p /opt/musetalk/template_cache \

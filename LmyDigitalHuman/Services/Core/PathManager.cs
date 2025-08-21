@@ -1,3 +1,4 @@
+using LmyDigitalHuman.Services;
 using Microsoft.AspNetCore.Hosting;
 
 namespace LmyDigitalHuman.Services.Core
