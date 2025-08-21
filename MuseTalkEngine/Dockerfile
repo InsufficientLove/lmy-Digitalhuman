@@ -31,26 +31,27 @@ WORKDIR /opt/musetalk/repo/MuseTalkEngine
 
 # 先复制requirements.txt并安装依赖（利用Docker缓存）
 COPY MuseTalkEngine/requirements.txt .
-# 配置pip使用豆瓣镜像源
-RUN pip3 config set global.index-url https://pypi.douban.com/simple/ && \
-    pip3 config set global.trusted-host pypi.douban.com && \
-    pip3 config set global.timeout 120
-
-# 安装PyTorch（使用官方源，因为豆瓣可能没有CUDA版本）
+# 安装PyTorch（使用官方源）
 RUN pip3 install --no-cache-dir torch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2 --index-url https://download.pytorch.org/whl/cu118
 
-# 使用豆瓣源安装其他依赖，分批安装避免超时
+# 使用阿里云镜像源安装其他依赖
 RUN pip3 install --no-cache-dir \
+    -i https://mirrors.aliyun.com/pypi/simple/ \
+    --trusted-host mirrors.aliyun.com \
     transformers==4.30.2 \
     numpy==1.24.3 \
     scipy==1.10.1
 
 RUN pip3 install --no-cache-dir \
+    -i https://mirrors.aliyun.com/pypi/simple/ \
+    --trusted-host mirrors.aliyun.com \
     opencv-python==4.8.0.74 \
     librosa==0.10.0 \
     soundfile==0.12.1
 
 RUN pip3 install --no-cache-dir \
+    -i https://mirrors.aliyun.com/pypi/simple/ \
+    --trusted-host mirrors.aliyun.com \
     imageio==2.31.1 \
     imageio-ffmpeg==0.4.8 \
     websockets==11.0.3 \
