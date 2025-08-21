@@ -340,7 +340,12 @@ namespace LmyDigitalHuman.Services.Core
                     };
 
                     // 触发实时结果事件
-                    OnRealtimeResult?.Invoke(this, new RealtimeResultEventArgs { Result = result });
+                    OnRealtimeResult?.Invoke(this, new RealtimeResultEventArgs 
+                    { 
+                        SessionId = sessionId,
+                        Type = "video",
+                        Data = result
+                    });
 
                     session.ProcessedVideoChunks++;
                     session.LastActivity = DateTime.UtcNow;
@@ -454,23 +459,5 @@ namespace LmyDigitalHuman.Services.Core
         public string Text { get; set; } = string.Empty;
         public DateTime Timestamp { get; set; }
         public double TotalLatency { get; set; }
-    }
-
-     = string.Empty;
-        public bool IsActive { get; set; }
-        public DateTime StartTime { get; set; }
-        public TimeSpan Duration { get; set; }
-        public int AudioGpuId { get; set; }
-        public int LLMGpuId { get; set; }
-        public int VideoGpuId { get; set; }
-        public int ProcessedAudioChunks { get; set; }
-        public int ProcessedTextChunks { get; set; }
-        public int ProcessedTTSChunks { get; set; }
-        public int ProcessedVideoChunks { get; set; }
-        public double AverageLatency { get; set; }
-        public DateTime LastActivity { get; set; }
-    }
-
-     = new();
     }
 }
