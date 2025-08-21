@@ -373,5 +373,70 @@ namespace LmyDigitalHuman.Services.Core
                 return (false, "", ex.Message);
             }
         }
+
+        // 新增的接口方法实现
+        public async Task<bool> CheckPythonEnvironmentAsync()
+        {
+            var pythonPath = await GetRecommendedPythonPathAsync();
+            if (string.IsNullOrEmpty(pythonPath))
+                return false;
+
+            var (success, _, _) = await ExecutePythonCommandAsync(pythonPath, "--version");
+            return success;
+        }
+
+        public async Task<bool> CheckMuseTalkModelsAsync()
+        {
+            // 检查模型文件是否存在
+            var modelsPath = Path.Combine(Directory.GetCurrentDirectory(), "models");
+            if (!Directory.Exists(modelsPath))
+            {
+                _logger.LogWarning("MuseTalk模型目录不存在: {Path}", modelsPath);
+                return false;
+            }
+            return await Task.FromResult(true);
+        }
+
+        public async Task<string> GetPythonVersionAsync()
+        {
+            var pythonPath = await GetRecommendedPythonPathAsync();
+            if (string.IsNullOrEmpty(pythonPath))
+                return "Unknown";
+
+            var (success, output, error) = await ExecutePythonCommandAsync(pythonPath, "--version");
+            if (success)
+            {
+                return output.Trim();
+            }
+            return "Unknown";
+        }
+
+        public async Task<bool> CheckGPUAvailabilityAsync()
+        {
+            var pythonPath = await GetRecommendedPythonPathAsync();
+            if (string.IsNullOrEmpty(pythonPath))
+                return false;
+
+            var checkScript = "import torch; print(torch.cuda.is_available())";
+            var (success, output, _) = await ExecutePythonCommandAsync(pythonPath, "-c", $"\"{checkScript}\"");
+            
+            if (success && output.Contains("True", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+            return false;
+        }
+
+        public async Task<Dictionary<string, object>> GetSystemInfoAsync()
+        {
+            var info = new Dictionary<string, object>
+            {
+                ["os"] = Environment.OSVersion.ToString(),
+                ["python"] = await GetPythonVersionAsync(),
+                ["gpu"] = await CheckGPUAvailabilityAsync() ? "Available" : "Not Available",
+                ["environment"] = "Local"
+            };
+            return info;
+        }
     }
 }

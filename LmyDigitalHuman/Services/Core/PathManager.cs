@@ -245,5 +245,52 @@ namespace LmyDigitalHuman.Services.Core
                 configKey, defaultPath, _environment.EnvironmentName);
             return Path.GetFullPath(defaultPath);
         }
+
+        // 新增的接口方法实现
+        public string GetAudioPath()
+        {
+            return GetConfiguredPath("Paths:Audio", Path.Combine(_webRootPath, "audio"));
+        }
+
+        public string GetTemplateCachePath()
+        {
+            return GetConfiguredPath("Paths:TemplateCache", "/opt/musetalk/template_cache");
+        }
+
+        public string GetTemplatePath(string templateId)
+        {
+            return Path.Combine(_templatesPath, templateId);
+        }
+
+        public string GetVideoPath(string fileName)
+        {
+            return Path.Combine(_videosPath, fileName);
+        }
+
+        public string GetAudioFilePath(string fileName)
+        {
+            return Path.Combine(GetAudioPath(), fileName);
+        }
+
+        public async Task<string> SaveTemplateImageAsync(string templateId, byte[] imageData)
+        {
+            var templatePath = GetTemplatePath(templateId);
+            EnsureDirectoryExists(templatePath);
+            
+            var imagePath = Path.Combine(templatePath, "avatar.jpg");
+            await File.WriteAllBytesAsync(imagePath, imageData);
+            
+            return imagePath;
+        }
+
+        public void EnsureDirectoriesExist()
+        {
+            EnsureDirectoryExists(_templatesPath);
+            EnsureDirectoryExists(_videosPath);
+            EnsureDirectoryExists(_tempPath);
+            EnsureDirectoryExists(_modelsPath);
+            EnsureDirectoryExists(GetAudioPath());
+            EnsureDirectoryExists(GetTemplateCachePath());
+        }
     }
 }

@@ -13,7 +13,7 @@ namespace LmyDigitalHuman.Services.Core
         private readonly IWhisperNetService _whisperService;
         private readonly ILocalLLMService _llmService;
         private readonly IEdgeTTSService _ttsService;
-        private readonly IMuseTalkCommercialService _museTalkService;
+        private readonly IMuseTalkService _museTalkService;
         
         private readonly ConcurrentDictionary<string, RealtimePipelineSession> _activeSessions;
         private readonly SemaphoreSlim _sessionLock;
@@ -26,7 +26,7 @@ namespace LmyDigitalHuman.Services.Core
             IWhisperNetService whisperService,
             ILocalLLMService llmService,
             IEdgeTTSService ttsService,
-            IMuseTalkCommercialService museTalkService)
+            IMuseTalkService museTalkService)
         {
             _logger = logger;
             _gpuResourceManager = gpuResourceManager;
