@@ -1,0 +1,79 @@
+# MuseTalk完整依赖列表 - 经过验证的版本组合
+# Python 3.10 + CUDA 11.8
+
+# PyTorch核心
+torch==2.0.1
+torchvision==0.15.2
+torchaudio==2.0.2
+
+# Hugging Face生态（兼容版本）
+huggingface-hub==0.16.4
+transformers==4.30.2
+diffusers==0.18.2
+accelerate==0.20.3
+tokenizers==0.13.3
+safetensors==0.3.1
+
+# 音频处理
+librosa==0.10.0.post2
+soundfile==0.12.1
+audioread==3.0.0
+numba==0.57.1
+resampy==0.4.2
+
+# 视频和图像处理
+opencv-python==4.8.0.74
+opencv-contrib-python==4.8.0.74
+imageio==2.31.1
+imageio-ffmpeg==0.4.8
+moviepy==1.0.3
+Pillow==10.0.0
+scikit-image==0.21.0
+
+# 科学计算
+numpy==1.24.3
+scipy==1.10.1
+scikit-learn==1.3.0
+pandas==2.0.3
+
+# MMCV生态（关键版本匹配）
+mmcv-full==1.7.0
+mmdet==2.28.2
+mmpose==0.29.0
+mmengine==0.8.4
+
+# 人脸处理
+facexlib==0.3.0
+gfpgan==1.3.8
+basicsr==1.4.2
+realesrgan==0.3.0
+filterpy==1.4.5
+
+# 深度学习工具
+einops==0.7.0
+omegaconf==2.3.0
+hydra-core==1.3.2
+tqdm==4.65.0
+matplotlib==3.7.1
+tensorboard==2.13.0
+pyyaml==6.0.1
+
+# Web服务
+fastapi==0.104.1
+uvicorn==0.24.0
+python-multipart==0.0.6
+websockets==11.0.3
+aiofiles==23.1.0
+httpx==0.24.1
+
+# 其他必需
+typing-extensions==4.7.1
+packaging==23.1
+filelock==3.12.2
+sympy==1.12
+networkx==3.1
+requests==2.31.0
+urllib3==2.0.4
+certifi==2023.7.22
+charset-normalizer==3.2.0
+idna==3.4
