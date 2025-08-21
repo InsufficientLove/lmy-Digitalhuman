@@ -38,9 +38,10 @@ RUN pip3 install --no-cache-dir torch==2.0.1 torchvision==0.15.2 torchaudio==2.0
 RUN pip3 install --no-cache-dir \
     -i https://mirrors.aliyun.com/pypi/simple/ \
     --trusted-host mirrors.aliyun.com \
+    huggingface-hub==0.16.4 \
     transformers==4.30.2 \
-    diffusers==0.24.0 \
-    accelerate==0.25.0 \
+    diffusers==0.21.0 \
+    accelerate==0.21.0 \
     numpy==1.24.3 \
     scipy==1.10.1
 
