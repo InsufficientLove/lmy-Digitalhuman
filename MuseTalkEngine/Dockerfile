@@ -1,4 +1,4 @@
-FROM nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04
+FROM nvidia/cuda:12.1.0-cudnn8-runtime-ubuntu22.04
 
 # 设置环境变量
 ENV DEBIAN_FRONTEND=noninteractive
@@ -36,58 +36,58 @@ RUN python3 -m pip install --upgrade pip setuptools wheel
 # 创建工作目录
 WORKDIR /opt/musetalk/repo/MuseTalkEngine
 
-# 安装PyTorch（使用官方源，对应CUDA 11.8）
+# 安装PyTorch（CUDA 12.1版本）
 RUN pip3 install --no-cache-dir \
-    torch==2.0.1+cu118 \
-    torchvision==0.15.2+cu118 \
-    torchaudio==2.0.2+cu118 \
-    --index-url https://download.pytorch.org/whl/cu118
+    torch==2.1.0 \
+    torchvision==0.16.0 \
+    torchaudio==2.1.0 \
+    --index-url https://download.pytorch.org/whl/cu121
 
 # 安装numpy（其他包依赖）
 RUN pip3 install --no-cache-dir numpy==1.24.3
 
-# 安装MMCV（需要指定正确的版本和CUDA）
+# 安装MMCV（对应CUDA 12.1和torch 2.1）
 RUN pip3 install --no-cache-dir \
-    mmcv-full==1.7.0 -f https://download.openmmlab.com/mmcv/dist/cu118/torch2.0/index.html
+    mmcv==2.1.0 -f https://download.openmmlab.com/mmcv/dist/cu121/torch2.1/index.html
 
-# 安装MM系列（顺序很重要）
+# 安装MM系列（与mmcv 2.1兼容的版本）
 RUN pip3 install --no-cache-dir \
-    mmengine==0.8.4 \
-    mmdet==2.28.2 \
-    mmpose==0.29.0
+    mmengine==0.10.1 \
+    mmdet==3.2.0 \
+    mmpose==1.2.0
 
-# 安装Hugging Face生态
+# 安装Hugging Face生态（与torch 2.1兼容）
 RUN pip3 install --no-cache-dir \
-    huggingface-hub==0.16.4 \
-    transformers==4.30.2 \
-    diffusers==0.18.2 \
-    accelerate==0.20.3 \
-    tokenizers==0.13.3 \
-    safetensors==0.3.1
+    huggingface-hub==0.19.4 \
+    transformers==4.35.2 \
+    diffusers==0.24.0 \
+    accelerate==0.25.0 \
+    tokenizers==0.15.0 \
+    safetensors==0.4.1
 
 # 安装音视频处理
 RUN pip3 install --no-cache-dir \
-    opencv-python==4.8.0.74 \
-    opencv-contrib-python==4.8.0.74 \
-    imageio==2.31.1 \
-    imageio-ffmpeg==0.4.8 \
+    opencv-python==4.8.1.78 \
+    opencv-contrib-python==4.8.1.78 \
+    imageio==2.33.0 \
+    imageio-ffmpeg==0.4.9 \
     moviepy==1.0.3 \
-    Pillow==10.0.0 \
-    scikit-image==0.21.0
+    Pillow==10.1.0 \
+    scikit-image==0.22.0
 
 # 安装音频处理
 RUN pip3 install --no-cache-dir \
-    librosa==0.10.0.post2 \
+    librosa==0.10.1 \
     soundfile==0.12.1 \
-    audioread==3.0.0 \
-    numba==0.57.1 \
+    audioread==3.0.1 \
+    numba==0.58.1 \
     resampy==0.4.2
 
 # 安装科学计算
 RUN pip3 install --no-cache-dir \
-    scipy==1.10.1 \
-    scikit-learn==1.3.0 \
-    pandas==2.0.3
+    scipy==1.11.4 \
+    scikit-learn==1.3.2 \
+    pandas==2.1.4
 
 # 安装人脸处理
 RUN pip3 install --no-cache-dir \
@@ -102,9 +102,9 @@ RUN pip3 install --no-cache-dir \
     einops==0.7.0 \
     omegaconf==2.3.0 \
     hydra-core==1.3.2 \
-    tqdm==4.65.0 \
-    matplotlib==3.7.1 \
-    tensorboard==2.13.0 \
+    tqdm==4.66.1 \
+    matplotlib==3.8.2 \
+    tensorboard==2.15.1 \
     pyyaml==6.0.1
 
 # 安装Web服务
@@ -112,9 +112,9 @@ RUN pip3 install --no-cache-dir \
     fastapi==0.104.1 \
     uvicorn==0.24.0 \
     python-multipart==0.0.6 \
-    websockets==11.0.3 \
-    aiofiles==23.1.0 \
-    httpx==0.24.1
+    websockets==12.0 \
+    aiofiles==23.2.1 \
+    httpx==0.25.2
 
 # 复制应用代码
 COPY MuseTalkEngine/core /opt/musetalk/repo/MuseTalkEngine/core/
