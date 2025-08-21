@@ -57,7 +57,11 @@ RUN pip3 install --no-cache-dir \
     websockets==11.0.3 \
     tqdm==4.65.0 \
     matplotlib==3.7.1 \
-    Pillow==10.0.0
+    Pillow==10.0.0 \
+    einops==0.7.0 \
+    fastapi==0.104.1 \
+    uvicorn==0.24.0 \
+    python-multipart==0.0.6
 
 # 复制应用代码（新的目录结构）
 COPY MuseTalkEngine/core /opt/musetalk/repo/MuseTalkEngine/core/
