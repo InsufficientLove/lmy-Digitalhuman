@@ -54,7 +54,6 @@ namespace LmyDigitalHuman.Services.Streaming
             using var response = await _httpClient.PostAsync(
                 "/api/generate",
                 content,
-                HttpCompletionOption.ResponseHeadersRead,
                 cancellationToken);
 
             response.EnsureSuccessStatusCode();

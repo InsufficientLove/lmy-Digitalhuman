@@ -50,9 +50,9 @@ namespace LmyDigitalHuman.Services.Core
                 }
 
                 // 分配GPU资源
-                var audioGpu = await _gpuResourceManager.AllocateGPUAsync(GPUWorkloadType.AudioProcessing);
-                var llmGpu = await _gpuResourceManager.AllocateGPUAsync(GPUWorkloadType.LLMInference);
-                var videoGpu = await _gpuResourceManager.AllocateGPUAsync(GPUWorkloadType.VideoGeneration);
+                var audioGpu = await _gpuResourceManager.AllocateGPUAsync(-1, Services.GPUWorkloadType.Whisper);
+                var llmGpu = await _gpuResourceManager.AllocateGPUAsync(-1, Services.GPUWorkloadType.General);
+                var videoGpu = await _gpuResourceManager.AllocateGPUAsync(-1, Services.GPUWorkloadType.MuseTalk);
 
                 // 创建流水线会话
                 var session = new RealtimePipelineSession
@@ -144,9 +144,9 @@ namespace LmyDigitalHuman.Services.Core
                 session.CancellationTokenSource.Cancel();
 
                 // 释放GPU资源
-                await _gpuResourceManager.ReleaseGPUAsync(session.AudioGpuId, GPUWorkloadType.AudioProcessing);
-                await _gpuResourceManager.ReleaseGPUAsync(session.LLMGpuId, GPUWorkloadType.LLMInference);
-                await _gpuResourceManager.ReleaseGPUAsync(session.VideoGpuId, GPUWorkloadType.VideoGeneration);
+                await _gpuResourceManager.ReleaseGPUAsync(session.AudioGpuId, Services.GPUWorkloadType.Whisper);
+                await _gpuResourceManager.ReleaseGPUAsync(session.LLMGpuId, Services.GPUWorkloadType.General);
+                await _gpuResourceManager.ReleaseGPUAsync(session.VideoGpuId, Services.GPUWorkloadType.MuseTalk);
 
                 // 关闭通道
                 session.AudioChannel.Writer.Complete();
@@ -269,7 +269,7 @@ namespace LmyDigitalHuman.Services.Core
                     var ttsRequest = new TTSRequest
                     {
                         Text = ttsChunk.Text,
-                        Voice = session.Config.VoiceId,
+                        Voice = session.Config.Voice,
                         OutputFormat = "audio-16khz-32kbitrate-mono-mp3"
                     };
 
@@ -306,18 +306,10 @@ namespace LmyDigitalHuman.Services.Core
                     var startTime = DateTime.UtcNow;
 
                     // 使用MuseTalk生成视频
-                    var config = new MuseTalkConfig
-                    {
-                        BatchSize = 1, // 实时模式使用小批次
-                        UseFloat16 = true,
-                        NumInferenceSteps = 10, // 减少推理步数以降低延迟
-                        Resolution = 256 // 使用较低分辨率
-                    };
-
-                    var videoPath = await _museTalkService.GenerateRealtimeVideoAsync(
-                        session.Config.TemplateImagePath, 
-                        videoChunk.AudioPath, 
-                        config);
+                    // TODO: 需要实现GenerateRealtimeVideoAsync方法
+                    var videoPath = await _museTalkService.GenerateVideoAsync(
+                        session.Config.TemplateId, 
+                        videoChunk.AudioPath);
 
                     var result = new RealtimeResult
                     {
@@ -333,7 +325,7 @@ namespace LmyDigitalHuman.Services.Core
                     // 触发实时结果事件
                     OnRealtimeResult?.Invoke(this, new RealtimeResultEventArgs 
                     { 
-                        SessionId = sessionId,
+                        SessionId = session.SessionId,
                         Type = "video",
                         Data = result
                     });

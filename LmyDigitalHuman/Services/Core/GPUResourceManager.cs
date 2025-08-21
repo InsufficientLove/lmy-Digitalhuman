@@ -88,10 +88,10 @@ namespace LmyDigitalHuman.Services.Core
                 }
             }
             
-            return await AllocateGPUAsync(workloadType);
+            return await AllocateGPUInternalAsync(workloadType);
         }
 
-        private async Task<int> AllocateGPUAsync(Services.GPUWorkloadType workloadType)
+        private async Task<int> AllocateGPUInternalAsync(Services.GPUWorkloadType workloadType)
         {
             await _allocationLock.WaitAsync();
             try

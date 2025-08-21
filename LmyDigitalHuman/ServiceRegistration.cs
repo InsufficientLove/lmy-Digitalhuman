@@ -48,8 +48,8 @@ namespace LmyDigitalHuman
             
             // ========== MuseTalk服务和客户端 ==========
             services.AddSingleton<IMuseTalkService, Offline.OptimizedMuseTalkService>();
-            services.AddSingleton<PersistentMuseTalkClient>();
-            services.AddSingleton<GlobalMuseTalkClient>();
+            services.AddSingleton<Offline.PersistentMuseTalkClient>();
+            services.AddSingleton<Offline.GlobalMuseTalkClient>();
             
             return services;
         }
