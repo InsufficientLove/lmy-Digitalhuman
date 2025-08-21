@@ -71,10 +71,11 @@ class RealtimeSegmentProcessor:
             sf.write(dummy_path, dummy_audio, 16000)
             
             # 执行一次推理预热GPU
-            if hasattr(self.service, 'extract_audio_features_ultra_fast'):
+            if self.service and hasattr(self.service, 'extract_audio_features_ultra_fast'):
                 self.service.extract_audio_features_ultra_fast(dummy_path, 25)
             
-            os.remove(dummy_path)
+            if os.path.exists(dummy_path):
+                os.remove(dummy_path)
             print("✅ 模型预热完成")
         except Exception as e:
             print(f"⚠️ 模型预热失败: {e}")
