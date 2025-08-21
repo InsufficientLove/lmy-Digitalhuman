@@ -69,6 +69,9 @@ namespace LmyDigitalHuman.Services.Streaming
                 var line = await reader.ReadLineAsync();
                 if (string.IsNullOrWhiteSpace(line)) continue;
 
+                string sentenceToYield = null;
+                bool shouldBreak = false;
+
                 try
                 {
                     var responseObj = JsonSerializer.Deserialize<OllamaStreamResponse>(line);
@@ -84,7 +87,7 @@ namespace LmyDigitalHuman.Services.Streaming
                         if (!string.IsNullOrEmpty(sentence))
                         {
                             _logger.LogDebug("输出句子: {Sentence}", sentence);
-                            yield return sentence;
+                            sentenceToYield = sentence;
                             
                             sentenceBuffer.Clear();
                             charCount = 0;
@@ -94,12 +97,23 @@ namespace LmyDigitalHuman.Services.Streaming
                     if (responseObj.Done)
                     {
                         _logger.LogInformation("流式生成完成");
-                        break;
+                        shouldBreak = true;
                     }
                 }
                 catch (JsonException ex)
                 {
                     _logger.LogWarning("解析响应失败: {Error}", ex.Message);
+                }
+
+                // 在try块外yield
+                if (!string.IsNullOrEmpty(sentenceToYield))
+                {
+                    yield return sentenceToYield;
+                }
+
+                if (shouldBreak)
+                {
+                    break;
                 }
             }
 

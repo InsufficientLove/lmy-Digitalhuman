@@ -310,7 +310,7 @@ namespace LmyDigitalHuman.Services.Core
                     {
                         TemplateId = session.Config.TemplateId,
                         AudioPath = videoChunk.AudioPath,
-                        Text = videoChunk.Text
+                        AvatarImagePath = "" // 使用模板的默认图片
                     };
                     var videoResponse = await _museTalkService.GenerateVideoAsync(videoRequest);
                     var videoPath = videoResponse.VideoPath;

@@ -125,7 +125,15 @@ namespace LmyDigitalHuman.Services.Streaming
                 var audioPath = Path.Combine(audioDir, fileName);
 
                 // 使用TTS生成音频
-                await _ttsService.GenerateAudioAsync(text, voice, audioPath);
+                var ttsResult = await _ttsService.ConvertTextToSpeechAsync(text, voice);
+                if (ttsResult.Success && !string.IsNullOrEmpty(ttsResult.AudioPath))
+                {
+                    // 移动到目标路径
+                    if (ttsResult.AudioPath != audioPath)
+                    {
+                        File.Move(ttsResult.AudioPath, audioPath, true);
+                    }
+                }
                 
                 _logger.LogDebug("音频生成完成: {Path}", audioPath);
                 return audioPath;
@@ -148,15 +156,14 @@ namespace LmyDigitalHuman.Services.Streaming
             try
             {
                 // 调用MuseTalk生成视频
-                var result = await _museTalkService.GenerateVideoAsync(
-                    templateId,
-                    audioPath,
-                    new VideoGenerationOptions
-                    {
-                        BatchSize = 25,  // 小批次快速处理
-                        SkipFrames = 2,   // 跳帧加速
-                        Streaming = true  // 流式模式
-                    });
+                var request = new LmyDigitalHuman.Models.DigitalHumanRequest
+                {
+                    TemplateId = templateId,
+                    AudioPath = audioPath,
+                    AvatarImagePath = "", // 使用模板默认图片
+                    Quality = "medium"    // 中等质量，平衡速度和效果
+                };
+                var result = await _museTalkService.GenerateVideoAsync(request);
 
                 if (result.Success)
                 {
