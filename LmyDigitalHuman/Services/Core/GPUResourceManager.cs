@@ -17,22 +17,18 @@ namespace LmyDigitalHuman.Services.Core
             _gpuResources = new ConcurrentDictionary<int, GPUResource>();
             _allocationLock = new SemaphoreSlim(1, 1);
             
-            // 初始化GPU资源
             InitializeGPUResources();
-            
-            // 启动监控定时器 (每5秒更新一次)
             _monitoringTimer = new Timer(UpdateGPUMetrics, null, TimeSpan.Zero, TimeSpan.FromSeconds(5));
         }
 
         private void InitializeGPUResources()
         {
-            // 4张RTX4090的专用分配策略
             _gpuResources[0] = new GPUResource
             {
                 Id = 0,
                 Name = "RTX4090-0",
-                TotalMemoryMB = 24576, // 24GB
-                PrimaryWorkload = GPUWorkloadType.VideoGeneration,
+                TotalMemoryMB = 24576,
+                PrimaryWorkload = Services.GPUWorkloadType.MuseTalk,
                 MaxConcurrentTasks = 4,
                 Description = "MuseTalk视频生成专用"
             };
@@ -42,7 +38,7 @@ namespace LmyDigitalHuman.Services.Core
                 Id = 1,
                 Name = "RTX4090-1", 
                 TotalMemoryMB = 24576,
-                PrimaryWorkload = GPUWorkloadType.LLMInference,
+                PrimaryWorkload = Services.GPUWorkloadType.General,
                 MaxConcurrentTasks = 8,
                 Description = "LLM推理专用"
             };
@@ -52,7 +48,7 @@ namespace LmyDigitalHuman.Services.Core
                 Id = 2,
                 Name = "RTX4090-2",
                 TotalMemoryMB = 24576,
-                PrimaryWorkload = GPUWorkloadType.AudioProcessing,
+                PrimaryWorkload = Services.GPUWorkloadType.Whisper,
                 MaxConcurrentTasks = 12,
                 Description = "TTS合成 + 语音识别"
             };
@@ -62,7 +58,7 @@ namespace LmyDigitalHuman.Services.Core
                 Id = 3,
                 Name = "RTX4090-3",
                 TotalMemoryMB = 24576,
-                PrimaryWorkload = GPUWorkloadType.PostProcessing,
+                PrimaryWorkload = Services.GPUWorkloadType.General,
                 MaxConcurrentTasks = 6,
                 Description = "视频后处理 + 缓存预热"
             };
@@ -70,13 +66,36 @@ namespace LmyDigitalHuman.Services.Core
             _logger.LogInformation("初始化4张RTX4090 GPU资源完成");
         }
 
-        // 保留作为私有辅助方法
-        private async Task<int> AllocateGPUAsync(GPUWorkloadType workloadType)
+        // 实现IGPUResourceManager.AllocateGPUAsync接口方法
+        public async Task<int> AllocateGPUAsync(int preferredGpu, Services.GPUWorkloadType workloadType)
+        {
+            if (preferredGpu >= 0 && _gpuResources.TryGetValue(preferredGpu, out var preferredGpuResource))
+            {
+                if (preferredGpuResource.CurrentTasks < preferredGpuResource.MaxConcurrentTasks)
+                {
+                    await _allocationLock.WaitAsync();
+                    try
+                    {
+                        preferredGpuResource.CurrentTasks++;
+                        preferredGpuResource.LastAllocatedTime = DateTime.UtcNow;
+                        _logger.LogDebug($"分配指定GPU {preferredGpu} 用于 {workloadType}");
+                        return preferredGpu;
+                    }
+                    finally
+                    {
+                        _allocationLock.Release();
+                    }
+                }
+            }
+            
+            return await AllocateGPUAsync(workloadType);
+        }
+
+        private async Task<int> AllocateGPUAsync(Services.GPUWorkloadType workloadType)
         {
             await _allocationLock.WaitAsync();
             try
             {
-                // 首先尝试分配主要负责该工作负载的GPU
                 var primaryGpu = _gpuResources.Values.FirstOrDefault(g => g.PrimaryWorkload == workloadType);
                 if (primaryGpu != null && primaryGpu.CurrentTasks < primaryGpu.MaxConcurrentTasks)
                 {
@@ -86,7 +105,6 @@ namespace LmyDigitalHuman.Services.Core
                     return primaryGpu.Id;
                 }
 
-                // 如果主要GPU忙碌，寻找负载最低的备用GPU
                 var availableGpu = _gpuResources.Values
                     .Where(g => g.CurrentTasks < g.MaxConcurrentTasks)
                     .OrderBy(g => g.GetLoadPercentage())
@@ -110,7 +128,7 @@ namespace LmyDigitalHuman.Services.Core
         }
 
         // 实现IGPUResourceManager.ReleaseGPUAsync接口方法
-        public async Task ReleaseGPUAsync(int gpuId, GPUWorkloadType workloadType)
+        public async Task ReleaseGPUAsync(int gpuId, Services.GPUWorkloadType workloadType)
         {
             await _allocationLock.WaitAsync();
             try
@@ -128,25 +146,6 @@ namespace LmyDigitalHuman.Services.Core
             }
         }
 
-        public async Task<GPUStatus[]> GetGPUStatusAsync()
-        {
-            return await Task.FromResult(_gpuResources.Values.Select(gpu => new GPUStatus
-            {
-                Id = gpu.Id,
-                Name = gpu.Name,
-                LoadPercentage = gpu.GetLoadPercentage(),
-                MemoryUsedMB = gpu.MemoryUsedMB,
-                MemoryTotalMB = gpu.TotalMemoryMB,
-                CurrentTasks = gpu.CurrentTasks,
-                MaxTasks = gpu.MaxConcurrentTasks,
-                PrimaryWorkload = gpu.PrimaryWorkload,
-                Temperature = gpu.Temperature,
-                PowerUsage = gpu.PowerUsage,
-                IsHealthy = gpu.IsHealthy
-            }).ToArray());
-        }
-
-        // 新增接口方法实现
         public async Task<GPUInfo> GetGPUInfoAsync()
         {
             var gpuInfo = new GPUInfo
@@ -156,7 +155,7 @@ namespace LmyDigitalHuman.Services.Core
                 {
                     Index = gpu.Id,
                     Name = gpu.Name,
-                    TotalMemory = gpu.TotalMemoryMB * 1024L * 1024L, // 转换为字节
+                    TotalMemory = gpu.TotalMemoryMB * 1024L * 1024L,
                     UsedMemory = gpu.MemoryUsedMB * 1024L * 1024L,
                     FreeMemory = (gpu.TotalMemoryMB - gpu.MemoryUsedMB) * 1024L * 1024L,
                     Utilization = gpu.GetLoadPercentage()
@@ -193,38 +192,28 @@ namespace LmyDigitalHuman.Services.Core
             return 0;
         }
 
-        // 实现IGPUResourceManager.AllocateGPUAsync接口方法
-        public async Task<int> AllocateGPUAsync(int preferredGpu, GPUWorkloadType workloadType)
+        public async Task<GPUStatus[]> GetGPUStatusAsync()
         {
-            // 如果指定了首选GPU且可用，优先使用
-            if (preferredGpu >= 0 && _gpuResources.TryGetValue(preferredGpu, out var preferredGpuResource))
+            return await Task.FromResult(_gpuResources.Values.Select(gpu => new GPUStatus
             {
-                if (preferredGpuResource.CurrentTasks < preferredGpuResource.MaxConcurrentTasks)
-                {
-                    await _allocationLock.WaitAsync();
-                    try
-                    {
-                        preferredGpuResource.CurrentTasks++;
-                        preferredGpuResource.LastAllocatedTime = DateTime.UtcNow;
-                        _logger.LogDebug($"分配指定GPU {preferredGpu} 用于 {workloadType}");
-                        return preferredGpu;
-                    }
-                    finally
-                    {
-                        _allocationLock.Release();
-                    }
-                }
-            }
-            
-            // 否则使用原有逻辑
-            return await AllocateGPUAsync(workloadType);
+                Id = gpu.Id,
+                Name = gpu.Name,
+                LoadPercentage = gpu.GetLoadPercentage(),
+                MemoryUsedMB = gpu.MemoryUsedMB,
+                MemoryTotalMB = gpu.TotalMemoryMB,
+                CurrentTasks = gpu.CurrentTasks,
+                MaxTasks = gpu.MaxConcurrentTasks,
+                PrimaryWorkload = gpu.PrimaryWorkload,
+                Temperature = gpu.Temperature,
+                PowerUsage = gpu.PowerUsage,
+                IsHealthy = gpu.IsHealthy
+            }).ToArray());
         }
 
-        public async Task<GPUResourceInfo> GetOptimalGPUAsync(GPUWorkloadType workloadType)
+        public async Task<GPUResourceInfo> GetOptimalGPUAsync(Services.GPUWorkloadType workloadType)
         {
             var statuses = await GetGPUStatusAsync();
             
-            // 优先选择专用GPU
             var primaryGpu = statuses.FirstOrDefault(s => s.PrimaryWorkload == workloadType && s.LoadPercentage < 80);
             if (primaryGpu != null)
             {
@@ -237,7 +226,6 @@ namespace LmyDigitalHuman.Services.Core
                 };
             }
 
-            // 选择负载最低的GPU
             var optimalGpu = statuses.Where(s => s.LoadPercentage < 90)
                                    .OrderBy(s => s.LoadPercentage)
                                    .FirstOrDefault();
@@ -260,7 +248,6 @@ namespace LmyDigitalHuman.Services.Core
         {
             try
             {
-                // 使用nvidia-smi获取实时GPU状态
                 var gpuMetrics = await GetNvidiaGPUMetricsAsync();
                 
                 foreach (var metric in gpuMetrics)
@@ -271,7 +258,7 @@ namespace LmyDigitalHuman.Services.Core
                         gpu.Temperature = metric.Temperature;
                         gpu.PowerUsage = metric.PowerUsage;
                         gpu.UtilizationPercentage = metric.UtilizationPercentage;
-                        gpu.IsHealthy = metric.Temperature < 85 && metric.PowerUsage < 450; // RTX4090安全阈值
+                        gpu.IsHealthy = metric.Temperature < 85 && metric.PowerUsage < 450;
                         gpu.LastUpdateTime = DateTime.UtcNow;
                     }
                 }
@@ -328,22 +315,18 @@ namespace LmyDigitalHuman.Services.Core
             }
         }
 
-        private int CalculateExpectedLatency(GPUStatus gpu, GPUWorkloadType workloadType)
+        private int CalculateExpectedLatency(GPUStatus gpu, Services.GPUWorkloadType workloadType)
         {
-            // 基于GPU负载和工作负载类型估算延迟
             var baseLatency = workloadType switch
             {
-                GPUWorkloadType.VideoGeneration => 80,   // MuseTalk基础延迟80ms
-                GPUWorkloadType.LLMInference => 150,     // LLM推理基础延迟150ms
-                GPUWorkloadType.AudioProcessing => 60,   // TTS基础延迟60ms
-                GPUWorkloadType.PostProcessing => 30,    // 后处理基础延迟30ms
+                Services.GPUWorkloadType.MuseTalk => 80,
+                Services.GPUWorkloadType.General => 100,
+                Services.GPUWorkloadType.Whisper => 60,
                 _ => 100
             };
 
-            // 根据GPU负载调整延迟
             var loadMultiplier = 1.0f + (gpu.LoadPercentage / 100.0f);
             
-            // 如果不是专用GPU，增加额外延迟
             if (gpu.PrimaryWorkload != workloadType)
             {
                 loadMultiplier *= 1.2f;
@@ -359,21 +342,13 @@ namespace LmyDigitalHuman.Services.Core
         }
     }
 
-    public enum GPUWorkloadType
-    {
-        VideoGeneration,    // MuseTalk视频生成
-        LLMInference,       // LLM推理
-        AudioProcessing,    // TTS + 语音识别
-        PostProcessing      // 视频后处理
-    }
-
     public class GPUResource
     {
         public int Id { get; set; }
         public string Name { get; set; } = string.Empty;
         public int TotalMemoryMB { get; set; }
         public int MemoryUsedMB { get; set; }
-        public GPUWorkloadType PrimaryWorkload { get; set; }
+        public Services.GPUWorkloadType PrimaryWorkload { get; set; }
         public int MaxConcurrentTasks { get; set; }
         public int CurrentTasks { get; set; }
         public int Temperature { get; set; }
@@ -400,7 +375,7 @@ namespace LmyDigitalHuman.Services.Core
         public int MemoryTotalMB { get; set; }
         public int CurrentTasks { get; set; }
         public int MaxTasks { get; set; }
-        public GPUWorkloadType PrimaryWorkload { get; set; }
+        public Services.GPUWorkloadType PrimaryWorkload { get; set; }
         public int Temperature { get; set; }
         public float PowerUsage { get; set; }
         public bool IsHealthy { get; set; }
