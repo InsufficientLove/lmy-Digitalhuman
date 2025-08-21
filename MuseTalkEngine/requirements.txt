@@ -22,3 +22,4 @@ websockets==11.0.3
 # Others
 tqdm==4.65.0
 matplotlib==3.7.1
+einops==0.7.0
