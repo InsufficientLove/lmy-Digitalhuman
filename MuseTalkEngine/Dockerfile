@@ -1,4 +1,4 @@
-FROM nvidia/cuda:12.1.0-cudnn8-runtime-ubuntu22.04
+FROM nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04
 
 # 设置环境变量
 ENV DEBIAN_FRONTEND=noninteractive
@@ -6,90 +6,122 @@ ENV PYTHONUNBUFFERED=1
 ENV CUDA_HOME=/usr/local/cuda
 ENV PATH=${CUDA_HOME}/bin:${PATH}
 ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
+ENV TORCH_CUDA_ARCH_LIST="6.0;6.1;7.0;7.5;8.0;8.6;8.9;9.0"
 
 # 安装系统依赖
 RUN apt-get update && apt-get install -y \
     python3.10 \
+    python3.10-dev \
     python3-pip \
-    ffmpeg \
+    build-essential \
+    cmake \
     git \
     wget \
+    curl \
+    ffmpeg \
     libgl1-mesa-glx \
     libglib2.0-0 \
     libsm6 \
     libxext6 \
     libxrender-dev \
     libgomp1 \
-    libglib2.0-0 \
-    libsm6 \
-    libxrender1 \
-    libxext6 \
+    libffi-dev \
+    libjpeg-dev \
+    zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
+
+# 升级pip
+RUN python3 -m pip install --upgrade pip setuptools wheel
 
 # 创建工作目录
 WORKDIR /opt/musetalk/repo/MuseTalkEngine
 
-# 先复制requirements.txt并安装依赖（利用Docker缓存）
-COPY MuseTalkEngine/requirements.txt .
-# 安装PyTorch（使用官方源）
-RUN pip3 install --no-cache-dir torch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2 --index-url https://download.pytorch.org/whl/cu118
-
-# 使用阿里云镜像源安装Hugging Face生态（版本兼容组）
+# 安装PyTorch（使用官方源，对应CUDA 11.8）
 RUN pip3 install --no-cache-dir \
-    -i https://mirrors.aliyun.com/pypi/simple/ \
-    --trusted-host mirrors.aliyun.com \
+    torch==2.0.1+cu118 \
+    torchvision==0.15.2+cu118 \
+    torchaudio==2.0.2+cu118 \
+    --index-url https://download.pytorch.org/whl/cu118
+
+# 安装numpy（其他包依赖）
+RUN pip3 install --no-cache-dir numpy==1.24.3
+
+# 安装MMCV（需要指定正确的版本和CUDA）
+RUN pip3 install --no-cache-dir \
+    mmcv-full==1.7.0 -f https://download.openmmlab.com/mmcv/dist/cu118/torch2.0/index.html
+
+# 安装MM系列（顺序很重要）
+RUN pip3 install --no-cache-dir \
+    mmengine==0.8.4 \
+    mmdet==2.28.2 \
+    mmpose==0.29.0
+
+# 安装Hugging Face生态
+RUN pip3 install --no-cache-dir \
     huggingface-hub==0.16.4 \
     transformers==4.30.2 \
     diffusers==0.18.2 \
-    accelerate==0.20.3
+    accelerate==0.20.3 \
+    tokenizers==0.13.3 \
+    safetensors==0.3.1
 
-# 安装科学计算和音频处理
+# 安装音视频处理
 RUN pip3 install --no-cache-dir \
-    -i https://mirrors.aliyun.com/pypi/simple/ \
-    --trusted-host mirrors.aliyun.com \
-    numpy==1.24.3 \
-    scipy==1.10.1 \
     opencv-python==4.8.0.74 \
     opencv-contrib-python==4.8.0.74 \
-    librosa==0.10.0.post2 \
-    soundfile==0.12.1
-
-# 安装其他依赖
-RUN pip3 install --no-cache-dir \
-    -i https://mirrors.aliyun.com/pypi/simple/ \
-    --trusted-host mirrors.aliyun.com \
     imageio==2.31.1 \
     imageio-ffmpeg==0.4.8 \
-    websockets==11.0.3 \
-    tqdm==4.65.0 \
-    matplotlib==3.7.1 \
+    moviepy==1.0.3 \
     Pillow==10.0.0 \
+    scikit-image==0.21.0
+
+# 安装音频处理
+RUN pip3 install --no-cache-dir \
+    librosa==0.10.0.post2 \
+    soundfile==0.12.1 \
+    audioread==3.0.0 \
+    numba==0.57.1 \
+    resampy==0.4.2
+
+# 安装科学计算
+RUN pip3 install --no-cache-dir \
+    scipy==1.10.1 \
+    scikit-learn==1.3.0 \
+    pandas==2.0.3
+
+# 安装人脸处理
+RUN pip3 install --no-cache-dir \
+    basicsr==1.4.2 \
+    facexlib==0.3.0 \
+    gfpgan==1.3.8 \
+    realesrgan==0.3.0 \
+    filterpy==1.4.5
+
+# 安装深度学习工具
+RUN pip3 install --no-cache-dir \
     einops==0.7.0 \
     omegaconf==2.3.0 \
+    hydra-core==1.3.2 \
+    tqdm==4.65.0 \
+    matplotlib==3.7.1 \
+    tensorboard==2.13.0 \
+    pyyaml==6.0.1
+
+# 安装Web服务
+RUN pip3 install --no-cache-dir \
     fastapi==0.104.1 \
     uvicorn==0.24.0 \
-    python-multipart==0.0.6
+    python-multipart==0.0.6 \
+    websockets==11.0.3 \
+    aiofiles==23.1.0 \
+    httpx==0.24.1
 
-# 安装MMCV和MMPose（MuseTalk人体姿态检测需要）
-RUN pip3 install --no-cache-dir \
-    -i https://mirrors.aliyun.com/pypi/simple/ \
-    --trusted-host mirrors.aliyun.com \
-    mmcv-full==1.7.0 \
-    mmpose==0.29.0 \
-    mmdet==2.28.2
-
-# 安装人脸处理库
-RUN pip3 install --no-cache-dir \
-    -i https://mirrors.aliyun.com/pypi/simple/ \
-    --trusted-host mirrors.aliyun.com \
-    facexlib==0.3.0 \
-    gfpgan==1.3.8
-
-# 复制应用代码（新的目录结构）
+# 复制应用代码
 COPY MuseTalkEngine/core /opt/musetalk/repo/MuseTalkEngine/core/
 COPY MuseTalkEngine/offline /opt/musetalk/repo/MuseTalkEngine/offline/
 COPY MuseTalkEngine/streaming /opt/musetalk/repo/MuseTalkEngine/streaming/
 COPY MuseTalkEngine/main.py /opt/musetalk/repo/MuseTalkEngine/
+COPY MuseTalkEngine/requirements.txt /opt/musetalk/repo/MuseTalkEngine/
 
 # 创建必要的目录
 RUN mkdir -p /opt/musetalk/template_cache \
@@ -102,7 +134,11 @@ RUN mkdir -p /opt/musetalk/template_cache \
 ENV PYTHONPATH=/opt/musetalk/repo/MuseTalkEngine:/opt/musetalk/repo/MuseTalk:$PYTHONPATH
 
 # 暴露端口
-EXPOSE 8000 8766
+EXPOSE 8000 8766 28888
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD python3 -c "import torch; import mmpose; import diffusers; print('OK')" || exit 1
 
 # 启动命令
 CMD ["python3", "main.py", "--mode", "hybrid"]
