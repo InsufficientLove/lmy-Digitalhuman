@@ -70,7 +70,8 @@ namespace LmyDigitalHuman.Services.Core
             _logger.LogInformation("初始化4张RTX4090 GPU资源完成");
         }
 
-        public async Task<int> AllocateGPUAsync(GPUWorkloadType workloadType)
+        // 保留作为私有辅助方法
+        private async Task<int> AllocateGPUAsync(GPUWorkloadType workloadType)
         {
             await _allocationLock.WaitAsync();
             try
