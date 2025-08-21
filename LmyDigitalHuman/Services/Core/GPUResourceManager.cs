@@ -109,7 +109,12 @@ namespace LmyDigitalHuman.Services.Core
             }
         }
 
-        public async Task ReleaseGPUAsync(int gpuId, GPUWorkloadType workloadType)
+        public Task ReleaseGPUAsync(int gpuId, GPUWorkloadType workloadType)
+        {
+            return ReleaseGPUInternalAsync(gpuId, workloadType);
+        }
+
+        private async Task ReleaseGPUInternalAsync(int gpuId, GPUWorkloadType workloadType)
         {
             await _allocationLock.WaitAsync();
             try
@@ -192,8 +197,13 @@ namespace LmyDigitalHuman.Services.Core
             return 0;
         }
 
-        // 修改AllocateGPUAsync签名以匹配接口
-        public async Task<int> AllocateGPUAsync(int preferredGpu, GPUWorkloadType workloadType)
+        // 实现接口方法 AllocateGPUAsync
+        public Task<int> AllocateGPUAsync(int preferredGpu, GPUWorkloadType workloadType)
+        {
+            return AllocateGPUInternalAsync(preferredGpu, workloadType);
+        }
+
+        private async Task<int> AllocateGPUInternalAsync(int preferredGpu, GPUWorkloadType workloadType)
         {
             // 如果指定了首选GPU且可用，优先使用
             if (preferredGpu >= 0 && _gpuResources.TryGetValue(preferredGpu, out var preferredGpuResource))
