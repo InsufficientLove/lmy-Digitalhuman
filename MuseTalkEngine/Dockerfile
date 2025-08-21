@@ -74,7 +74,7 @@ RUN pip3 install --no-cache-dir \
 RUN pip3 install --no-cache-dir \
     -i https://mirrors.aliyun.com/pypi/simple/ \
     --trusted-host mirrors.aliyun.com \
-    mmcv-full==1.7.1 \
+    mmcv-full==1.7.0 \
     mmpose==0.29.0 \
     mmdet==2.28.2
 
