@@ -3,16 +3,8 @@ using System.Collections.Concurrent;
 using System.Threading.Channels;
 using LmyDigitalHuman.Models;
 
-namespace LmyDigitalHuman.Services
+namespace LmyDigitalHuman.Services.Core
 {
-    public interface IRealtimePipelineService
-    {
-        Task<string> StartRealtimeSessionAsync(string sessionId, RealtimePipelineConfig config);
-        Task ProcessAudioStreamAsync(string sessionId, Stream audioStream);
-        Task StopRealtimeSessionAsync(string sessionId);
-        Task<RealtimePipelineStatus> GetSessionStatusAsync(string sessionId);
-        event EventHandler<RealtimeResultEventArgs> OnRealtimeResult;
-    }
 
     public class RealtimePipelineService : IRealtimePipelineService
     {

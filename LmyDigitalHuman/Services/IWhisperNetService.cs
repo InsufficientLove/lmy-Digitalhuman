@@ -1,4 +1,7 @@
+using System;
+using System.IO;
 using System.Threading.Tasks;
+using LmyDigitalHuman.Models;
 
 namespace LmyDigitalHuman.Services
 {
@@ -7,11 +10,13 @@ namespace LmyDigitalHuman.Services
     /// </summary>
     public interface IWhisperNetService
     {
-        Task<string> TranscribeAsync(string audioPath);
-        Task<TranscriptionResult> TranscribeWithTimestampsAsync(string audioPath);
+        Task<SpeechToTextResponse> TranscribeAsync(Stream audioStream, string language = "zh");
+        Task<SpeechToTextResponse> TranscribeAsync(byte[] audioData, string language = "zh");
+        Task<SpeechToTextResponse> TranscribeAsync(string audioFilePath, string language = "zh");
         Task<bool> InitializeAsync();
+        void Dispose();
     }
-
+    
     public class TranscriptionResult
     {
         public string Text { get; set; }

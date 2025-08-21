@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace LmyDigitalHuman.Services
@@ -13,9 +14,22 @@ namespace LmyDigitalHuman.Services
         Task<bool> CheckGPUAvailabilityAsync();
         Task<string> GetSystemInfoAsync();
         
-        // 额外的方法（从DiagnosticsController中发现的）
-        Task<object> GetAllAvailablePythonEnvironmentsAsync();
+        // 完整的方法签名
+        Task<PythonEnvironmentInfo> DetectBestPythonEnvironmentAsync();
+        Task<bool> ValidatePythonEnvironmentAsync(string pythonPath, params string[] requiredPackages);
         Task<string> GetRecommendedPythonPathAsync();
-        Task<object> ValidatePythonEnvironmentAsync(string pythonPath);
+        Task<List<PythonEnvironmentInfo>> GetAllAvailablePythonEnvironmentsAsync();
+    }
+    
+    public class PythonEnvironmentInfo
+    {
+        public string PythonPath { get; set; } = "";
+        public string Version { get; set; } = "";
+        public bool IsVirtualEnv { get; set; }
+        public string VirtualEnvPath { get; set; } = "";
+        public List<string> InstalledPackages { get; set; } = new();
+        public bool IsValid { get; set; }
+        public string ErrorMessage { get; set; } = "";
+        public int Priority { get; set; } // 优先级，数字越小优先级越高
     }
 }

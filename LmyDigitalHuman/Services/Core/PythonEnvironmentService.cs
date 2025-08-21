@@ -7,27 +7,6 @@ namespace LmyDigitalHuman.Services.Core
     /// <summary>
     /// Python环境检测和管理服务
     /// </summary>
-    public interface IPythonEnvironmentService
-    {
-        Task<PythonEnvironmentInfo> DetectBestPythonEnvironmentAsync();
-        Task<bool> ValidatePythonEnvironmentAsync(string pythonPath, params string[] requiredPackages);
-        Task<string> GetRecommendedPythonPathAsync();
-        Task<List<PythonEnvironmentInfo>> GetAllAvailablePythonEnvironmentsAsync();
-
-    }
-
-    public class PythonEnvironmentInfo
-    {
-        public string PythonPath { get; set; } = "";
-        public string Version { get; set; } = "";
-        public bool IsVirtualEnv { get; set; }
-        public string VirtualEnvPath { get; set; } = "";
-        public List<string> InstalledPackages { get; set; } = new();
-        public bool IsValid { get; set; }
-        public string ErrorMessage { get; set; } = "";
-        public int Priority { get; set; } // 优先级，数字越小优先级越高
-    }
-
     public class PythonEnvironmentService : IPythonEnvironmentService
     {
         private readonly ILogger<PythonEnvironmentService> _logger;

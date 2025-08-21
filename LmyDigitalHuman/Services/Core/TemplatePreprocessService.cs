@@ -7,13 +7,6 @@ using Microsoft.Extensions.Logging;
 
 namespace LmyDigitalHuman.Services.Core
 {
-    public interface ITemplatePreprocessService
-    {
-        Task<bool> PreprocessTemplateAsync(string templateId, string imagePath);
-        Task<bool> DeleteTemplateAsync(string templateId);
-        Task<bool> VerifyTemplateAsync(string templateId);
-    }
-
     public class TemplatePreprocessService : ITemplatePreprocessService
     {
         private readonly ILogger<TemplatePreprocessService> _logger;

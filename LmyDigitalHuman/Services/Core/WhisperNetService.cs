@@ -5,15 +5,6 @@ using System.Diagnostics;
 
 namespace LmyDigitalHuman.Services.Core
 {
-    public interface IWhisperNetService
-    {
-        Task<SpeechToTextResponse> TranscribeAsync(Stream audioStream, string language = "zh");
-        Task<SpeechToTextResponse> TranscribeAsync(byte[] audioData, string language = "zh");
-        Task<SpeechToTextResponse> TranscribeAsync(string audioFilePath, string language = "zh");
-        Task<bool> InitializeAsync();
-        void Dispose();
-    }
-
     public class WhisperNetService : IWhisperNetService, IDisposable
     {
         private readonly ILogger<WhisperNetService> _logger;
