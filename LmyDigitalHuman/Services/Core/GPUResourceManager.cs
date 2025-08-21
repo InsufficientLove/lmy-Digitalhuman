@@ -109,6 +109,7 @@ namespace LmyDigitalHuman.Services.Core
             }
         }
 
+        // 实现IGPUResourceManager.ReleaseGPUAsync接口方法
         public async Task ReleaseGPUAsync(int gpuId, GPUWorkloadType workloadType)
         {
             await _allocationLock.WaitAsync();
@@ -192,7 +193,7 @@ namespace LmyDigitalHuman.Services.Core
             return 0;
         }
 
-        // 实现接口方法 AllocateGPUAsync
+        // 实现IGPUResourceManager.AllocateGPUAsync接口方法
         public async Task<int> AllocateGPUAsync(int preferredGpu, GPUWorkloadType workloadType)
         {
             // 如果指定了首选GPU且可用，优先使用
