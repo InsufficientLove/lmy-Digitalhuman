@@ -427,15 +427,14 @@ namespace LmyDigitalHuman.Services.Core
             return false;
         }
 
-        public async Task<Dictionary<string, object>> GetSystemInfoAsync()
+        public async Task<string> GetSystemInfoAsync()
         {
-            var info = new Dictionary<string, object>
-            {
-                ["os"] = Environment.OSVersion.ToString(),
-                ["python"] = await GetPythonVersionAsync(),
-                ["gpu"] = await CheckGPUAvailabilityAsync() ? "Available" : "Not Available",
-                ["environment"] = "Local"
-            };
+            var pythonVersion = await GetPythonVersionAsync();
+            var gpuStatus = await CheckGPUAvailabilityAsync() ? "Available" : "Not Available";
+            var info = $"OS: {Environment.OSVersion}\n" +
+                       $"Python: {pythonVersion}\n" +
+                       $"GPU: {gpuStatus}\n" +
+                       $"Environment: Local";
             return info;
         }
     }

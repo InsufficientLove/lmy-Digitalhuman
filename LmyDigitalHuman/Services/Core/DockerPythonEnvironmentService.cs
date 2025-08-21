@@ -178,15 +178,13 @@ namespace LmyDigitalHuman.Services.Core
         return await Task.FromResult(true);
     }
 
-    public async Task<Dictionary<string, object>> GetSystemInfoAsync()
+    public async Task<string> GetSystemInfoAsync()
     {
-        var info = new Dictionary<string, object>
-        {
-            ["os"] = "Linux (Docker)",
-            ["python"] = await GetPythonVersionAsync(),
-            ["gpu"] = "NVIDIA GPU (Docker Runtime)",
-            ["environment"] = "Docker Container"
-        };
+        var pythonVersion = await GetPythonVersionAsync();
+        var info = $"OS: Linux (Docker)\n" +
+                   $"Python: {pythonVersion}\n" +
+                   $"GPU: NVIDIA GPU (Docker Runtime)\n" +
+                   $"Environment: Docker Container";
         return info;
     }
     }

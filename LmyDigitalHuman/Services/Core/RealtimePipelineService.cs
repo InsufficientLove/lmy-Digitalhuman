@@ -411,9 +411,7 @@ namespace LmyDigitalHuman.Services.Core
         }
     }
 
-    public class RealtimePipelineConfig
-    {
-        public string TemplateImagePath { get; set; } = string.Empty;
+    // 使用IRealtimePipelineService中定义的RealtimePipelineConfig = string.Empty;
         public string VoiceId { get; set; } = "zh-CN-XiaoxiaoNeural";
         public int MaxLatencyMs { get; set; } = 500;
         public int AudioChunkSizeMs { get; set; } = 1000;
@@ -421,9 +419,7 @@ namespace LmyDigitalHuman.Services.Core
         public int VideoResolution { get; set; } = 256;
     }
 
-    public class AudioChunk
-    {
-        public byte[] Data { get; set; } = Array.Empty<byte>();
+     = Array.Empty<byte>();
         public DateTime Timestamp { get; set; }
         public string ChunkId { get; set; } = string.Empty;
     }
@@ -464,9 +460,7 @@ namespace LmyDigitalHuman.Services.Core
         public double TotalLatency { get; set; }
     }
 
-    public class RealtimePipelineStatus
-    {
-        public string SessionId { get; set; } = string.Empty;
+     = string.Empty;
         public bool IsActive { get; set; }
         public DateTime StartTime { get; set; }
         public TimeSpan Duration { get; set; }
@@ -481,8 +475,6 @@ namespace LmyDigitalHuman.Services.Core
         public DateTime LastActivity { get; set; }
     }
 
-    public class RealtimeResultEventArgs : EventArgs
-    {
-        public RealtimeResult Result { get; set; } = new();
+     = new();
     }
 }
