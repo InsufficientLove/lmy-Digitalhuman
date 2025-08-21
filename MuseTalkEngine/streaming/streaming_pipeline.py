@@ -1,25 +1,18 @@
 """
-流式数字人对话系统
-实现1-2秒延迟的准实时对话
+流式处理架构示例
+仅供参考，实际实现在C#端
 """
 
-import asyncio
-import torch
-from typing import AsyncGenerator
-import time
-
 # 这是一个概念性的示例代码，展示流式处理的架构
-# 实际实现需要集成具体的ASR、LLM、TTS和MuseTalk组件
+# 实际的流式处理逻辑在C#端实现
+# Python端只提供MuseTalk推理加速服务
 
-class StreamingDigitalHuman:
-    """流式数字人系统 - 概念示例"""
+class StreamingPipelineExample:
+    """流式管道示例 - 仅供参考"""
     
     def __init__(self):
-        # 各组件初始化（需要实际实现）
-        self.asr = None  # WhisperASR() - 语音识别
-        self.llm = None  # LocalLLM() - 本地大模型
-        self.tts = None  # EdgeTTS() - 语音合成
-        self.musetalk = None  # MuseTalk() - 数字人
+        # 实际组件在C#端
+        pass
         
         # 缓冲区
         self.text_buffer = []

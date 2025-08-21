@@ -193,14 +193,16 @@ class SegmentProcessor:
 
 
 class StreamingServer:
-    """流式服务器 - 处理WebSocket连接"""
+    """流式服务器 - WebSocket模式（可选）"""
     
     def __init__(self):
         self.processor = SegmentProcessor()
         self.connections = {}
         
     async def handle_connection(self, websocket, path):
-        """处理WebSocket连接"""
+        """处理WebSocket连接 - 备用模式"""
+        # 注意：主要的流式处理通过C#端协调
+        # 这个WebSocket服务器是可选的备用方案
         connection_id = id(websocket)
         self.connections[connection_id] = websocket
         
