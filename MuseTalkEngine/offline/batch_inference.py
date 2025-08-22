@@ -840,6 +840,17 @@ class UltraFastMuseTalkService:
                 ori_frame = copy.deepcopy(frame_list_cycle[i % len(frame_list_cycle)])
                 
                 x1, y1, x2, y2 = bbox
+                # 确保坐标在合理范围内
+                h, w = ori_frame.shape[:2]
+                x1 = max(0, min(x1, w))
+                x2 = max(0, min(x2, w))
+                y1 = max(0, min(y1, h))
+                y2 = max(0, min(y2, h))
+                
+                # 暂时不转换颜色，保持原样
+                # if len(res_frame.shape) == 3 and res_frame.shape[2] == 3:
+                #     res_frame = cv2.cvtColor(res_frame.astype(np.uint8), cv2.COLOR_BGR2RGB)
+                
                 res_frame = cv2.resize(res_frame.astype(np.uint8), (x2-x1, y2-y1))
                 
                 # 使用优化的blending
