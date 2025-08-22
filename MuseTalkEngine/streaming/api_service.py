@@ -65,9 +65,9 @@ class StreamingMuseTalkAPI:
         self.skip_frames = int(os.environ.get('SKIP_FRAMES', '2'))
         self.batch_size_config = {
             'ultra_fast': 1,   # 0.5秒以内 - 单帧处理最稳定
-            'fast': 2,         # 1秒以内
-            'normal': 4,       # 1-2秒
-            'quality': 6       # 2秒以上 - 降低避免CUDA错误
+            'fast': 1,         # 1秒以内 - 也用单帧
+            'normal': 2,       # 1-2秒 - 最多2帧
+            'quality': 2       # 2秒以上 - 降到2避免OOM
         }
         
         # 线程池
