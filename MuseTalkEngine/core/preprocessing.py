@@ -25,7 +25,7 @@ warnings.filterwarnings("ignore")
 # 添加MuseTalk模块路径
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'MuseTalk'))
 
-from musetalk.utils.face_parsing import FaceParsing
+# from musetalk.utils.face_parsing import FaceParsing  # 注释掉，因为不存在
 from musetalk.utils.utils import load_all_model
 from musetalk.utils.preprocessing import get_landmark_and_bbox, read_imgs
 from musetalk.utils.blending import get_image_prepare_material
@@ -101,8 +101,9 @@ class OptimizedPreprocessor:
                 print("警告: PE对象没有.to()方法，跳过优化")
                 self.pe = pe
             
-            # 面部解析器
-            self.fp = FaceParsing()
+            # 初始化面部解析 - 暂时跳过，因为FaceParsing不存在
+            # self.fp = FaceParsing()
+            self.fp = None  # 暂时设为None
             
             print("预处理模型初始化完成")
             self.is_initialized = True
@@ -285,6 +286,13 @@ class OptimizedPreprocessor:
                     print(f"警告: 第{i}帧没有检测到人脸")
                     continue
                     
+                # 确保face_box只有4个值 (x, y, x1, y1)
+                if isinstance(face_box, (list, tuple)) and len(face_box) > 4:
+                    face_box = face_box[:4]  # 只取前4个值
+                elif isinstance(face_box, (list, tuple)) and len(face_box) < 4:
+                    print(f"警告: face_box格式不正确: {face_box}")
+                    continue
+                
                 # 面部解析 - 使用正确的方法调用
                 try:
                     # 尝试常见的面部解析方法
@@ -302,11 +310,13 @@ class OptimizedPreprocessor:
                     elif hasattr(self.fp, 'predict'):
                         mask_out = self.fp.predict(frame)
                     else:
-                        raise AttributeError(f"FaceParsing对象没有可用的解析方法")
-                except Exception as fp_error:
-                    print(f"面部解析失败: {fp_error}")
-                    # 使用默认的空mask
-                    mask_out = np.zeros_like(frame[:,:,0])
+                        print("面部解析失败: FaceParsing对象没有可用的解析方法")
+                        # 使用默认mask（全白，表示整个面部区域）
+                        mask_out = np.ones((frame.shape[0], frame.shape[1]), dtype=np.uint8) * 255
+                except Exception as e:
+                    print(f"面部解析出错: {e}")
+                    # 使用默认mask
+                    mask_out = np.ones((frame.shape[0], frame.shape[1]), dtype=np.uint8) * 255
                 
                 # 保存面部解析的mask
                 face_parsing_masks.append(mask_out)
