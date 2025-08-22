@@ -925,6 +925,27 @@ class UltraFastMuseTalkService:
             print(f"音频特征提取失败: {str(e)}")
             return None
     
+    def interpolate_frames(self, key_frames, total_frames, skip_frames):
+        """简单的帧插值"""
+        if skip_frames <= 1:
+            return key_frames
+        
+        result = []
+        for i in range(len(key_frames) - 1):
+            result.append(key_frames[i])
+            # 简单复制关键帧作为插值（最快的方法）
+            for _ in range(skip_frames - 1):
+                result.append(key_frames[i])
+        
+        # 添加最后一帧
+        if len(key_frames) > 0:
+            result.append(key_frames[-1])
+            # 填充到目标长度
+            while len(result) < total_frames:
+                result.append(key_frames[-1])
+        
+        return result[:total_frames]
+    
     def load_template_cache_optimized(self, cache_dir, template_id):
         """优化的模板缓存加载"""
         try:

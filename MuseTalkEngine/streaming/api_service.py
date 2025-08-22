@@ -260,22 +260,18 @@ class StreamingMuseTalkAPI:
             duration = len(audio_data) / sr
             num_frames = int(duration * 25)  # 25fps
             
-            # 智能选择批处理大小和跳帧策略
-            if duration <= 0.5:
-                batch_size = min(num_frames, self.batch_size_config['ultra_fast'])
-                skip_frames = 1
+            # 优化策略：短音频精确处理，长音频跳帧加速
+            if duration <= 1.0:
+                batch_size = 1  # 单帧处理避免OOM
+                skip_frames = 1  # 不跳帧，保证质量
                 mode = 'ultra_fast'
-            elif duration <= 1.0:
-                batch_size = min(num_frames, self.batch_size_config['fast'])
-                skip_frames = 2
-                mode = 'fast'
             elif duration <= 2.0:
-                batch_size = self.batch_size_config['normal']
-                skip_frames = 2
-                mode = 'normal'
+                batch_size = 1
+                skip_frames = 3  # 每3帧处理1次
+                mode = 'fast'
             else:
-                batch_size = self.batch_size_config['quality']
-                skip_frames = 3
+                batch_size = 2
+                skip_frames = 5  # 每5帧处理1次，大幅加速
                 mode = 'quality'
             
             print(f"⚡ 处理音频段 {segment_index}: {duration:.2f}秒, {num_frames}帧, 模式={mode}")
