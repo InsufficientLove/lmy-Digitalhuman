@@ -281,23 +281,23 @@ class StreamingMuseTalkAPI:
             # 根据音频长度选择处理策略
             num_frames = int(duration * 25)  # 25fps
             
-            # 优化策略：短音频精确处理，长音频跳帧加速
+            # 优化策略：先确保能生成视频，每帧都处理
             # 基于实测：每帧需要约3GB显存，batch_size需要保守设置
-            if num_frames <= 25:  # 1秒以内 - 实时响应
+            if num_frames <= 25:  # 1秒以内
                 batch_size = 1  # 单帧处理最安全
-                skip_frames = 1  # 不跳帧
+                skip_frames = 1  # 不跳帧，每帧都处理
                 mode = 'realtime'
-            elif num_frames <= 50:  # 2秒以内 - 快速响应
-                batch_size = 2  # 小批量
-                skip_frames = 2  # 每2帧处理1次
+            elif num_frames <= 50:  # 2秒以内
+                batch_size = 1  # 单帧处理
+                skip_frames = 1  # 不跳帧，每帧都处理
                 mode = 'fast'
-            elif num_frames <= 100:  # 4秒以内 - 平衡模式
-                batch_size = 2  # 保守批量
-                skip_frames = 3  # 每3帧处理1次
+            elif num_frames <= 100:  # 4秒以内
+                batch_size = 1  # 单帧处理
+                skip_frames = 1  # 不跳帧，每帧都处理
                 mode = 'balanced'
-            else:  # 4秒以上 - 质量模式
-                batch_size = 2  # 固定小批量
-                skip_frames = 5  # 每5帧处理1次，大幅加速
+            else:  # 4秒以上
+                batch_size = 1  # 单帧处理
+                skip_frames = 1  # 不跳帧，每帧都处理
                 mode = 'quality'
             
             print(f"⚡ 处理音频段 {segment_index}: {duration:.2f}秒, {num_frames}帧, 模式={mode}")

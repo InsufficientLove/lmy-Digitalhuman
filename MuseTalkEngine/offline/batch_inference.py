@@ -608,25 +608,16 @@ class UltraFastMuseTalkService:
             # 2. 多GPU并行推理（支持跳帧加速）
             inference_start = time.time()
             
-            # 跳帧处理：只推理部分帧，其余插值
+            # 跳帧策略优化
             if skip_frames > 1:
-                print(f"⚡ 跳帧模式：每{skip_frames}帧推理1次")
-                # 只取需要推理的帧
-                selected_indices = list(range(0, len(whisper_chunks), skip_frames))
-                selected_whisper = [whisper_chunks[i] for i in selected_indices]
-                
-                # 推理选中的帧
-                key_frames = self.execute_4gpu_parallel_inference(
-                    selected_whisper, cache_data, batch_size
-                )
-                
-                # 插值生成中间帧
-                res_frame_list = self.interpolate_frames(key_frames, len(whisper_chunks), skip_frames)
-                print(f"推理{len(key_frames)}关键帧，插值生成{len(res_frame_list)}帧")
-            else:
-                res_frame_list = self.execute_4gpu_parallel_inference(
-                    whisper_chunks, cache_data, batch_size
-                )
+                # 暂时禁用跳帧，确保每帧都处理
+                skip_frames = 1
+                print(f"⚡ 全帧模式：每帧都处理（不跳帧）")
+            
+            # 音频处理
+            res_frame_list = self.execute_4gpu_parallel_inference(
+                whisper_chunks, cache_data, batch_size
+            )
             
             inference_time = time.time() - inference_start
             print(f"{self.gpu_count}GPU并行推理完成: {inference_time:.3f}s, {len(res_frame_list)}帧")
