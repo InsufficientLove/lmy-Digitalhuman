@@ -532,7 +532,27 @@ class OptimizedPreprocessor:
                 
                 # 获取面部区域坐标 - 传入正确的参数
                 mask, crop_box = get_image_prepare_material(frame, face_box, fp=self.fp)
-                mask_coords_list.append(crop_box)
+                
+                # 调试输出
+                print(f"crop_box类型: {type(crop_box)}, 值: {crop_box if not isinstance(crop_box, np.ndarray) else crop_box.shape}")
+                
+                # 确保crop_box是4个元素的列表
+                if isinstance(crop_box, (list, tuple)):
+                    if len(crop_box) == 4:
+                        mask_coords_list.append(list(crop_box))
+                    else:
+                        print(f"警告: crop_box长度不是4: {len(crop_box)}, 使用face_box")
+                        mask_coords_list.append(list(face_box))
+                elif isinstance(crop_box, np.ndarray):
+                    if crop_box.size >= 4:
+                        mask_coords_list.append(crop_box.flatten()[:4].tolist())
+                    else:
+                        print(f"警告: crop_box太小: {crop_box.shape}, 使用face_box")
+                        mask_coords_list.append(list(face_box))
+                else:
+                    print(f"警告: crop_box类型异常: {type(crop_box)}, 使用face_box")
+                    mask_coords_list.append(list(face_box))
+                    
                 mask_list.append(mask)
             
             # 5. VAE编码 - 并行处理
