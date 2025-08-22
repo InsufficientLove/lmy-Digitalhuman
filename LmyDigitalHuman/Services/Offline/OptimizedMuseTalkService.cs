@@ -70,10 +70,15 @@ namespace LmyDigitalHuman.Services.Offline
                     request.AudioPath,
                     outputPath);
 
+                _logger.LogInformation("API返回的videoPath: {VideoPath}", videoPath ?? "null");
+
                 if (!string.IsNullOrEmpty(videoPath))
                 {
                     // 直接使用返回的路径，不检查文件存在性（因为是跨容器）
                     var videoFileName = Path.GetFileName(videoPath);
+                    
+                    _logger.LogInformation("生成成功！VideoPath={VideoPath}, VideoUrl=/videos/{FileName}", 
+                        videoPath, videoFileName);
                     
                     return new DigitalHumanResponse
                     {
@@ -84,6 +89,7 @@ namespace LmyDigitalHuman.Services.Offline
                     };
                 }
 
+                _logger.LogError("videoPath为空，API调用失败");
                 return new DigitalHumanResponse
                 {
                     Success = false,
