@@ -857,12 +857,22 @@ class UltraFastMuseTalkService:
                 mask_coords = mask_coords_list_cycle[i % len(mask_coords_list_cycle)]
                 mask = mask_list_cycle[i % len(mask_list_cycle)]
                 
+                # 确保mask_coords是4个值
+                if isinstance(mask_coords, (list, tuple)) and len(mask_coords) == 4:
+                    crop_box = mask_coords
+                elif isinstance(mask_coords, np.ndarray):
+                    # 如果是numpy数组，尝试提取前4个值
+                    crop_box = mask_coords.flatten()[:4].tolist() if mask_coords.size >= 4 else [x1, y1, x2, y2]
+                else:
+                    # 使用face_box作为默认值
+                    crop_box = [x1, y1, x2, y2]
+                
                 combine_frame = get_image_blending(
                     image=ori_frame,
                     face=res_frame, 
                     face_box=[x1, y1, x2, y2],
                     mask_array=mask,
-                    crop_box=mask_coords
+                    crop_box=crop_box
                 )
                 
                 return i, combine_frame
@@ -1013,31 +1023,40 @@ class UltraFastMuseTalkService:
             
             # 并行音频合成
             try:
-                from moviepy.editor import VideoFileClip, AudioFileClip
-                video_clip = VideoFileClip(temp_video)
-                audio_clip = AudioFileClip(audio_path)
+                # 使用ffmpeg合成音频
+                import subprocess
                 
-                final_clip = video_clip.set_audio(audio_clip)
-                final_clip.write_videofile(
-                    output_path, 
-                    codec='libx264', 
-                    audio_codec='aac', 
-                    fps=fps,
-                    preset='ultrafast',
-                    verbose=False, 
-                    logger=None
-                )
+                # 构建ffmpeg命令
+                cmd = [
+                    'ffmpeg',
+                    '-i', temp_video,  # 输入视频
+                    '-i', audio_path,  # 输入音频
+                    '-c:v', 'copy',    # 复制视频流
+                    '-c:a', 'aac',     # 音频编码为AAC
+                    '-strict', 'experimental',
+                    '-shortest',       # 以最短的流为准
+                    '-y',             # 覆盖输出文件
+                    output_path
+                ]
                 
-                final_clip.close()
-                audio_clip.close()
-                video_clip.close()
+                # 执行ffmpeg命令
+                result = subprocess.run(cmd, capture_output=True, text=True)
+                
+                if result.returncode != 0:
+                    print(f"ffmpeg错误: {result.stderr}")
+                    # 如果失败，使用无音频版本
+                    os.rename(temp_video, output_path)
+                else:
+                    print(f"✅ 音频合成成功: {output_path}")
                 
                 # 清理临时文件
-                os.remove(temp_video)
+                if os.path.exists(temp_video):
+                    os.remove(temp_video)
                 
             except Exception as e:
                 print(f"音频合成失败，使用无音频版本: {str(e)}")
-                os.rename(temp_video, output_path)
+                if os.path.exists(temp_video):
+                    os.rename(temp_video, output_path)
             
             return True
             
