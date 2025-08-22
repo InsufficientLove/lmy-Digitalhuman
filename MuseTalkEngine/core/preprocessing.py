@@ -222,12 +222,27 @@ class OptimizedPreprocessor:
             return image
     
     def preprocess_template_ultra_fast(self, template_path, output_dir, template_id):
-        """极速模板预处理"""
+        """极速预处理模板 - 修复阴影问题，优化性能"""
         try:
-            start_time = time.time()
             print(f"开始极速预处理: {template_id}")
             
-            # 创建模板专属的子目录
+            # 确保模型已初始化
+            if not self.is_initialized:
+                print("模型未初始化，开始初始化...")
+                if not self.initialize_models():
+                    raise RuntimeError("模型初始化失败")
+            
+            # 再次检查VAE是否存在
+            if self.vae is None:
+                print("VAE未加载，尝试重新加载模型...")
+                from musetalk.utils.utils import load_all_model
+                vae, unet, pe = load_all_model()
+                self.vae = vae
+                self.unet = unet
+                self.pe = pe
+                print("模型重新加载完成")
+            
+            # 创建输出目录
             template_output_dir = os.path.join(output_dir, template_id)
             os.makedirs(template_output_dir, exist_ok=True)
             print(f"使用缓存目录: {template_output_dir}")
@@ -287,7 +302,12 @@ class OptimizedPreprocessor:
                     continue
                     
                 # 确保face_box只有4个值 (x, y, x1, y1)
-                if isinstance(orig_face_box, (list, tuple)):
+                # 处理numpy.ndarray类型
+                if isinstance(orig_face_box, np.ndarray):
+                    print(f"原始face_box (numpy): shape={orig_face_box.shape}, dtype={orig_face_box.dtype}")
+                    face_box = orig_face_box.flatten()[:4].tolist()  # 展平并取前4个值
+                    print(f"转换后的face_box: {face_box}")
+                elif isinstance(orig_face_box, (list, tuple)):
                     print(f"原始face_box: {orig_face_box}, 长度: {len(orig_face_box)}")
                     if len(orig_face_box) > 4:
                         face_box = list(orig_face_box[:4])  # 只取前4个值并转换为列表
@@ -344,7 +364,20 @@ class OptimizedPreprocessor:
                     frame_tensor = frame_tensor.permute(2, 0, 1).unsqueeze(0)
                     
                     # 编码原始帧得到reference latent (4通道)
-                    reference_latent = self.vae.encode_latents(frame_tensor)
+                    # VAE可能有不同的编码方法名
+                    if hasattr(self.vae, 'encode_latents'):
+                        reference_latent = self.vae.encode_latents(frame_tensor)
+                    elif hasattr(self.vae, 'encode'):
+                        # 标准的VAE encode方法
+                        latent_dist = self.vae.encode(frame_tensor)
+                        if hasattr(latent_dist, 'latent_dist'):
+                            reference_latent = latent_dist.latent_dist.sample() * 0.18215
+                        elif hasattr(latent_dist, 'sample'):
+                            reference_latent = latent_dist.sample() * 0.18215
+                        else:
+                            reference_latent = latent_dist * 0.18215
+                    else:
+                        raise AttributeError(f"VAE对象没有encode方法: {dir(self.vae)}")
                     
                     # 如果有mask，创建masked版本
                     if mask is not None and mask.size > 0:
