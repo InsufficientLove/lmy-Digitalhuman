@@ -527,26 +527,26 @@ class UltraFastMuseTalkService:
                 print(f"最小可用显存: {min_free_memory:.1f}GB")
                 
                 # 根据可用显存动态调整batch_size
-                # 实测：每帧需要约3GB显存（峰值），考虑安全余量
-                # 但为了稳定性和速度平衡，设置合理的batch_size
+                # 实测：每帧需要约3GB显存（峰值），但实际使用中需要更保守
+                # 先使用极保守的设置确保能运行
                 
-                if min_free_memory > 40:  # 40GB以上 - 安全处理8-10帧
-                    batch_size = 8  # 8帧约需24GB，留16GB余量
-                    print(f"✅ 显存充足({min_free_memory:.1f}GB)，设置batch_size=8")
-                elif min_free_memory > 30:  # 30-40GB - 安全处理6-8帧
-                    batch_size = 6  # 6帧约需18GB，留12GB余量
-                    print(f"✅ 显存良好({min_free_memory:.1f}GB)，设置batch_size=6")
-                elif min_free_memory > 20:  # 20-30GB - 安全处理4-5帧
-                    batch_size = 4  # 4帧约需12GB，留8GB余量
-                    print(f"⚠️ 显存中等({min_free_memory:.1f}GB)，设置batch_size=4")
-                elif min_free_memory > 15:  # 15-20GB - 安全处理3帧
-                    batch_size = 3  # 3帧约需9GB，留6GB余量
-                    print(f"⚠️ 显存偏少({min_free_memory:.1f}GB)，设置batch_size=3")
-                elif min_free_memory > 10:  # 10-15GB - 安全处理2帧
-                    batch_size = 2  # 2帧约需6GB，留4GB余量
-                    print(f"❌ 显存紧张({min_free_memory:.1f}GB)，设置batch_size=2")
-                else:  # 10GB以下 - 单帧处理
-                    batch_size = 1  # 1帧约需3GB
+                if min_free_memory > 40:  # 40GB以上
+                    batch_size = 2  # 极保守，确保不OOM
+                    print(f"✅ 显存充足({min_free_memory:.1f}GB)，设置batch_size=2")
+                elif min_free_memory > 30:  # 30-40GB
+                    batch_size = 2  
+                    print(f"✅ 显存良好({min_free_memory:.1f}GB)，设置batch_size=2")
+                elif min_free_memory > 20:  # 20-30GB
+                    batch_size = 2  
+                    print(f"⚠️ 显存中等({min_free_memory:.1f}GB)，设置batch_size=2")
+                elif min_free_memory > 15:  # 15-20GB
+                    batch_size = 1  
+                    print(f"⚠️ 显存偏少({min_free_memory:.1f}GB)，设置batch_size=1")
+                elif min_free_memory > 10:  # 10-15GB
+                    batch_size = 1  
+                    print(f"❌ 显存紧张({min_free_memory:.1f}GB)，设置batch_size=1")
+                else:  # 10GB以下
+                    batch_size = 1  
                     print(f"❌ 显存不足({min_free_memory:.1f}GB)，设置batch_size=1")
                     
                 print(f"基于可用显存({min_free_memory:.1f}GB)，设置batch_size={batch_size}")
