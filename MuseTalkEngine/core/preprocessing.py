@@ -496,20 +496,23 @@ class OptimizedPreprocessor:
                     if self.fp is not None and hasattr(self.fp, '__call__'):
                         try:
                             result = self.fp(frame)
-                            # 检查返回值类型
-                            if isinstance(result, tuple) and len(result) > 0:
+                            # 检查返回值类型并正确处理
+                            if result is None:
+                                print("面部解析返回None，使用默认mask")
+                                mask_out = np.ones((frame.shape[0], frame.shape[1]), dtype=np.uint8) * 255
+                            elif isinstance(result, tuple) and len(result) > 0:
                                 mask_out = result[0] if isinstance(result[0], np.ndarray) else np.ones((frame.shape[0], frame.shape[1]), dtype=np.uint8) * 255
                             elif isinstance(result, np.ndarray):
                                 mask_out = result
-                            elif isinstance(result, int):
-                                # 如果返回整数，创建默认mask
-                                print(f"面部解析返回整数: {result}")
+                            elif isinstance(result, (int, float)):
+                                # 如果返回数字，创建默认mask
+                                print(f"面部解析返回数字: {result}")
                                 mask_out = np.ones((frame.shape[0], frame.shape[1]), dtype=np.uint8) * 255
                             else:
                                 print(f"面部解析返回未知类型: {type(result)}")
                                 mask_out = np.ones((frame.shape[0], frame.shape[1]), dtype=np.uint8) * 255
-                        except TypeError as te:
-                            print(f"面部解析调用错误: {te}")
+                        except (TypeError, ValueError) as te:
+                            print(f"面部解析调用错误（已处理）: {te}")
                             mask_out = np.ones((frame.shape[0], frame.shape[1]), dtype=np.uint8) * 255
                     elif self.fp is not None and hasattr(self.fp, 'parse'):
                         mask_out = self.fp.parse(frame)
