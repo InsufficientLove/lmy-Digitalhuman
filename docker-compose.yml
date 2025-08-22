@@ -74,6 +74,7 @@ services:
       - /opt/musetalk/videos:/videos
       - /opt/musetalk/temp:/temp
     working_dir: /opt/musetalk/repo/MuseTalkEngine
+    command: ["python3", "main.py", "--mode", "hybrid"]  # 自动启动API服务供C#调用
     # 需要主机已安装 nvidia-container-toolkit
     deploy:
       resources:
