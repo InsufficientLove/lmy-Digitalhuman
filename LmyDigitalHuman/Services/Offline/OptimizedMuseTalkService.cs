@@ -70,19 +70,16 @@ namespace LmyDigitalHuman.Services.Offline
                     request.AudioPath,
                     outputPath);
 
-                if (!string.IsNullOrEmpty(videoPath) && File.Exists(videoPath))
+                if (!string.IsNullOrEmpty(videoPath))
                 {
-                    // 如果videoPath和outputPath不同，确保文件在正确位置
-                    if (videoPath != outputPath && File.Exists(videoPath))
-                    {
-                        File.Copy(videoPath, outputPath, true);
-                    }
+                    // 直接使用返回的路径，不检查文件存在性（因为是跨容器）
+                    var videoFileName = Path.GetFileName(videoPath);
                     
                     return new DigitalHumanResponse
                     {
                         Success = true,
-                        VideoPath = outputPath,
-                        VideoUrl = $"/videos/{Path.GetFileName(outputPath)}",
+                        VideoPath = videoPath,  // 保留原始路径
+                        VideoUrl = $"/videos/{videoFileName}",  // 使用文件名构建URL
                         Message = "Success"
                     };
                 }

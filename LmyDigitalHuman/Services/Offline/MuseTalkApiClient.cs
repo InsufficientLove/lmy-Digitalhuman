@@ -226,17 +226,41 @@ namespace LmyDigitalHuman.Services.Offline
                     
                     if (!string.IsNullOrEmpty(videoPath))
                     {
-                        // 如果需要，复制到指定输出路径
-                        if (!string.IsNullOrEmpty(outputPath) && videoPath != outputPath)
+                        // 处理路径映射：Python返回的/opt/musetalk/videos在C#容器中可能是不同路径
+                        string actualVideoPath = videoPath;
+                        
+                        // 如果是绝对路径，尝试提取文件名并在videos目录查找
+                        if (videoPath.StartsWith("/opt/musetalk/videos/"))
                         {
-                            if (File.Exists(videoPath))
+                            var fileName = Path.GetFileName(videoPath);
+                            // C#容器中的videos目录路径
+                            var videosDir = Path.Combine(_configuration.GetValue<string>("Paths:ContentRoot") ?? "/app", "wwwroot", "videos");
+                            actualVideoPath = Path.Combine(videosDir, fileName);
+                            
+                            // 如果还是找不到，尝试直接使用文件名（可能在当前目录）
+                            if (!File.Exists(actualVideoPath))
                             {
-                                File.Copy(videoPath, outputPath, true);
-                                _logger.LogInformation("视频已复制到: {OutputPath}", outputPath);
+                                actualVideoPath = Path.Combine("/videos", fileName);
                             }
                         }
                         
-                        return videoPath;
+                        // 如果需要，复制到指定输出路径
+                        if (!string.IsNullOrEmpty(outputPath) && actualVideoPath != outputPath)
+                        {
+                            if (File.Exists(actualVideoPath))
+                            {
+                                File.Copy(actualVideoPath, outputPath, true);
+                                _logger.LogInformation("视频已复制到: {OutputPath}", outputPath);
+                                return outputPath;
+                            }
+                            else
+                            {
+                                _logger.LogWarning("视频文件不存在: {VideoPath}, 返回原始路径", actualVideoPath);
+                                return videoPath; // 返回原始路径，让调用者处理
+                            }
+                        }
+                        
+                        return actualVideoPath;
                     }
                     
                     return null;
