@@ -276,8 +276,8 @@ class StreamingMuseTalkAPI:
             
             print(f"⚡ 处理音频段 {segment_index}: {duration:.2f}秒, {num_frames}帧, 模式={mode}")
             
-            # 生成输出路径 - 使用共享目录
-            output_dir = "/opt/musetalk/videos"
+            # 生成输出路径 - 使用正确的挂载路径
+            output_dir = "/videos"  # 这是容器内的挂载路径
             os.makedirs(output_dir, exist_ok=True)
             output_filename = f"segment_{session_id}_{segment_index}_{int(time.time()*1000)}.mp4"
             output_path = os.path.join(output_dir, output_filename)
