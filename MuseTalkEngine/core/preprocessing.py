@@ -292,6 +292,7 @@ class OptimizedPreprocessor:
     def preprocess_template_ultra_fast(self, template_path, output_dir, template_id):
         """极速预处理模板 - 修复阴影问题，优化性能"""
         try:
+            start_time = time.time()  # 添加start_time定义
             print(f"开始极速预处理: {template_id}")
             
             # 确保模型已初始化
@@ -377,13 +378,25 @@ class OptimizedPreprocessor:
                         # 计算边界框 (x_min, y_min, x_max, y_max)
                         x_coords = landmarks[:, 0]
                         y_coords = landmarks[:, 1]
+                        
+                        # 检查坐标范围
+                        print(f"X坐标范围: {np.min(x_coords):.2f} - {np.max(x_coords):.2f}")
+                        print(f"Y坐标范围: {np.min(y_coords):.2f} - {np.max(y_coords):.2f}")
+                        
+                        # 如果坐标是归一化的（0-1范围），需要缩放到图像尺寸
+                        if np.max(x_coords) <= 1.0 and np.max(y_coords) <= 1.0:
+                            h, w = frame.shape[:2]
+                            x_coords = x_coords * w
+                            y_coords = y_coords * h
+                            print(f"检测到归一化坐标，缩放到图像尺寸: {w}x{h}")
+                        
                         x_min = int(np.min(x_coords))
                         y_min = int(np.min(y_coords))
                         x_max = int(np.max(x_coords))
                         y_max = int(np.max(y_coords))
                         
                         # 添加一些边距
-                        margin = 20
+                        margin = 30
                         x_min = max(0, x_min - margin)
                         y_min = max(0, y_min - margin)
                         x_max = min(frame.shape[1], x_max + margin)
@@ -408,6 +421,10 @@ class OptimizedPreprocessor:
                             mask_out = result[0] if len(result) > 0 else np.zeros_like(frame[:,:,0])
                         elif isinstance(result, np.ndarray):
                             mask_out = result
+                        elif isinstance(result, int):
+                            # 如果返回整数，创建默认mask
+                            print(f"面部解析返回整数: {result}")
+                            mask_out = np.ones((frame.shape[0], frame.shape[1]), dtype=np.uint8) * 255
                         else:
                             mask_out = np.array(result)
                     elif hasattr(self.fp, 'parse'):
