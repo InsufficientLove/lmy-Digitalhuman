@@ -21,10 +21,11 @@ services:
     restart: unless-stopped
 
   musetalk-python:
-    image: musetalk-python:working  # 使用包含face-alignment的镜像
-    # build:
-    #   context: .
-    #   dockerfile: MuseTalkEngine/Dockerfile
+    # 可以选择使用镜像或build
+    # image: musetalk-python:working  # 注释掉image，使用build
+    build:
+      context: .
+      dockerfile: MuseTalkEngine/Dockerfile
     container_name: musetalk-python
     ports:
       - "28888:28888"  # HTTP API端口
