@@ -925,12 +925,14 @@ class UltraFastMuseTalkService:
     def load_template_cache_optimized(self, cache_dir, template_id):
         """优化的模板缓存加载"""
         try:
-            # 尝试多种可能的文件名
+            # 尝试多种可能的文件名（cache_dir已经包含template_id）
             possible_files = [
                 os.path.join(cache_dir, f"{template_id}_preprocessed.pkl"),
                 os.path.join(cache_dir, "preprocessed.pkl"),
                 os.path.join(cache_dir, f"{template_id}.pkl"),
-                os.path.join(cache_dir, "latents.pkl")
+                os.path.join(cache_dir, "latents.pkl"),
+                # 如果cache_dir没有包含template_id，尝试上一级
+                os.path.join(os.path.dirname(cache_dir), f"{template_id}_preprocessed.pkl")
             ]
             
             cache_file = None
