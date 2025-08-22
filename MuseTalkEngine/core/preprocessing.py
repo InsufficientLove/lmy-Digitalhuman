@@ -281,16 +281,24 @@ class OptimizedPreprocessor:
             face_parsing_masks = []  # 存储面部解析的mask
             
             # 使用coord_list作为bbox_list（从get_landmark_and_bbox返回的）
-            for i, (frame, face_box) in enumerate(zip(frame_list, coord_list)):
-                if face_box is None or face_box == coord_placeholder:
+            for i, (frame, orig_face_box) in enumerate(zip(frame_list, coord_list)):
+                if orig_face_box is None or orig_face_box == coord_placeholder:
                     print(f"警告: 第{i}帧没有检测到人脸")
                     continue
                     
                 # 确保face_box只有4个值 (x, y, x1, y1)
-                if isinstance(face_box, (list, tuple)) and len(face_box) > 4:
-                    face_box = face_box[:4]  # 只取前4个值
-                elif isinstance(face_box, (list, tuple)) and len(face_box) < 4:
-                    print(f"警告: face_box格式不正确: {face_box}")
+                if isinstance(orig_face_box, (list, tuple)):
+                    print(f"原始face_box: {orig_face_box}, 长度: {len(orig_face_box)}")
+                    if len(orig_face_box) > 4:
+                        face_box = list(orig_face_box[:4])  # 只取前4个值并转换为列表
+                        print(f"裁剪后的face_box: {face_box}")
+                    elif len(orig_face_box) == 4:
+                        face_box = list(orig_face_box)  # 转换为列表
+                    else:
+                        print(f"警告: face_box格式不正确: {orig_face_box}")
+                        continue
+                else:
+                    print(f"警告: face_box类型不正确: {type(orig_face_box)}")
                     continue
                 
                 # 面部解析 - 使用正确的方法调用
