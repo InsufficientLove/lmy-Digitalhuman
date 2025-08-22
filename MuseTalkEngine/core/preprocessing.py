@@ -24,8 +24,16 @@ warnings.filterwarnings("ignore")
 
 # 添加MuseTalk模块路径
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'MuseTalk'))
+sys.path.append('/opt/musetalk/repo/MuseTalk')  # 添加实际的MuseTalk路径
 
-# from musetalk.utils.face_parsing import FaceParsing  # 注释掉，因为不存在
+try:
+    from musetalk.utils.face_parsing import FaceParsing
+    print("成功导入FaceParsing")
+    FACE_PARSING_AVAILABLE = True
+except ImportError as e:
+    print(f"无法导入FaceParsing: {e}")
+    FACE_PARSING_AVAILABLE = False
+
 from musetalk.utils.utils import load_all_model
 from musetalk.utils.preprocessing import get_landmark_and_bbox, read_imgs
 from musetalk.utils.blending import get_image_prepare_material
@@ -43,16 +51,49 @@ class SimpleFaceParsing:
         pass
     
     def __call__(self, image, mode=None):
-        """返回一个简单的面部mask"""
+        """返回一个面部分割mask
+        返回值应该是分割标签图，其中：
+        0 = 背景
+        1-5 = 皮肤
+        6-10 = 眉毛、眼睛
+        11-13 = 鼻子、嘴巴
+        14-17 = 头发
+        """
         if isinstance(image, np.ndarray):
             h, w = image.shape[:2]
-            # 创建一个椭圆形mask作为面部区域
+            # 创建分割mask
             mask = np.zeros((h, w), dtype=np.uint8)
-            center = (w // 2, h // 2)
-            axes = (w // 3, h // 3)
-            cv2.ellipse(mask, center, axes, 0, 0, 360, 255, -1)
+            
+            # 面部主要区域（皮肤）- 使用标签1
+            center_x, center_y = w // 2, h // 2
+            
+            # 脸部椭圆（皮肤区域）
+            face_axes = (int(w * 0.35), int(h * 0.45))
+            cv2.ellipse(mask, (center_x, center_y), face_axes, 0, 0, 360, 1, -1)
+            
+            # 嘴巴区域 - 使用标签11（重要！）
+            mouth_y = center_y + int(h * 0.15)
+            mouth_axes = (int(w * 0.15), int(h * 0.08))
+            cv2.ellipse(mask, (center_x, mouth_y), mouth_axes, 0, 0, 360, 11, -1)
+            
+            # 鼻子区域 - 使用标签12
+            nose_y = center_y
+            nose_axes = (int(w * 0.08), int(h * 0.1))
+            cv2.ellipse(mask, (center_x, nose_y), nose_axes, 0, 0, 360, 12, -1)
+            
+            # 眼睛区域 - 使用标签6
+            eye_y = center_y - int(h * 0.1)
+            eye_offset = int(w * 0.12)
+            eye_axes = (int(w * 0.08), int(h * 0.05))
+            cv2.ellipse(mask, (center_x - eye_offset, eye_y), eye_axes, 0, 0, 360, 6, -1)
+            cv2.ellipse(mask, (center_x + eye_offset, eye_y), eye_axes, 0, 0, 360, 6, -1)
+            
             return mask
         return None
+    
+    def parse(self, image):
+        """兼容parse方法"""
+        return self.__call__(image)
 
 class OptimizedPreprocessor:
     """优化的预处理器 - 修复阴影问题，极速处理"""
@@ -119,9 +160,18 @@ class OptimizedPreprocessor:
                 print("警告: PE对象没有.to()方法，跳过优化")
                 self.pe = pe
             
-            # 初始化面部解析 - 暂时跳过，因为FaceParsing不存在
-            # self.fp = FaceParsing()
-            self.fp = SimpleFaceParsing()  # 使用简单的替代实现
+            # 初始化面部解析 - 优先使用真正的FaceParsing
+            if FACE_PARSING_AVAILABLE:
+                try:
+                    self.fp = FaceParsing()
+                    print("使用MuseTalk原生FaceParsing")
+                except Exception as e:
+                    print(f"FaceParsing初始化失败: {e}")
+                    self.fp = SimpleFaceParsing()
+                    print("降级到SimpleFaceParsing")
+            else:
+                self.fp = SimpleFaceParsing()
+                print("使用SimpleFaceParsing替代实现")
             
             print("预处理模型初始化完成")
             self.is_initialized = True
