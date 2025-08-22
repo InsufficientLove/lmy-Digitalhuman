@@ -21,7 +21,7 @@ services:
     restart: unless-stopped
 
   musetalk-python:
-    image: musetalk-python:latest  # 使用已经工作的镜像
+    image: musetalk-python:standard-env  # 使用标准环境镜像
     # build:
     #   context: .
     #   dockerfile: MuseTalkEngine/Dockerfile
@@ -74,8 +74,8 @@ services:
       - /opt/musetalk/cache:/opt/musetalk/cache
       - /opt/musetalk/videos:/videos
       - /opt/musetalk/temp:/temp
-    working_dir: /opt/musetalk/repo/MuseTalkEngine
-    command: ["python3", "main.py", "--mode", "hybrid"]  # 自动启动API服务供C#调用
+    working_dir: /opt/musetalk/repo
+    command: ["bash", "-c", "pip install face-alignment==1.4.1 --no-deps 2>/dev/null; python3 MuseTalkEngine/streaming/api_service.py"]
     # 需要主机已安装 nvidia-container-toolkit
     deploy:
       resources:
