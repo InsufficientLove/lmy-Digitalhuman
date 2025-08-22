@@ -108,9 +108,10 @@ class OptimizedPreprocessor:
         self.is_initialized = False
         
         # 🎨 阴影修复参数
-        self.shadow_fix_enabled = True
-        self.lighting_adjustment = True
-        self.color_correction = True
+        self.shadow_fix_enabled = False  # 默认禁用，避免颜色变化
+        self.lighting_adjustment = False  # 禁用光照调整
+        self.color_correction = False  # 禁用颜色校正
+        self.preserve_original_color = True  # 保持原始颜色
         
     def initialize_models(self, device='cuda:0'):
         """初始化模型"""
@@ -182,11 +183,15 @@ class OptimizedPreprocessor:
             return False
     
     def fix_face_shadows(self, image):
-        """修复面部阴影问题"""
-        if not self.shadow_fix_enabled:
-            return image
-        
+        """修复面部阴影 - 极速版"""
         try:
+            # 如果需要保持原始颜色，直接返回
+            if self.preserve_original_color:
+                return image
+                
+            if not self.shadow_fix_enabled:
+                return image
+        
             # 🎨 1. 光照均衡化
             if self.lighting_adjustment:
                 # 转换到LAB色彩空间进行光照调整
@@ -338,13 +343,14 @@ class OptimizedPreprocessor:
                 print(f"使用目录中的图像: {input_image_path}")
             
             # 🎨 2. 图像预处理和阴影修复
-            print("🎨 图像预处理和阴影修复...")
+            print("🎨 图像预处理...")
             image = cv2.imread(input_image_path)
             if image is None:
                 raise ValueError(f"无法读取图像: {input_image_path}")
             
-            # 关键：阴影修复
-            image = self.fix_face_shadows(image)
+            # 跳过阴影修复，保持原始颜色
+            # image = self.fix_face_shadows(image)
+            print("保持原始颜色，跳过阴影修复")
             
             # 3. 面部检测和关键点提取
             print("👤 面部检测和关键点提取...")
@@ -532,7 +538,12 @@ class OptimizedPreprocessor:
                 
                 # 获取面部区域坐标 - 传入正确的参数
                 try:
-                    result = get_image_prepare_material(frame, face_box, fp=self.fp)
+                    # 只有在fp是真正的FaceParsing对象时才传入
+                    if self.fp is not None and hasattr(self.fp, '__call__'):
+                        result = get_image_prepare_material(frame, face_box, fp=self.fp)
+                    else:
+                        # 不传入fp参数，让函数使用默认处理
+                        result = get_image_prepare_material(frame, face_box)
                     
                     # 处理不同的返回格式
                     if isinstance(result, tuple):
