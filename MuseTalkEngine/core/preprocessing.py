@@ -27,9 +27,12 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'MuseTalk'))
 
 from musetalk.utils.face_parsing import FaceParsing
 from musetalk.utils.utils import load_all_model
-from musetalk.utils.preprocessing import get_landmark_and_bbox, read_imgs, coord_placeholder
+from musetalk.utils.preprocessing import get_landmark_and_bbox, read_imgs
 from musetalk.utils.blending import get_image_prepare_material
 from musetalk.utils.audio_processor import AudioProcessor
+
+# 定义coord_placeholder常量
+coord_placeholder = (0, 0, 0, 0)  # 表示无效的边界框
 
 print("Optimized Preprocessing V2 - 极速预处理引擎")
 
