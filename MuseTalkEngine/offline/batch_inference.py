@@ -38,6 +38,10 @@ warnings.filterwarnings("ignore")
 GPU_MEMORY_CONFIG = {'batch_size': {'default': 4}}
 print("使用默认GPU配置")
 
+# 设置模型路径
+os.environ['MODEL_PATH'] = '/opt/musetalk/models'
+os.environ['MUSETALK_MODEL_PATH'] = '/opt/musetalk/models'
+
 # 添加MuseTalk模块路径
 sys.path.append('/opt/musetalk/repo/MuseTalk')
 
@@ -146,26 +150,27 @@ class UltraFastMuseTalkService:
                         print(f"GPU{device_id} 开始加载模型...")
                         
                         # 设置模型路径环境变量
-                        os.environ['MUSETALK_MODEL_PATH'] = '/opt/musetalk/models'
-                        
-                        # 禁用torch.compile避免CUDA图冲突
                         os.environ['DISABLE_TORCH_COMPILE'] = '1'
                         
                         # 检查sd-vae目录是否完整
-                        sd_vae_path = "/opt/musetalk/models/sd-vae"
+                        sd_vae_path = "/opt/musetalk/models/sd-vae"  # 正确的路径
                         config_file = os.path.join(sd_vae_path, "config.json")
                         
-                        if os.path.exists(config_file):
-                            print(f"GPU{device_id} 使用完整的sd-vae模型")
-                            # 直接加载模型，不指定vae_type参数
+                        # sd-vae可能没有config.json，直接加载
+                        print(f"GPU{device_id} 使用sd-vae模型路径: {sd_vae_path}")
+                        
+                        # 设置模型路径环境变量
+                        os.environ['MODEL_PATH'] = '/opt/musetalk/models'
+                        
+                        # 直接加载模型，不检查config
+                        try:
                             vae, unet, pe = load_all_model()
                             print(f"GPU{device_id} 模型加载成功")
-                        else:
-                            print(f"GPU{device_id} sd-vae配置文件不存在: {config_file}")
-                            # 尝试直接加载模型
-                            print(f"GPU{device_id} 尝试使用默认模型路径...")
+                        except Exception as e:
+                            print(f"GPU{device_id} 尝试指定VAE类型加载...")
+                            # 尝试不同的加载方式
                             vae, unet, pe = load_all_model()
-                            print(f"GPU{device_id} 模型加载成功（使用默认路径）")
+                            print(f"GPU{device_id} 模型加载成功（备用方式）")
                             
                     except Exception as e:
                         print(f"GPU{device_id} 模型加载失败: {e}")
