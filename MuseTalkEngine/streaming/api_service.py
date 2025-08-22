@@ -127,26 +127,38 @@ class StreamingMuseTalkAPI:
         except Exception as e:
             print(f"⚠️ 模型预热失败: {e}")
     
-    def preprocess_template(self, template_id: str, image_path: str) -> Dict:
+    def preprocess_template(self, template_id: str, image_path: str, force: bool = False) -> Dict:
         """
         预处理模板（由C#调用）
         返回关键推理信息用于持久化
+        
+        Args:
+            template_id: 模板ID
+            image_path: 图片路径
+            force: 是否强制重新处理（清除缓存）
         """
         try:
-            print(f"📋 预处理模板: {template_id}")
+            print(f"📋 预处理模板: {template_id} (force={force})")
             
             # 检查缓存
             cache_path = os.path.join(self.template_cache_dir, template_id)
             pkl_file = os.path.join(cache_path, f"{template_id}_preprocessed.pkl")
             
-            if os.path.exists(pkl_file):
-                print(f"✅ 模板已存在: {template_id}")
+            # 如果不是强制重处理，且缓存存在，返回缓存
+            if not force and os.path.exists(pkl_file):
+                print(f"✅ 使用缓存模板: {template_id}")
                 return {
                     'success': True,
                     'template_id': template_id,
                     'cache_path': cache_path,
-                    'message': '模板已预处理'
+                    'message': '模板已预处理（使用缓存）'
                 }
+            
+            # 如果是强制重处理，清理旧缓存
+            if force and os.path.exists(cache_path):
+                print(f"🗑️ 清理旧缓存: {template_id}")
+                import shutil
+                shutil.rmtree(cache_path, ignore_errors=True)
             
             # 创建缓存目录
             os.makedirs(cache_path, exist_ok=True)
@@ -174,6 +186,12 @@ class StreamingMuseTalkAPI:
                     'message': '模板预处理成功'
                 }
             else:
+                # 预处理失败，清理缓存目录
+                print(f"❌ 预处理失败，清理缓存: {template_id}")
+                import shutil
+                if os.path.exists(cache_path):
+                    shutil.rmtree(cache_path, ignore_errors=True)
+                
                 return {
                     'success': False,
                     'message': '模板预处理失败'
@@ -447,6 +465,7 @@ app = FastAPI(title="MuseTalk Streaming API")
 class PreprocessRequest(BaseModel):
     template_id: str
     image_path: str
+    force: bool = False  # 是否强制重新处理
 
 
 class SessionRequest(BaseModel):
@@ -483,7 +502,7 @@ async def initialize():
 async def preprocess_template(request: PreprocessRequest):
     """预处理模板"""
     service = get_api_service()
-    result = service.preprocess_template(request.template_id, request.image_path)
+    result = service.preprocess_template(request.template_id, request.image_path, request.force)
     if result['success']:
         return result
     else:
