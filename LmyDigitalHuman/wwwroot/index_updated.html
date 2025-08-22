@@ -659,8 +659,16 @@
             <div id="create-tab" class="tab-content">
                 <form class="create-template-form" id="createTemplateForm">
                     <div class="form-group">
-                        <label for="templateName">模板名称</label>
-                        <input type="text" id="templateName" placeholder="输入模板名称" required>
+                        <label for="templateName">模板名称（中文）</label>
+                        <input type="text" id="templateName" placeholder="例如：小哈" 
+                               onblur="generateSystemName()" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="systemName">系统名称（英文）</label>
+                        <input type="text" id="systemName" placeholder="例如：xiaoha（用于文件路径，只能包含英文字母、数字和下划线）" 
+                               pattern="[a-zA-Z0-9_]+" required>
+                        <small style="color: #666;">自动根据中文名称生成，也可手动修改</small>
                     </div>
 
                     <div class="form-group">
@@ -776,6 +784,7 @@
     <script>
         // 全局变量
         let currentTemplateId = null;
+        let currentTemplateSystemName = null;  // 添加systemName变量
         let isRecording = false;
         let mediaRecorder = null;
         let audioChunks = [];
@@ -849,6 +858,8 @@
             event.currentTarget.classList.add('selected');
             
             currentTemplateId = template.templateId;
+            // 保存systemName供Python服务使用
+            currentTemplateSystemName = template.systemName || template.templateId;
             updateStatus('processing', '正在初始化数字人...');
             
             // 生成欢迎视频
@@ -860,6 +871,7 @@
                     },
                     body: JSON.stringify({
                         templateId: template.templateId,
+                        systemName: template.systemName,  // 传递systemName
                         quality: 'medium'
                     })
                 });
@@ -888,6 +900,7 @@
             try {
                 const formData = new FormData();
                 formData.append('templateName', document.getElementById('templateName').value);
+                formData.append('systemName', document.getElementById('systemName').value);
                 formData.append('description', document.getElementById('templateDescription').value);
                 formData.append('voiceId', document.getElementById('templateVoice').value);
                 formData.append('quality', document.getElementById('templateQuality').value);
@@ -938,6 +951,46 @@
                 };
                 reader.readAsDataURL(file);
             }
+        }
+
+        // 自动生成系统名称
+        function generateSystemName() {
+            const templateName = document.getElementById('templateName').value;
+            const systemNameInput = document.getElementById('systemName');
+            
+            // 如果系统名称已经有值，不自动覆盖
+            if (systemNameInput.value) return;
+            
+            // 简单的拼音映射（可以扩展）
+            const pinyinMap = {
+                '小': 'xiao',
+                '哈': 'ha',
+                '美': 'mei',
+                '丽': 'li',
+                '张': 'zhang',
+                '李': 'li',
+                '王': 'wang',
+                '助': 'zhu',
+                '手': 'shou',
+                '客': 'ke',
+                '服': 'fu'
+            };
+            
+            let systemName = '';
+            for (let char of templateName) {
+                if (pinyinMap[char]) {
+                    systemName += pinyinMap[char];
+                } else if (/[a-zA-Z0-9]/.test(char)) {
+                    systemName += char.toLowerCase();
+                }
+            }
+            
+            // 如果生成失败，使用时间戳
+            if (!systemName) {
+                systemName = 'template_' + Date.now();
+            }
+            
+            systemNameInput.value = systemName;
         }
 
         // API测试

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI数字人助手</title>
+    <title>AI数字人助手 - 完整版</title>
     <style>
         * {
             margin: 0;
@@ -116,7 +116,7 @@
         }
 
         .header {
-            margin-bottom: 30px;
+            margin-bottom: 20px;
         }
 
         .header h1 {
@@ -130,9 +130,54 @@
             font-size: 14px;
         }
 
+        /* 标签页 */
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            background: transparent;
+            border: none;
+            color: #666;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            position: relative;
+            transition: all 0.3s;
+        }
+
+        .tab.active {
+            color: #667eea;
+        }
+
+        .tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: #667eea;
+        }
+
+        .tab-content {
+            display: none;
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .tab-content.active {
+            display: flex;
+            flex-direction: column;
+        }
+
         /* 模板选择 */
         .template-selector {
-            margin-bottom: 30px;
+            margin-bottom: 20px;
         }
 
         .template-selector h3 {
@@ -188,13 +233,187 @@
             text-align: center;
         }
 
+        /* 创建模板表单 */
+        .create-template-form {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .form-group label {
+            font-size: 14px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .file-upload {
+            position: relative;
+            display: inline-block;
+            cursor: pointer;
+            width: 100%;
+        }
+
+        .file-upload input[type=file] {
+            position: absolute;
+            left: -9999px;
+        }
+
+        .file-upload label {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px;
+            background: #f8f9fa;
+            border: 2px dashed #667eea;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .file-upload label:hover {
+            background: #f0f0f0;
+        }
+
+        .file-preview {
+            margin-top: 10px;
+            max-width: 100%;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .file-preview img {
+            width: 100%;
+            height: auto;
+        }
+
+        .btn-primary {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* API测试 */
+        .api-test-section {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .api-endpoint {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+        }
+
+        .api-endpoint h4 {
+            font-size: 14px;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .api-endpoint .method {
+            display: inline-block;
+            padding: 2px 6px;
+            background: #4CAF50;
+            color: white;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+            margin-right: 10px;
+        }
+
+        .api-endpoint .method.post {
+            background: #2196F3;
+        }
+
+        .api-endpoint .method.delete {
+            background: #f44336;
+        }
+
+        .api-endpoint .url {
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            color: #666;
+            background: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+
+        .api-test-btn {
+            padding: 8px 16px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s;
+        }
+
+        .api-test-btn:hover {
+            background: #45a049;
+        }
+
+        .api-response {
+            margin-top: 10px;
+            padding: 10px;
+            background: #263238;
+            color: #aed581;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
         /* 对话区 */
         .chat-area {
             flex: 1;
             display: flex;
             flex-direction: column;
-            border-top: 1px solid #e0e0e0;
-            padding-top: 20px;
         }
 
         .messages {
@@ -328,65 +547,19 @@
             transform: none;
         }
 
-        /* 快捷回复 */
-        .quick-replies {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 15px;
-            flex-wrap: wrap;
-        }
-
-        .quick-reply {
-            padding: 6px 12px;
-            background: #f0f0f0;
-            border: 1px solid #e0e0e0;
-            border-radius: 15px;
-            font-size: 13px;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-
-        .quick-reply:hover {
-            background: #667eea;
-            color: white;
-            border-color: #667eea;
-        }
-
         /* 加载动画 */
-        .typing-indicator {
-            display: none;
-            align-items: center;
-            gap: 5px;
-            padding: 10px;
-        }
-
-        .typing-indicator.active {
-            display: flex;
-        }
-
-        .typing-dot {
-            width: 8px;
-            height: 8px;
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
             border-radius: 50%;
-            background: #667eea;
-            animation: typing 1.4s infinite;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
         }
 
-        .typing-dot:nth-child(2) {
-            animation-delay: 0.2s;
-        }
-
-        .typing-dot:nth-child(3) {
-            animation-delay: 0.4s;
-        }
-
-        @keyframes typing {
-            0%, 60%, 100% {
-                transform: translateY(0);
-            }
-            30% {
-                transform: translateY(-10px);
-            }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
 
         /* 响应式设计 */
@@ -404,19 +577,14 @@
             .interaction-area {
                 width: 100%;
             }
-        }
 
-        /* 工具提示 */
-        .tooltip {
-            position: absolute;
-            background: rgba(0, 0, 0, 0.8);
-            color: white;
-            padding: 5px 10px;
-            border-radius: 5px;
-            font-size: 12px;
-            white-space: nowrap;
-            z-index: 1000;
-            pointer-events: none;
+            .tabs {
+                font-size: 12px;
+            }
+
+            .templates-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
         }
     </style>
 </head>
@@ -438,58 +606,176 @@
         <div class="interaction-area">
             <div class="header">
                 <h1>AI数字人助手</h1>
-                <p>选择一个数字人形象，开始智能对话</p>
+                <p>创建模板、测试对话、验证API</p>
             </div>
 
-            <!-- 模板选择 -->
-            <div class="template-selector">
-                <h3>选择数字人形象</h3>
-                <div class="templates-grid" id="templatesGrid">
-                    <!-- 动态加载模板 -->
+            <!-- 标签页 -->
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab('conversation')">对话</button>
+                <button class="tab" onclick="switchTab('create')">创建模板</button>
+                <button class="tab" onclick="switchTab('api')">API测试</button>
+            </div>
+
+            <!-- 对话标签 -->
+            <div id="conversation-tab" class="tab-content active">
+                <!-- 模板选择 -->
+                <div class="template-selector">
+                    <h3>选择数字人形象</h3>
+                    <div class="templates-grid" id="templatesGrid">
+                        <!-- 动态加载模板 -->
+                    </div>
                 </div>
-            </div>
 
-            <!-- 对话区 -->
-            <div class="chat-area">
-                <!-- 消息列表 -->
-                <div class="messages" id="messages">
-                    <div class="message ai">
-                        <div class="message-avatar">AI</div>
-                        <div>
-                            <div class="message-content">
-                                您好！请选择一个数字人形象，我将为您提供智能对话服务。
+                <!-- 对话区 -->
+                <div class="chat-area">
+                    <div class="messages" id="messages">
+                        <div class="message ai">
+                            <div class="message-avatar">AI</div>
+                            <div>
+                                <div class="message-content">
+                                    您好！请选择一个数字人形象，我将为您提供智能对话服务。
+                                </div>
+                                <div class="message-time">刚刚</div>
                             </div>
-                            <div class="message-time">刚刚</div>
                         </div>
                     </div>
-                </div>
 
-                <!-- 输入提示 -->
-                <div class="typing-indicator" id="typingIndicator">
-                    <div class="typing-dot"></div>
-                    <div class="typing-dot"></div>
-                    <div class="typing-dot"></div>
-                </div>
-
-                <!-- 快捷回复 -->
-                <div class="quick-replies">
-                    <div class="quick-reply" onclick="sendQuickReply('你好')">你好</div>
-                    <div class="quick-reply" onclick="sendQuickReply('介绍一下自己')">介绍一下自己</div>
-                    <div class="quick-reply" onclick="sendQuickReply('今天天气怎么样')">今天天气怎么样</div>
-                    <div class="quick-reply" onclick="sendQuickReply('再见')">再见</div>
-                </div>
-
-                <!-- 输入区 -->
-                <div class="input-area">
-                    <div class="input-wrapper">
-                        <input type="text" class="chat-input" id="chatInput" 
-                               placeholder="输入消息或点击麦克风说话..." 
-                               onkeypress="handleKeyPress(event)">
-                        <button class="voice-btn" id="voiceBtn" onclick="toggleVoiceInput()">
-                            🎤
-                        </button>
+                    <!-- 输入区 -->
+                    <div class="input-area">
+                        <div class="input-wrapper">
+                            <input type="text" class="chat-input" id="chatInput" 
+                                   placeholder="输入消息或点击麦克风说话..." 
+                                   onkeypress="handleKeyPress(event)">
+                            <button class="voice-btn" id="voiceBtn" onclick="toggleVoiceInput()">
+                                🎤
+                            </button>
+                        </div>
+                        <button class="send-btn" id="sendBtn" onclick="sendMessage()">发送</button>
                     </div>
-                    <button class="send-btn" id="sendBtn" onclick="sendMessage()">发送</button>
+                </div>
+            </div>
+
+            <!-- 创建模板标签 -->
+            <div id="create-tab" class="tab-content">
+                <form class="create-template-form" id="createTemplateForm">
+                    <div class="form-group">
+                        <label for="templateName">模板名称（中文）</label>
+                        <input type="text" id="templateName" placeholder="例如：小哈" 
+                               onblur="generateSystemName()" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="systemName">系统名称（英文）</label>
+                        <input type="text" id="systemName" placeholder="例如：xiaoha（用于文件路径，只能包含英文字母、数字和下划线）" 
+                               pattern="[a-zA-Z0-9_]+" required>
+                        <small style="color: #666;">自动根据中文名称生成，也可手动修改</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="templateDescription">描述</label>
+                        <textarea id="templateDescription" rows="3" placeholder="输入模板描述"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label>上传图片</label>
+                        <div class="file-upload">
+                            <input type="file" id="templateImage" accept="image/*" onchange="previewImage(event)">
+                            <label for="templateImage">
+                                📷 选择图片文件
+                            </label>
+                        </div>
+                        <div class="file-preview" id="imagePreview" style="display: none;">
+                            <img id="previewImg" src="" alt="预览">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="templateVoice">声音选择</label>
+                        <select id="templateVoice">
+                            <option value="zh-CN-XiaoxiaoNeural">晓晓（女声）</option>
+                            <option value="zh-CN-YunxiNeural">云希（男声）</option>
+                            <option value="zh-CN-YunjianNeural">云健（男声）</option>
+                            <option value="zh-CN-XiaoyiNeural">晓伊（女声）</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="templateQuality">质量设置</label>
+                        <select id="templateQuality">
+                            <option value="low">低质量（快速）</option>
+                            <option value="medium" selected>中等质量（平衡）</option>
+                            <option value="high">高质量（慢速）</option>
+                        </select>
+                    </div>
+
+                    <button type="submit" class="btn-primary" id="createTemplateBtn">
+                        创建模板
+                    </button>
+                </form>
+
+                <div id="createResult" style="margin-top: 20px; display: none;">
+                    <h4>创建结果</h4>
+                    <div class="api-response" id="createResultContent"></div>
+                </div>
+            </div>
+
+            <!-- API测试标签 -->
+            <div id="api-tab" class="tab-content">
+                <div class="api-test-section">
+                    <!-- 健康检查 -->
+                    <div class="api-endpoint">
+                        <h4>
+                            <span class="method">GET</span>
+                            健康检查
+                        </h4>
+                        <div class="url">/health</div>
+                        <button class="api-test-btn" onclick="testAPI('health')">测试</button>
+                        <div class="api-response" id="health-response" style="display: none;"></div>
+                    </div>
+
+                    <!-- Python服务状态 -->
+                    <div class="api-endpoint">
+                        <h4>
+                            <span class="method">GET</span>
+                            Python服务状态
+                        </h4>
+                        <div class="url">http://localhost:28888/api/status</div>
+                        <button class="api-test-btn" onclick="testPythonAPI('status')">测试</button>
+                        <div class="api-response" id="python-status-response" style="display: none;"></div>
+                    </div>
+
+                    <!-- 模板列表 -->
+                    <div class="api-endpoint">
+                        <h4>
+                            <span class="method">GET</span>
+                            获取模板列表
+                        </h4>
+                        <div class="url">/api/digitalhumantemplate/list</div>
+                        <button class="api-test-btn" onclick="testAPI('templates')">测试</button>
+                        <div class="api-response" id="templates-response" style="display: none;"></div>
+                    </div>
+
+                    <!-- 初始化Python服务 -->
+                    <div class="api-endpoint">
+                        <h4>
+                            <span class="method post">POST</span>
+                            初始化Python服务
+                        </h4>
+                        <div class="url">http://localhost:28888/api/initialize</div>
+                        <button class="api-test-btn" onclick="testPythonAPI('initialize', 'POST')">测试</button>
+                        <div class="api-response" id="python-init-response" style="display: none;"></div>
+                    </div>
+
+                    <!-- 系统诊断 -->
+                    <div class="api-endpoint">
+                        <h4>
+                            <span class="method">GET</span>
+                            系统诊断
+                        </h4>
+                        <div class="url">/api/diagnostics/full</div>
+                        <button class="api-test-btn" onclick="testAPI('diagnostics')">测试</button>
+                        <div class="api-response" id="diagnostics-response" style="display: none;"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -498,16 +784,34 @@
     <script>
         // 全局变量
         let currentTemplateId = null;
+        let currentTemplateSystemName = null;  // 添加systemName变量
         let isRecording = false;
         let mediaRecorder = null;
         let audioChunks = [];
-        let messageHistory = [];
 
         // 初始化
         document.addEventListener('DOMContentLoaded', function() {
             loadTemplates();
             updateStatus('waiting', '请选择数字人');
+            
+            // 绑定表单提交事件
+            document.getElementById('createTemplateForm').addEventListener('submit', createTemplate);
         });
+
+        // 切换标签页
+        function switchTab(tabName) {
+            // 更新标签按钮状态
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            // 显示对应内容
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById(`${tabName}-tab`).classList.add('active');
+        }
 
         // 加载模板列表
         async function loadTemplates() {
@@ -554,6 +858,8 @@
             event.currentTarget.classList.add('selected');
             
             currentTemplateId = template.templateId;
+            // 保存systemName供Python服务使用
+            currentTemplateSystemName = template.systemName || template.templateId;
             updateStatus('processing', '正在初始化数字人...');
             
             // 生成欢迎视频
@@ -565,6 +871,7 @@
                     },
                     body: JSON.stringify({
                         templateId: template.templateId,
+                        systemName: template.systemName,  // 传递systemName
                         quality: 'medium'
                     })
                 });
@@ -582,19 +889,158 @@
             }
         }
 
-        // 显示数字人视频
-        function displayDigitalHuman(videoUrl) {
-            const video = document.getElementById('digitalHumanVideo');
-            const placeholder = document.getElementById('avatarPlaceholder');
+        // 创建模板
+        async function createTemplate(event) {
+            event.preventDefault();
             
-            video.src = videoUrl;
-            video.style.display = 'block';
-            placeholder.style.display = 'none';
+            const btn = document.getElementById('createTemplateBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading-spinner"></span> 创建中...';
             
-            // 自动播放
-            video.play().catch(e => {
-                console.log('自动播放失败，需要用户交互');
-            });
+            try {
+                const formData = new FormData();
+                formData.append('templateName', document.getElementById('templateName').value);
+                formData.append('systemName', document.getElementById('systemName').value);
+                formData.append('description', document.getElementById('templateDescription').value);
+                formData.append('voiceId', document.getElementById('templateVoice').value);
+                formData.append('quality', document.getElementById('templateQuality').value);
+                
+                const imageFile = document.getElementById('templateImage').files[0];
+                if (imageFile) {
+                    formData.append('imageFile', imageFile);
+                }
+                
+                const response = await fetch('/api/digitalhumantemplate/create', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                // 显示结果
+                document.getElementById('createResult').style.display = 'block';
+                document.getElementById('createResultContent').textContent = JSON.stringify(result, null, 2);
+                
+                if (result.success) {
+                    alert('模板创建成功！');
+                    // 重新加载模板列表
+                    loadTemplates();
+                    // 清空表单
+                    document.getElementById('createTemplateForm').reset();
+                    document.getElementById('imagePreview').style.display = 'none';
+                } else {
+                    alert('模板创建失败：' + (result.message || '未知错误'));
+                }
+            } catch (error) {
+                console.error('创建模板失败:', error);
+                alert('创建模板失败：' + error.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '创建模板';
+            }
+        }
+
+        // 预览图片
+        function previewImage(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('previewImg').src = e.target.result;
+                    document.getElementById('imagePreview').style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        // 自动生成系统名称
+        function generateSystemName() {
+            const templateName = document.getElementById('templateName').value;
+            const systemNameInput = document.getElementById('systemName');
+            
+            // 如果系统名称已经有值，不自动覆盖
+            if (systemNameInput.value) return;
+            
+            // 简单的拼音映射（可以扩展）
+            const pinyinMap = {
+                '小': 'xiao',
+                '哈': 'ha',
+                '美': 'mei',
+                '丽': 'li',
+                '张': 'zhang',
+                '李': 'li',
+                '王': 'wang',
+                '助': 'zhu',
+                '手': 'shou',
+                '客': 'ke',
+                '服': 'fu'
+            };
+            
+            let systemName = '';
+            for (let char of templateName) {
+                if (pinyinMap[char]) {
+                    systemName += pinyinMap[char];
+                } else if (/[a-zA-Z0-9]/.test(char)) {
+                    systemName += char.toLowerCase();
+                }
+            }
+            
+            // 如果生成失败，使用时间戳
+            if (!systemName) {
+                systemName = 'template_' + Date.now();
+            }
+            
+            systemNameInput.value = systemName;
+        }
+
+        // API测试
+        async function testAPI(endpoint) {
+            const responseDiv = document.getElementById(`${endpoint}-response`);
+            responseDiv.style.display = 'block';
+            responseDiv.textContent = '加载中...';
+            
+            try {
+                let url = '';
+                switch(endpoint) {
+                    case 'health':
+                        url = '/health';
+                        break;
+                    case 'templates':
+                        url = '/api/digitalhumantemplate/list';
+                        break;
+                    case 'diagnostics':
+                        url = '/api/diagnostics/full';
+                        break;
+                }
+                
+                const response = await fetch(url);
+                const data = await response.json();
+                responseDiv.textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                responseDiv.textContent = `错误: ${error.message}`;
+            }
+        }
+
+        // Python API测试
+        async function testPythonAPI(endpoint, method = 'GET') {
+            const responseDiv = document.getElementById(`python-${endpoint}-response`);
+            responseDiv.style.display = 'block';
+            responseDiv.textContent = '加载中...';
+            
+            try {
+                const options = {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                };
+                
+                const response = await fetch(`http://localhost:28888/api/${endpoint}`, options);
+                const data = await response.json();
+                responseDiv.textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                responseDiv.textContent = `错误: ${error.message}\n可能Python服务未启动或跨域问题`;
+            }
         }
 
         // 发送消息
@@ -612,8 +1058,6 @@
             addMessage('user', text);
             input.value = '';
             
-            // 显示输入中状态
-            showTypingIndicator(true);
             updateStatus('processing', '正在生成回复...');
             
             try {
@@ -634,12 +1078,9 @@
                 const result = await response.json();
                 
                 if (result.success) {
-                    // 播放视频回复
                     if (result.videoUrl) {
                         displayDigitalHuman(result.videoUrl);
                     }
-                    
-                    // 添加AI回复（从LLM获取的回复文本）
                     addMessage('ai', result.responseText || '好的，我明白了。');
                     updateStatus('ready', '数字人就绪');
                 }
@@ -647,12 +1088,24 @@
                 console.error('发送消息失败:', error);
                 addMessage('ai', '抱歉，处理您的请求时出现了问题。');
                 updateStatus('ready', '数字人就绪');
-            } finally {
-                showTypingIndicator(false);
             }
         }
 
-        // 添加消息到对话框
+        // 显示数字人视频
+        function displayDigitalHuman(videoUrl) {
+            const video = document.getElementById('digitalHumanVideo');
+            const placeholder = document.getElementById('avatarPlaceholder');
+            
+            video.src = videoUrl;
+            video.style.display = 'block';
+            placeholder.style.display = 'none';
+            
+            video.play().catch(e => {
+                console.log('自动播放失败，需要用户交互');
+            });
+        }
+
+        // 添加消息
         function addMessage(type, text) {
             const messages = document.getElementById('messages');
             const message = document.createElement('div');
@@ -673,15 +1126,6 @@
             
             messages.appendChild(message);
             messages.scrollTop = messages.scrollHeight;
-            
-            // 保存到历史
-            messageHistory.push({ type, text, time });
-        }
-
-        // 快捷回复
-        function sendQuickReply(text) {
-            document.getElementById('chatInput').value = text;
-            sendMessage();
         }
 
         // 语音输入
@@ -735,8 +1179,6 @@
                 formData.append('templateId', currentTemplateId);
                 formData.append('audioFile', audioBlob, 'recording.wav');
                 formData.append('quality', 'medium');
-                formData.append('enableEmotionDetection', 'true');
-                formData.append('useCache', 'true');
 
                 const response = await fetch('/api/conversation/audio', {
                     method: 'POST',
@@ -746,21 +1188,15 @@
                 const result = await response.json();
                 
                 if (result.success) {
-                    // 添加识别的文本
                     if (result.inputText) {
                         addMessage('user', result.inputText);
                     }
-                    
-                    // 播放视频回复
                     if (result.videoUrl) {
                         displayDigitalHuman(result.videoUrl);
                     }
-                    
-                    // 添加AI回复
                     if (result.responseText) {
                         addMessage('ai', result.responseText);
                     }
-                    
                     updateStatus('ready', '数字人就绪');
                 }
             } catch (error) {
@@ -790,16 +1226,6 @@
             }
             
             statusText.textContent = text;
-        }
-
-        // 显示输入指示器
-        function showTypingIndicator(show) {
-            const indicator = document.getElementById('typingIndicator');
-            if (show) {
-                indicator.classList.add('active');
-            } else {
-                indicator.classList.remove('active');
-            }
         }
 
         // 处理回车键
