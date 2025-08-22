@@ -925,8 +925,30 @@ class UltraFastMuseTalkService:
     def load_template_cache_optimized(self, cache_dir, template_id):
         """优化的模板缓存加载"""
         try:
-            cache_file = os.path.join(cache_dir, f"{template_id}_preprocessed.pkl")
-            if not os.path.exists(cache_file):
+            # 尝试多种可能的文件名
+            possible_files = [
+                os.path.join(cache_dir, f"{template_id}_preprocessed.pkl"),
+                os.path.join(cache_dir, "preprocessed.pkl"),
+                os.path.join(cache_dir, f"{template_id}.pkl"),
+                os.path.join(cache_dir, "latents.pkl")
+            ]
+            
+            cache_file = None
+            for pf in possible_files:
+                if os.path.exists(pf):
+                    cache_file = pf
+                    print(f"找到缓存文件: {pf}")
+                    break
+            
+            if not cache_file:
+                print(f"缓存文件不存在，尝试的路径: {possible_files}")
+                # 列出目录内容帮助调试
+                if os.path.exists(cache_dir):
+                    print(f"目录 {cache_dir} 内容:")
+                    for f in os.listdir(cache_dir):
+                        print(f"  - {f}")
+                else:
+                    print(f"目录不存在: {cache_dir}")
                 return None
             
             with open(cache_file, 'rb') as f:
