@@ -532,20 +532,20 @@ class UltraFastMuseTalkService:
                 # 但为了稳定性和速度平衡，设置合理的batch_size
                 
                 if min_free_memory > 40:  # 40GB以上 - 可以安全处理12-16帧
-                    batch_size = 12
-                    print(f"✅ 显存充足({min_free_memory:.1f}GB)，设置batch_size=12")
+                    batch_size = 24  # 从12增加到24
+                    print(f"✅ 显存充足({min_free_memory:.1f}GB)，设置batch_size=24")
                 elif min_free_memory > 30:  # 30-40GB - 可以处理8-10帧
-                    batch_size = 8
-                    print(f"✅ 显存良好({min_free_memory:.1f}GB)，设置batch_size=8")
-                elif min_free_memory > 20:  # 20-30GB - 可以处理6帧
-                    batch_size = 6
-                    print(f"⚠️ 显存适中({min_free_memory:.1f}GB)，设置batch_size=6")
-                elif min_free_memory > 10:  # 10-20GB - 可以处理4帧
-                    batch_size = 4
-                    print(f"⚠️ 显存偏少({min_free_memory:.1f}GB)，设置batch_size=4")
+                    batch_size = 16  # 从8增加到16
+                    print(f"✅ 显存良好({min_free_memory:.1f}GB)，设置batch_size=16")
+                elif min_free_memory > 20:  # 20-30GB
+                    batch_size = 12  # 从6增加到12
+                    print(f"⚠️ 显存中等({min_free_memory:.1f}GB)，设置batch_size=12")
+                elif min_free_memory > 10:  # 10-20GB
+                    batch_size = 8  # 从4增加到8
+                    print(f"⚠️ 显存偏少({min_free_memory:.1f}GB)，设置batch_size=8")
                 else:  # 10GB以下
-                    batch_size = 2
-                    print(f"❌ 显存不足({min_free_memory:.1f}GB)，设置batch_size=2")
+                    batch_size = 4  # 从2增加到4
+                    print(f"❌ 显存不足({min_free_memory:.1f}GB)，设置batch_size=4")
                     
                 print(f"基于可用显存({min_free_memory:.1f}GB)，设置batch_size={batch_size}")
                 

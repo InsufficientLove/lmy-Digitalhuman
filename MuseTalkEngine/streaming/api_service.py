@@ -280,16 +280,16 @@ class StreamingMuseTalkAPI:
             num_frames = int(duration * 25)  # 25fps
             
             # 优化策略：短音频精确处理，长音频跳帧加速
-            if duration <= 1.0:
-                batch_size = 1  # 单帧处理避免OOM
-                skip_frames = 1  # 不跳帧，保证质量
-                mode = 'ultra_fast'
-            elif duration <= 2.0:
-                batch_size = 1
+            if num_frames <= 50:  # 2秒以内 - 快速响应
+                batch_size = 8  # 从4增加到8
+                skip_frames = 2  # 每2帧处理1次
+                mode = 'realtime'
+            elif num_frames <= 100:  # 4秒以内 - 平衡模式
+                batch_size = 12  # 从6增加到12
                 skip_frames = 3  # 每3帧处理1次
                 mode = 'fast'
             else:
-                batch_size = 2
+                batch_size = 16  # 从2增加到16
                 skip_frames = 5  # 每5帧处理1次，大幅加速
                 mode = 'quality'
             
