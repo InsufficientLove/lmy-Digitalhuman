@@ -305,7 +305,7 @@ class StreamingMuseTalkAPI:
                     'success': True,
                     'session_id': session_id,
                     'segment_index': segment_index,
-                    'video_path': output_path,
+                    'video_path': f"/videos/{output_filename}",  # 返回挂载路径
                     'video_filename': output_filename,  # 只有文件名
                     'video_url': f"/videos/{output_filename}",  # Web访问路径
                     'duration': duration,
