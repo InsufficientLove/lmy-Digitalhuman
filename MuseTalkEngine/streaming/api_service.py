@@ -45,6 +45,17 @@ class StreamingMuseTalkAPI:
         self.musetalk_service = UltraFastMuseTalkService()
         self.interpolator = FrameInterpolator(method='optical_flow')
         
+        # 立即初始化模型，避免首次调用时的延迟
+        print("🚀 自动初始化MuseTalk模型...")
+        try:
+            success = self.musetalk_service.initialize_models_ultra_fast()
+            if success:
+                print("✅ 模型自动初始化成功")
+            else:
+                print("⚠️ 模型自动初始化失败，将在首次调用时重试")
+        except Exception as e:
+            print(f"⚠️ 模型自动初始化异常: {e}")
+        
         # 模板缓存
         self.template_cache = {}
         self.template_cache_dir = os.environ.get('MUSE_TEMPLATE_CACHE_DIR', '/opt/musetalk/template_cache')
@@ -73,8 +84,13 @@ class StreamingMuseTalkAPI:
         try:
             print("🚀 初始化MuseTalk推理服务...")
             
-            # 初始化模型
-            success = self.musetalk_service.initialize_models()
+            # 检查是否已经初始化
+            if self.musetalk_service.is_initialized:
+                print("✅ 模型已经初始化，跳过重复初始化")
+                return True
+            
+            # 初始化模型 - 使用正确的方法名
+            success = self.musetalk_service.initialize_models_ultra_fast()
             if not success:
                 print("❌ 模型初始化失败")
                 return False
