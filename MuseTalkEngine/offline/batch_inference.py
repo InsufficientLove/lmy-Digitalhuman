@@ -144,17 +144,25 @@ class UltraFastMuseTalkService:
                     # 加载模型到指定GPU - 只使用可用的sd-vae
                     try:
                         print(f"GPU{device_id} 开始加载模型...")
+                        
+                        # 设置模型路径环境变量
+                        os.environ['MUSETALK_MODEL_PATH'] = '/opt/musetalk/models'
+                        
                         # 检查sd-vae目录是否完整
-                        sd_vae_path = "./models/sd-vae"
+                        sd_vae_path = "/opt/musetalk/models/sd-vae"
                         config_file = os.path.join(sd_vae_path, "config.json")
                         
                         if os.path.exists(config_file):
                             print(f"GPU{device_id} 使用完整的sd-vae模型")
-                            vae, unet, pe = load_all_model(vae_type="sd-vae")
+                            # 直接加载模型，不指定vae_type参数
+                            vae, unet, pe = load_all_model()
                             print(f"GPU{device_id} 模型加载成功")
                         else:
-                            print(f"GPU{device_id} sd-vae配置文件不存在，跳过此GPU")
-                            return None
+                            print(f"GPU{device_id} sd-vae配置文件不存在: {config_file}")
+                            # 尝试直接加载模型
+                            print(f"GPU{device_id} 尝试使用默认模型路径...")
+                            vae, unet, pe = load_all_model()
+                            print(f"GPU{device_id} 模型加载成功（使用默认路径）")
                             
                     except Exception as e:
                         print(f"GPU{device_id} 模型加载失败: {e}")
