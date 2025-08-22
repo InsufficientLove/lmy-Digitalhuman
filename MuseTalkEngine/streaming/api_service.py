@@ -152,11 +152,12 @@ class StreamingMuseTalkAPI:
             os.makedirs(cache_path, exist_ok=True)
             
             # 调用预处理
-            from core.preprocessing import preprocess_template_ultra_fast
-            success = preprocess_template_ultra_fast(
-                template_id=template_id,
-                image_path=image_path,
-                output_dir=self.template_cache_dir
+            from core.preprocessing import OptimizedPreprocessor
+            preprocessor = OptimizedPreprocessor()
+            success = preprocessor.preprocess_template_ultra_fast(
+                template_path=image_path,
+                output_dir=self.template_cache_dir,
+                template_id=template_id
             )
             
             if success:
