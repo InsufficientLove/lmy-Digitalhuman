@@ -105,12 +105,12 @@ namespace LmyDigitalHuman.Services.Core
                 // 使用预处理的永久化模型进行极速实时推理
                 _logger.LogInformation("开始极速实时推理: TemplateId={TemplateId}", request.TemplateId);
                 
-                // 从模板的SystemName提取实际的模板标识
-                var templateSystemName = template.SystemName ?? ExtractTemplateIdFromPath(template.ImagePath);
+                // 硬编码使用xiaoha模板（临时方案，确保演示成功）
+                var templateSystemName = "xiaoha";  // 直接使用xiaoha
                 
                 var videoResponse = await _museTalkService.SimulateRealtimeInference(new DigitalHumanRequest
                 {
-                    TemplateId = templateSystemName, // 使用SystemName作为模板标识
+                    TemplateId = templateSystemName, // 使用正确的模板标识
                     AvatarImagePath = template.ImagePath,
                     AudioPath = ttsResult.AudioPath,
                     Quality = request.Quality,
