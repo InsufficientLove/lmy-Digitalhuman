@@ -288,7 +288,7 @@ class StreamingMuseTalkAPI:
                 template_id=template_id,
                 audio_path=audio_path,
                 output_path=output_path,
-                cache_dir=self.template_cache_dir,
+                cache_dir=None,  # 让函数自己拼接正确的路径
                 batch_size=batch_size,
                 skip_frames=skip_frames,
                 streaming=True,
