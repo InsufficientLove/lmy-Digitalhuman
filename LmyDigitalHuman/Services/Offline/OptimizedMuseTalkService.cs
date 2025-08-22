@@ -3,17 +3,18 @@ using LmyDigitalHuman.Services;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
+using System.Net.Http;
 using LmyDigitalHuman.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
 
 namespace LmyDigitalHuman.Services.Offline
 {
-    // 轻量占位实现，委托给持久化客户端或直接返回错误，用于恢复编译通过
+    // 使用HTTP API客户端与Python MuseTalk服务通信
     public class OptimizedMuseTalkService : IMuseTalkService
     {
         private readonly ILogger<OptimizedMuseTalkService> _logger;
-        private readonly PersistentMuseTalkClient _persistentClient;
+        private readonly MuseTalkApiClient _apiClient;
         private readonly IPathManager _pathManager;
         private readonly IConfiguration _configuration;
 
@@ -21,14 +22,16 @@ namespace LmyDigitalHuman.Services.Offline
             ILogger<OptimizedMuseTalkService> logger,
             IPathManager pathManager,
             IConfiguration configuration,
+            IHttpClientFactory httpClientFactory,
             ILoggerFactory loggerFactory)
         {
             _logger = logger;
             _pathManager = pathManager;
             _configuration = configuration;
-            _persistentClient = new PersistentMuseTalkClient(
-                loggerFactory.CreateLogger<PersistentMuseTalkClient>(),
-                configuration
+            _apiClient = new MuseTalkApiClient(
+                loggerFactory.CreateLogger<MuseTalkApiClient>(),
+                configuration,
+                httpClientFactory
             );
         }
 
@@ -61,20 +64,20 @@ namespace LmyDigitalHuman.Services.Offline
                 var cacheDir = Path.Combine(templateCacheDir, request.TemplateId);
                 Directory.CreateDirectory(cacheDir);
 
-                // 尝试通过持久化服务推理（需要服务端支持）
-                var response = await _persistentClient.InferenceAsync(
-                    templateId: request.TemplateId,
-                    audioPath: request.AudioPath,
-                    outputPath: outputPath,
-                    templateDir: "./wwwroot/templates",
-                    fps: request.Fps ?? 25,
-                    bboxShift: request.BboxShift.HasValue ? (int)Math.Round(request.BboxShift.Value) : 0,
-                    parsingMode: "jaw",
-                    cacheDir: cacheDir,
-                    batchSize: 6);
+                // 通过HTTP API进行推理
+                var videoPath = await _apiClient.UltraFastInferenceAsync(
+                    request.TemplateId,
+                    request.AudioPath,
+                    outputPath);
 
-                if (response?.Success == true && File.Exists(outputPath))
+                if (!string.IsNullOrEmpty(videoPath) && File.Exists(videoPath))
                 {
+                    // 如果videoPath和outputPath不同，确保文件在正确位置
+                    if (videoPath != outputPath && File.Exists(videoPath))
+                    {
+                        File.Copy(videoPath, outputPath, true);
+                    }
+                    
                     return new DigitalHumanResponse
                     {
                         Success = true,
@@ -87,7 +90,7 @@ namespace LmyDigitalHuman.Services.Offline
                 return new DigitalHumanResponse
                 {
                     Success = false,
-                    Message = response?.Error ?? "MuseTalk inference failed"
+                    Message = "MuseTalk API调用失败"
                 };
             }
             catch (Exception ex)
@@ -148,13 +151,12 @@ namespace LmyDigitalHuman.Services.Offline
             {
                 // 使用共享目录路径，Python容器可以访问
                 var imagePath = $"/opt/musetalk/templates/{templateId}.jpg";
-                var response = await _persistentClient.PreprocessAsync(templateId, imagePath);
-                var success = response?.Success == true;
+                var success = await _apiClient.PreprocessTemplateAsync(templateId, imagePath);
                 return new PreprocessingResult
                 {
                     Success = success,
                     TemplateId = templateId,
-                    PreprocessingTime = (long)((response?.ProcessTime ?? 0) * 1000)
+                    PreprocessingTime = 1000 // 默认1秒
                 };
             }
             catch (Exception ex)
@@ -239,9 +241,10 @@ namespace LmyDigitalHuman.Services.Offline
             return Task.FromResult(true);
         }
 
-        public Task<DigitalHumanResponse> SimulateRealtimeInference(DigitalHumanRequest request)
+        public async Task<DigitalHumanResponse> SimulateRealtimeInference(DigitalHumanRequest request)
         {
-            return Task.FromResult(new DigitalHumanResponse { Success = false, Message = "Not implemented in lightweight service" });
+            // 使用HTTP API进行实时推理
+            return await GenerateVideoAsync(request);
         }
     }
 }
