@@ -276,8 +276,11 @@ class StreamingMuseTalkAPI:
             
             print(f"⚡ 处理音频段 {segment_index}: {duration:.2f}秒, {num_frames}帧, 模式={mode}")
             
-            # 生成输出路径
-            output_path = f"/tmp/segment_{session_id}_{segment_index}_{int(time.time()*1000)}.mp4"
+            # 生成输出路径 - 使用共享目录
+            output_dir = "/opt/musetalk/videos"
+            os.makedirs(output_dir, exist_ok=True)
+            output_filename = f"segment_{session_id}_{segment_index}_{int(time.time()*1000)}.mp4"
+            output_path = os.path.join(output_dir, output_filename)
             
             # 调用推理
             success = self.musetalk_service.ultra_fast_inference_parallel(
@@ -303,6 +306,8 @@ class StreamingMuseTalkAPI:
                     'session_id': session_id,
                     'segment_index': segment_index,
                     'video_path': output_path,
+                    'video_filename': output_filename,  # 只有文件名
+                    'video_url': f"/videos/{output_filename}",  # Web访问路径
                     'duration': duration,
                     'frames': num_frames,
                     'process_time': process_time,
