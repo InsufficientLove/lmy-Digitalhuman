@@ -390,13 +390,19 @@ class StreamingMuseTalkAPI:
         """清理会话相关的临时文件"""
         try:
             import glob
+            # 只清理/tmp下的临时文件，不清理/opt/musetalk/videos下的成品
             pattern = f"/tmp/segment_{session_id}_*.mp4"
             for file in glob.glob(pattern):
                 try:
                     os.remove(file)
                 except:
                     pass
-            print(f"🧹 清理会话文件: {session_id}")
+            
+            # 不要清理/opt/musetalk/videos下的文件！这些是最终成品
+            # pattern2 = f"/opt/musetalk/videos/segment_{session_id}_*.mp4"
+            # 注释掉，保留视频文件供调试和使用
+            
+            print(f"🧹 清理临时文件: {session_id} (保留成品视频)")
         except Exception as e:
             print(f"⚠️ 清理失败: {e}")
     
