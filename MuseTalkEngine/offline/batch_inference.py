@@ -849,7 +849,61 @@ class UltraFastMuseTalkService:
                 bbox = coord_list_cycle[i % len(coord_list_cycle)]
                 ori_frame = copy.deepcopy(frame_list_cycle[i % len(frame_list_cycle)])
                 
-                x1, y1, x2, y2 = bbox
+                # 处理bbox - 可能是关键点数组或边界框
+                if isinstance(bbox, np.ndarray):
+                    if bbox.shape == (133, 2) or (bbox.ndim == 2 and bbox.shape[0] > 4):
+                        # 这是关键点数组，计算边界框
+                        valid_points = bbox[bbox[:, 0] > 0]
+                        if len(valid_points) > 0:
+                            x_coords = valid_points[:, 0]
+                            y_coords = valid_points[:, 1]
+                            margin = 30
+                            x1 = int(max(0, x_coords.min() - margin))
+                            y1 = int(max(0, y_coords.min() - margin))
+                            x2 = int(x_coords.max() + margin)
+                            y2 = int(y_coords.max() + margin)
+                        else:
+                            # 使用默认值
+                            h, w = ori_frame.shape[:2]
+                            x1, y1, x2, y2 = w//4, h//4, 3*w//4, 3*h//4
+                    elif bbox.size >= 4:
+                        # 扁平化并取前4个
+                        x1, y1, x2, y2 = bbox.flatten()[:4].astype(int).tolist()
+                    else:
+                        # 使用默认值
+                        h, w = ori_frame.shape[:2]
+                        x1, y1, x2, y2 = w//4, h//4, 3*w//4, 3*h//4
+                elif isinstance(bbox, (list, tuple)):
+                    if len(bbox) == 4:
+                        x1, y1, x2, y2 = [int(x) for x in bbox]
+                    elif len(bbox) == 133:
+                        # 133个关键点，需要计算边界框
+                        bbox = np.array(bbox)
+                        if bbox.shape == (133, 2):
+                            valid_points = bbox[bbox[:, 0] > 0]
+                            if len(valid_points) > 0:
+                                x_coords = valid_points[:, 0]
+                                y_coords = valid_points[:, 1]
+                                margin = 30
+                                x1 = int(max(0, x_coords.min() - margin))
+                                y1 = int(max(0, y_coords.min() - margin))
+                                x2 = int(x_coords.max() + margin)
+                                y2 = int(y_coords.max() + margin)
+                            else:
+                                h, w = ori_frame.shape[:2]
+                                x1, y1, x2, y2 = w//4, h//4, 3*w//4, 3*h//4
+                        else:
+                            h, w = ori_frame.shape[:2]
+                            x1, y1, x2, y2 = w//4, h//4, 3*w//4, 3*h//4
+                    else:
+                        # 使用默认值
+                        h, w = ori_frame.shape[:2]
+                        x1, y1, x2, y2 = w//4, h//4, 3*w//4, 3*h//4
+                else:
+                    # 使用默认值
+                    h, w = ori_frame.shape[:2]
+                    x1, y1, x2, y2 = w//4, h//4, 3*w//4, 3*h//4
+                
                 # 确保坐标在合理范围内
                 h, w = ori_frame.shape[:2]
                 x1 = max(0, min(x1, w))
@@ -1051,7 +1105,23 @@ class UltraFastMuseTalkService:
                 
                 # 使用imageio生成视频
                 import imageio
-                writer = imageio.get_writer(temp_video, fps=fps, codec='libx264', quality=8)
+                
+                # 确保视频尺寸是16的倍数（避免警告）
+                if len(video_frames) > 0:
+                    h, w = video_frames[0].shape[:2]
+                    new_h = ((h + 15) // 16) * 16
+                    new_w = ((w + 15) // 16) * 16
+                    
+                    if new_h != h or new_w != w:
+                        print(f"调整视频尺寸: {w}x{h} -> {new_w}x{new_h}")
+                        resized_frames = []
+                        for frame in video_frames:
+                            if frame is not None:
+                                resized_frame = cv2.resize(frame, (new_w, new_h))
+                                resized_frames.append(resized_frame)
+                        video_frames = resized_frames
+                
+                writer = imageio.get_writer(temp_video, fps=fps, codec='libx264', quality=8, macro_block_size=1)
                 for frame in video_frames:
                     if frame is not None:
                         writer.append_data(frame)
