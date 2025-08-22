@@ -277,19 +277,26 @@ class StreamingMuseTalkAPI:
             import librosa
             audio_data, sr = librosa.load(audio_path, sr=16000)
             duration = len(audio_data) / sr
+            
+            # 根据音频长度选择处理策略
             num_frames = int(duration * 25)  # 25fps
             
             # 优化策略：短音频精确处理，长音频跳帧加速
-            if num_frames <= 50:  # 2秒以内 - 快速响应
-                batch_size = 8  # 从4增加到8
-                skip_frames = 2  # 每2帧处理1次
+            # 基于实测：每帧需要约3GB显存，batch_size需要保守设置
+            if num_frames <= 25:  # 1秒以内 - 实时响应
+                batch_size = 2  # 安全的小批量
+                skip_frames = 1  # 不跳帧
                 mode = 'realtime'
-            elif num_frames <= 100:  # 4秒以内 - 平衡模式
-                batch_size = 12  # 从6增加到12
-                skip_frames = 3  # 每3帧处理1次
+            elif num_frames <= 50:  # 2秒以内 - 快速响应
+                batch_size = 3  # 适中批量
+                skip_frames = 2  # 每2帧处理1次
                 mode = 'fast'
-            else:
-                batch_size = 16  # 从2增加到16
+            elif num_frames <= 100:  # 4秒以内 - 平衡模式
+                batch_size = 4  # 较大批量
+                skip_frames = 3  # 每3帧处理1次
+                mode = 'balanced'
+            else:  # 4秒以上 - 质量模式
+                batch_size = 6  # 最大批量（避免OOM）
                 skip_frames = 5  # 每5帧处理1次，大幅加速
                 mode = 'quality'
             

@@ -526,26 +526,28 @@ class UltraFastMuseTalkService:
                 
                 print(f"最小可用显存: {min_free_memory:.1f}GB")
                 
-                # 基于实测：模型占用3.62GB + 推理时每帧约1.5GB
-                # 43GB可用显存 - 3.62GB模型 = 39GB可用于推理
-                # 39GB / 1.5GB per frame = 可处理26帧
+                # 根据可用显存动态调整batch_size
+                # 实测：每帧需要约3GB显存（峰值），考虑安全余量
                 # 但为了稳定性和速度平衡，设置合理的batch_size
                 
-                if min_free_memory > 40:  # 40GB以上 - 可以安全处理12-16帧
-                    batch_size = 24  # 从12增加到24
-                    print(f"✅ 显存充足({min_free_memory:.1f}GB)，设置batch_size=24")
-                elif min_free_memory > 30:  # 30-40GB - 可以处理8-10帧
-                    batch_size = 16  # 从8增加到16
-                    print(f"✅ 显存良好({min_free_memory:.1f}GB)，设置batch_size=16")
-                elif min_free_memory > 20:  # 20-30GB
-                    batch_size = 12  # 从6增加到12
-                    print(f"⚠️ 显存中等({min_free_memory:.1f}GB)，设置batch_size=12")
-                elif min_free_memory > 10:  # 10-20GB
-                    batch_size = 8  # 从4增加到8
-                    print(f"⚠️ 显存偏少({min_free_memory:.1f}GB)，设置batch_size=8")
-                else:  # 10GB以下
-                    batch_size = 4  # 从2增加到4
-                    print(f"❌ 显存不足({min_free_memory:.1f}GB)，设置batch_size=4")
+                if min_free_memory > 40:  # 40GB以上 - 安全处理8-10帧
+                    batch_size = 8  # 8帧约需24GB，留16GB余量
+                    print(f"✅ 显存充足({min_free_memory:.1f}GB)，设置batch_size=8")
+                elif min_free_memory > 30:  # 30-40GB - 安全处理6-8帧
+                    batch_size = 6  # 6帧约需18GB，留12GB余量
+                    print(f"✅ 显存良好({min_free_memory:.1f}GB)，设置batch_size=6")
+                elif min_free_memory > 20:  # 20-30GB - 安全处理4-5帧
+                    batch_size = 4  # 4帧约需12GB，留8GB余量
+                    print(f"⚠️ 显存中等({min_free_memory:.1f}GB)，设置batch_size=4")
+                elif min_free_memory > 15:  # 15-20GB - 安全处理3帧
+                    batch_size = 3  # 3帧约需9GB，留6GB余量
+                    print(f"⚠️ 显存偏少({min_free_memory:.1f}GB)，设置batch_size=3")
+                elif min_free_memory > 10:  # 10-15GB - 安全处理2帧
+                    batch_size = 2  # 2帧约需6GB，留4GB余量
+                    print(f"❌ 显存紧张({min_free_memory:.1f}GB)，设置batch_size=2")
+                else:  # 10GB以下 - 单帧处理
+                    batch_size = 1  # 1帧约需3GB
+                    print(f"❌ 显存不足({min_free_memory:.1f}GB)，设置batch_size=1")
                     
                 print(f"基于可用显存({min_free_memory:.1f}GB)，设置batch_size={batch_size}")
                 
@@ -803,7 +805,8 @@ class UltraFastMuseTalkService:
         batch_results = {}
         
         # 使用更大的并发数，让GPU保持忙碌
-        max_workers = self.gpu_count * 2  # 允许更多并发
+        # 关键优化：增加并发任务数，让每个GPU始终有任务处理
+        max_workers = self.gpu_count * 3  # 每个GPU允许3个并发任务排队
         
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             # 直接提交所有批次，让线程池管理调度
