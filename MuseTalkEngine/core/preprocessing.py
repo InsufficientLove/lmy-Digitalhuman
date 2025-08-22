@@ -351,7 +351,22 @@ class OptimizedPreprocessor:
             # 保存临时图像文件给get_landmark_and_bbox使用
             temp_image_path = os.path.join(output_dir, "temp_image.jpg")
             cv2.imwrite(temp_image_path, image)
+            
+            # 调试：检查图像是否正确保存
+            if os.path.exists(temp_image_path):
+                img_check = cv2.imread(temp_image_path)
+                print(f"临时图像: {img_check.shape if img_check is not None else 'None'}")
+            
             coord_list, frame_list = get_landmark_and_bbox([temp_image_path])
+            
+            # 调试：打印返回值
+            print(f"coord_list长度: {len(coord_list) if coord_list else 0}")
+            print(f"frame_list长度: {len(frame_list) if frame_list else 0}")
+            if coord_list and len(coord_list) > 0:
+                print(f"第一个coord类型: {type(coord_list[0])}")
+                if hasattr(coord_list[0], 'shape'):
+                    print(f"第一个coord shape: {coord_list[0].shape}")
+            
             # 清理临时文件
             if os.path.exists(temp_image_path):
                 os.remove(temp_image_path)
@@ -383,26 +398,54 @@ class OptimizedPreprocessor:
                         print(f"X坐标范围: {np.min(x_coords):.2f} - {np.max(x_coords):.2f}")
                         print(f"Y坐标范围: {np.min(y_coords):.2f} - {np.max(y_coords):.2f}")
                         
+                        # 如果坐标全是0，使用整个图像
+                        if np.max(x_coords) == 0 and np.max(y_coords) == 0:
+                            print("警告: 关键点全是0，使用整个图像作为人脸区域")
+                            h, w = frame.shape[:2]
+                            # 假设人脸在图像中心，占据大部分区域
+                            margin = min(w, h) // 8
+                            x_min = margin
+                            y_min = margin
+                            x_max = w - margin
+                            y_max = h - margin
+                            face_box = [x_min, y_min, x_max, y_max]
+                            print(f"使用默认边界框: {face_box}")
                         # 如果坐标是归一化的（0-1范围），需要缩放到图像尺寸
-                        if np.max(x_coords) <= 1.0 and np.max(y_coords) <= 1.0:
+                        elif np.max(x_coords) <= 1.0 and np.max(y_coords) <= 1.0:
                             h, w = frame.shape[:2]
                             x_coords = x_coords * w
                             y_coords = y_coords * h
                             print(f"检测到归一化坐标，缩放到图像尺寸: {w}x{h}")
+                            
+                            x_min = int(np.min(x_coords))
+                            y_min = int(np.min(y_coords))
+                            x_max = int(np.max(x_coords))
+                            y_max = int(np.max(y_coords))
+                            
+                            # 添加一些边距
+                            margin = 30
+                            x_min = max(0, x_min - margin)
+                            y_min = max(0, y_min - margin)
+                            x_max = min(frame.shape[1], x_max + margin)
+                            y_max = min(frame.shape[0], y_max + margin)
+                            
+                            face_box = [x_min, y_min, x_max, y_max]
+                        else:
+                            # 正常坐标
+                            x_min = int(np.min(x_coords))
+                            y_min = int(np.min(y_coords))
+                            x_max = int(np.max(x_coords))
+                            y_max = int(np.max(y_coords))
+                            
+                            # 添加一些边距
+                            margin = 30
+                            x_min = max(0, x_min - margin)
+                            y_min = max(0, y_min - margin)
+                            x_max = min(frame.shape[1], x_max + margin)
+                            y_max = min(frame.shape[0], y_max + margin)
+                            
+                            face_box = [x_min, y_min, x_max, y_max]
                         
-                        x_min = int(np.min(x_coords))
-                        y_min = int(np.min(y_coords))
-                        x_max = int(np.max(x_coords))
-                        y_max = int(np.max(y_coords))
-                        
-                        # 添加一些边距
-                        margin = 30
-                        x_min = max(0, x_min - margin)
-                        y_min = max(0, y_min - margin)
-                        x_max = min(frame.shape[1], x_max + margin)
-                        y_max = min(frame.shape[0], y_max + margin)
-                        
-                        face_box = [x_min, y_min, x_max, y_max]
                         print(f"计算的边界框: {face_box}")
                     else:
                         print(f"警告: 关键点为空")
