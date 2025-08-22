@@ -36,6 +36,24 @@ coord_placeholder = (0, 0, 0, 0)  # 表示无效的边界框
 
 print("Optimized Preprocessing V2 - 极速预处理引擎")
 
+# 简单的FaceParsing替代实现
+class SimpleFaceParsing:
+    """简单的面部解析替代实现"""
+    def __init__(self):
+        pass
+    
+    def __call__(self, image, mode=None):
+        """返回一个简单的面部mask"""
+        if isinstance(image, np.ndarray):
+            h, w = image.shape[:2]
+            # 创建一个椭圆形mask作为面部区域
+            mask = np.zeros((h, w), dtype=np.uint8)
+            center = (w // 2, h // 2)
+            axes = (w // 3, h // 3)
+            cv2.ellipse(mask, center, axes, 0, 0, 360, 255, -1)
+            return mask
+        return None
+
 class OptimizedPreprocessor:
     """优化的预处理器 - 修复阴影问题，极速处理"""
     
@@ -103,7 +121,7 @@ class OptimizedPreprocessor:
             
             # 初始化面部解析 - 暂时跳过，因为FaceParsing不存在
             # self.fp = FaceParsing()
-            self.fp = None  # 暂时设为None
+            self.fp = SimpleFaceParsing()  # 使用简单的替代实现
             
             print("预处理模型初始化完成")
             self.is_initialized = True
@@ -296,29 +314,38 @@ class OptimizedPreprocessor:
             face_parsing_masks = []  # 存储面部解析的mask
             
             # 使用coord_list作为bbox_list（从get_landmark_and_bbox返回的）
-            for i, (frame, orig_face_box) in enumerate(zip(frame_list, coord_list)):
-                if orig_face_box is None or orig_face_box == coord_placeholder:
+            for i, (frame, landmarks) in enumerate(zip(frame_list, coord_list)):
+                if landmarks is None:
                     print(f"警告: 第{i}帧没有检测到人脸")
                     continue
                     
-                # 确保face_box只有4个值 (x, y, x1, y1)
-                # 处理numpy.ndarray类型
-                if isinstance(orig_face_box, np.ndarray):
-                    print(f"原始face_box (numpy): shape={orig_face_box.shape}, dtype={orig_face_box.dtype}")
-                    face_box = orig_face_box.flatten()[:4].tolist()  # 展平并取前4个值
-                    print(f"转换后的face_box: {face_box}")
-                elif isinstance(orig_face_box, (list, tuple)):
-                    print(f"原始face_box: {orig_face_box}, 长度: {len(orig_face_box)}")
-                    if len(orig_face_box) > 4:
-                        face_box = list(orig_face_box[:4])  # 只取前4个值并转换为列表
-                        print(f"裁剪后的face_box: {face_box}")
-                    elif len(orig_face_box) == 4:
-                        face_box = list(orig_face_box)  # 转换为列表
+                # coord_list返回的是关键点坐标，不是边界框
+                # 需要从关键点计算边界框
+                if isinstance(landmarks, np.ndarray):
+                    print(f"关键点数据: shape={landmarks.shape}, dtype={landmarks.dtype}")
+                    if landmarks.shape[0] > 0:
+                        # 计算边界框 (x_min, y_min, x_max, y_max)
+                        x_coords = landmarks[:, 0]
+                        y_coords = landmarks[:, 1]
+                        x_min = int(np.min(x_coords))
+                        y_min = int(np.min(y_coords))
+                        x_max = int(np.max(x_coords))
+                        y_max = int(np.max(y_coords))
+                        
+                        # 添加一些边距
+                        margin = 20
+                        x_min = max(0, x_min - margin)
+                        y_min = max(0, y_min - margin)
+                        x_max = min(frame.shape[1], x_max + margin)
+                        y_max = min(frame.shape[0], y_max + margin)
+                        
+                        face_box = [x_min, y_min, x_max, y_max]
+                        print(f"计算的边界框: {face_box}")
                     else:
-                        print(f"警告: face_box格式不正确: {orig_face_box}")
+                        print(f"警告: 关键点为空")
                         continue
                 else:
-                    print(f"警告: face_box类型不正确: {type(orig_face_box)}")
+                    print(f"警告: 关键点类型不正确: {type(landmarks)}")
                     continue
                 
                 # 面部解析 - 使用正确的方法调用
