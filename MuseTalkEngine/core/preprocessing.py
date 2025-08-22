@@ -366,6 +366,10 @@ class OptimizedPreprocessor:
                 print(f"第一个coord类型: {type(coord_list[0])}")
                 if hasattr(coord_list[0], 'shape'):
                     print(f"第一个coord shape: {coord_list[0].shape}")
+                # 打印实际的值看看
+                if isinstance(coord_list[0], np.ndarray):
+                    print(f"前5个关键点: {coord_list[0][:5]}")
+                    print(f"非零值数量: {np.count_nonzero(coord_list[0])}")
             
             # 清理临时文件
             if os.path.exists(temp_image_path):
@@ -398,18 +402,50 @@ class OptimizedPreprocessor:
                         print(f"X坐标范围: {np.min(x_coords):.2f} - {np.max(x_coords):.2f}")
                         print(f"Y坐标范围: {np.min(y_coords):.2f} - {np.max(y_coords):.2f}")
                         
-                        # 如果坐标全是0，使用整个图像
+                        # 如果坐标全是0，使用整个图像作为人脸区域
                         if np.max(x_coords) == 0 and np.max(y_coords) == 0:
-                            print("警告: 关键点全是0，使用整个图像作为人脸区域")
-                            h, w = frame.shape[:2]
-                            # 假设人脸在图像中心，占据大部分区域
-                            margin = min(w, h) // 8
-                            x_min = margin
-                            y_min = margin
-                            x_max = w - margin
-                            y_max = h - margin
-                            face_box = [x_min, y_min, x_max, y_max]
-                            print(f"使用默认边界框: {face_box}")
+                            print("警告: 关键点全是0，尝试使用face_alignment重新检测...")
+                            
+                            # 尝试使用face_alignment直接检测
+                            try:
+                                from face_alignment import FaceAlignment, LandmarksType
+                                fa = FaceAlignment(LandmarksType.TWO_D, flip_input=False, device='cuda')
+                                preds = fa.get_landmarks(frame)
+                                
+                                if preds and len(preds) > 0:
+                                    landmarks_new = preds[0]  # 第一个人脸
+                                    x_coords = landmarks_new[:, 0]
+                                    y_coords = landmarks_new[:, 1]
+                                    print(f"face_alignment检测成功: X范围 {np.min(x_coords):.0f}-{np.max(x_coords):.0f}, Y范围 {np.min(y_coords):.0f}-{np.max(y_coords):.0f}")
+                                    
+                                    x_min = int(np.min(x_coords))
+                                    y_min = int(np.min(y_coords))
+                                    x_max = int(np.max(x_coords))
+                                    y_max = int(np.max(y_coords))
+                                    
+                                    # 添加边距
+                                    margin = 50
+                                    x_min = max(0, x_min - margin)
+                                    y_min = max(0, y_min - margin)
+                                    x_max = min(frame.shape[1], x_max + margin)
+                                    y_max = min(frame.shape[0], y_max + margin)
+                                    
+                                    face_box = [x_min, y_min, x_max, y_max]
+                                    print(f"重新检测的边界框: {face_box}")
+                                else:
+                                    raise Exception("face_alignment未检测到人脸")
+                                    
+                            except Exception as fa_error:
+                                print(f"face_alignment检测失败: {fa_error}")
+                                # 使用默认值
+                                h, w = frame.shape[:2]
+                                margin = min(w, h) // 8
+                                x_min = margin
+                                y_min = margin
+                                x_max = w - margin
+                                y_max = h - margin
+                                face_box = [x_min, y_min, x_max, y_max]
+                                print(f"使用默认边界框: {face_box}")
                         # 如果坐标是归一化的（0-1范围），需要缩放到图像尺寸
                         elif np.max(x_coords) <= 1.0 and np.max(y_coords) <= 1.0:
                             h, w = frame.shape[:2]
