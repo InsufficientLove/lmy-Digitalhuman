@@ -457,22 +457,27 @@ class OptimizedPreprocessor:
                 # 面部解析 - 使用正确的方法调用
                 try:
                     # 尝试常见的面部解析方法
-                    if hasattr(self.fp, '__call__'):
-                        result = self.fp(frame)
-                        # 检查返回值类型
-                        if isinstance(result, tuple):
-                            mask_out = result[0] if len(result) > 0 else np.zeros_like(frame[:,:,0])
-                        elif isinstance(result, np.ndarray):
-                            mask_out = result
-                        elif isinstance(result, int):
-                            # 如果返回整数，创建默认mask
-                            print(f"面部解析返回整数: {result}")
+                    if self.fp is not None and hasattr(self.fp, '__call__'):
+                        try:
+                            result = self.fp(frame)
+                            # 检查返回值类型
+                            if isinstance(result, tuple) and len(result) > 0:
+                                mask_out = result[0] if isinstance(result[0], np.ndarray) else np.ones((frame.shape[0], frame.shape[1]), dtype=np.uint8) * 255
+                            elif isinstance(result, np.ndarray):
+                                mask_out = result
+                            elif isinstance(result, int):
+                                # 如果返回整数，创建默认mask
+                                print(f"面部解析返回整数: {result}")
+                                mask_out = np.ones((frame.shape[0], frame.shape[1]), dtype=np.uint8) * 255
+                            else:
+                                print(f"面部解析返回未知类型: {type(result)}")
+                                mask_out = np.ones((frame.shape[0], frame.shape[1]), dtype=np.uint8) * 255
+                        except TypeError as te:
+                            print(f"面部解析调用错误: {te}")
                             mask_out = np.ones((frame.shape[0], frame.shape[1]), dtype=np.uint8) * 255
-                        else:
-                            mask_out = np.array(result)
-                    elif hasattr(self.fp, 'parse'):
+                    elif self.fp is not None and hasattr(self.fp, 'parse'):
                         mask_out = self.fp.parse(frame)
-                    elif hasattr(self.fp, 'predict'):
+                    elif self.fp is not None and hasattr(self.fp, 'predict'):
                         mask_out = self.fp.predict(frame)
                     else:
                         print("面部解析失败: FaceParsing对象没有可用的解析方法")
