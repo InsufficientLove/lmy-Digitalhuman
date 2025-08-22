@@ -37,13 +37,13 @@ docker exec musetalk-python bash -c "
 "
 
 echo "🔄 拉取最新代码..."
-docker exec musetalk-python bash -c "cd /opt/musetalk/repo && git pull origin main"
+cd /opt/musetalk/repo && git pull origin main
 
 echo "🔄 重启容器..."
-docker-compose restart musetalk-python
+docker compose restart musetalk-python
 
 echo "✅ 完成！等待服务启动..."
 sleep 5
 
 echo "📋 查看日志..."
-docker-compose logs --tail=50 musetalk-python
+docker compose logs --tail=50 musetalk-python
