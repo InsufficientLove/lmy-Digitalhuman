@@ -21,7 +21,7 @@ services:
     restart: unless-stopped
 
   musetalk-python:
-    image: musetalk-python:standard-env  # 使用标准环境镜像
+    image: musetalk-python:working  # 使用包含face-alignment的镜像
     # build:
     #   context: .
     #   dockerfile: MuseTalkEngine/Dockerfile
@@ -75,7 +75,7 @@ services:
       - /opt/musetalk/videos:/videos
       - /opt/musetalk/temp:/temp
     working_dir: /opt/musetalk/repo
-    command: ["bash", "-c", "echo '安装face-alignment...' && pip install face-alignment==1.4.1 --no-deps && echo 'face-alignment安装完成' && pip list | grep face && python3 MuseTalkEngine/streaming/api_service.py"]
+    command: ["python3", "MuseTalkEngine/streaming/api_service.py"]
     # 需要主机已安装 nvidia-container-toolkit
     deploy:
       resources:
