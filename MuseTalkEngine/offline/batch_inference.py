@@ -152,11 +152,8 @@ class UltraFastMuseTalkService:
                         # 设置模型路径环境变量
                         os.environ['DISABLE_TORCH_COMPILE'] = '1'
                         
-                        # 检查sd-vae目录是否完整
-                        sd_vae_path = "/opt/musetalk/models/sd-vae"  # 正确的路径
-                        config_file = os.path.join(sd_vae_path, "config.json")
-                        
                         # sd-vae可能没有config.json，直接加载
+                        sd_vae_path = "/opt/musetalk/models/sd-vae"  # 正确的路径
                         print(f"GPU{device_id} 使用sd-vae模型路径: {sd_vae_path}")
                         
                         # 设置模型路径环境变量
@@ -164,11 +161,19 @@ class UltraFastMuseTalkService:
                         
                         # 直接加载模型，不检查config
                         try:
+                            # 尝试默认加载
                             vae, unet, pe = load_all_model()
                             print(f"GPU{device_id} 模型加载成功")
                         except Exception as e:
-                            print(f"GPU{device_id} 尝试指定VAE类型加载...")
-                            # 尝试不同的加载方式
+                            # 如果失败，尝试不指定VAE类型
+                            print(f"GPU{device_id} 默认加载失败: {e}")
+                            print(f"GPU{device_id} 尝试备用加载方式...")
+                            
+                            # 设置环境变量指向模型
+                            os.environ['VAE_PATH'] = sd_vae_path
+                            os.environ['UNET_PATH'] = '/opt/musetalk/models/musetalk'
+                            
+                            # 再次尝试
                             vae, unet, pe = load_all_model()
                             print(f"GPU{device_id} 模型加载成功（备用方式）")
                             
