@@ -148,6 +148,9 @@ class UltraFastMuseTalkService:
                         # 设置模型路径环境变量
                         os.environ['MUSETALK_MODEL_PATH'] = '/opt/musetalk/models'
                         
+                        # 禁用torch.compile避免CUDA图冲突
+                        os.environ['DISABLE_TORCH_COMPILE'] = '1'
+                        
                         # 检查sd-vae目录是否完整
                         sd_vae_path = "/opt/musetalk/models/sd-vae"
                         config_file = os.path.join(sd_vae_path, "config.json")
