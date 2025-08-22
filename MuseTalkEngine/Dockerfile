@@ -46,15 +46,14 @@ RUN pip3 install --no-cache-dir \
 # 安装numpy（其他包依赖）
 RUN pip3 install --no-cache-dir numpy==1.24.3
 
-# 安装MMCV（对应CUDA 12.1和torch 2.1）
+# 安装MMCV-full（对应CUDA 12.1和torch 2.1，使用1.7.0版本以兼容mmpose）
 RUN pip3 install --no-cache-dir \
-    mmcv==2.1.0 -f https://download.openmmlab.com/mmcv/dist/cu121/torch2.1/index.html
+    mmcv-full==1.7.0 -f https://download.openmmlab.com/mmcv/dist/cu121/torch2.1/index.html
 
-# 安装MM系列（与mmcv 2.1兼容的版本）
+# 安装MM系列（与mmcv-full 1.7.0兼容的版本）
 RUN pip3 install --no-cache-dir \
-    mmengine==0.10.1 \
-    mmdet==3.2.0 \
-    mmpose==1.2.0
+    mmdet==2.28.2 \
+    mmpose==0.29.0
 
 # 安装Hugging Face生态（与torch 2.1兼容）
 RUN pip3 install --no-cache-dir \
