@@ -1,49 +1,43 @@
 #!/bin/bash
+echo "=== 修复模型路径问题 ==="
 
-echo "🔧 修复模型路径..."
+# 在容器中创建符号链接
+echo "在容器中创建模型符号链接..."
 
-# 在容器内创建软链接
+# 方法1: 在工作目录创建models链接
 docker exec musetalk-python bash -c "
-    # 如果/opt/musetalk/repo/MuseTalk/models不存在或不是链接，创建链接
-    if [ ! -L /opt/musetalk/repo/MuseTalk/models ]; then
-        rm -rf /opt/musetalk/repo/MuseTalk/models
-        ln -s /opt/musetalk/models /opt/musetalk/repo/MuseTalk/models
-        echo '✅ 创建MuseTalk模型软链接'
-    fi
-    
-    # 如果当前目录下没有models，也创建链接
-    cd /opt/musetalk/repo/MuseTalkEngine
-    if [ ! -L ./models ]; then
-        rm -rf ./models
-        ln -s /opt/musetalk/models ./models
-        echo '✅ 创建MuseTalkEngine模型软链接'
-    fi
-    
-    # 检查sd-vae
-    if [ -d /opt/musetalk/models/sd-vae ]; then
-        echo '✅ sd-vae模型目录存在'
-        ls -la /opt/musetalk/models/sd-vae/ | head -5
-    else
-        echo '❌ sd-vae模型目录不存在'
-    fi
-    
-    # 检查musetalk模型
-    if [ -d /opt/musetalk/models/musetalk ]; then
-        echo '✅ musetalk模型目录存在'
-        ls -la /opt/musetalk/models/musetalk/ | head -5
-    else
-        echo '❌ musetalk模型目录不存在'
-    fi
+cd /opt/musetalk/repo
+ln -sf /opt/musetalk/models models 2>/dev/null
+ls -la models/
 "
 
-echo "🔄 拉取最新代码..."
-cd /opt/musetalk/repo && git pull origin main
+# 方法2: 在MuseTalk目录创建models链接
+docker exec musetalk-python bash -c "
+cd /opt/musetalk/repo/MuseTalk
+ln -sf /opt/musetalk/models models 2>/dev/null
+ls -la models/
+"
 
-echo "🔄 重启容器..."
-docker compose restart musetalk-python
+# 方法3: 在MuseTalkEngine目录创建models链接
+docker exec musetalk-python bash -c "
+cd /opt/musetalk/repo/MuseTalkEngine
+ln -sf /opt/musetalk/models models 2>/dev/null
+ls -la models/
+"
 
-echo "✅ 完成！等待服务启动..."
+echo -e "\n检查链接创建结果："
+docker exec musetalk-python bash -c "
+echo '=== /opt/musetalk/repo/models ==='
+ls -la /opt/musetalk/repo/models/ | head -5
+echo '=== /opt/musetalk/repo/MuseTalk/models ==='
+ls -la /opt/musetalk/repo/MuseTalk/models/ | head -5
+echo '=== /opt/musetalk/repo/MuseTalkEngine/models ==='
+ls -la /opt/musetalk/repo/MuseTalkEngine/models/ | head -5
+"
+
+echo -e "\n重启服务..."
+docker restart musetalk-python
 sleep 5
 
-echo "📋 查看日志..."
-docker compose logs --tail=50 musetalk-python
+echo -e "\n查看日志："
+docker logs --tail=30 musetalk-python | grep -E "GPU|模型|初始化"

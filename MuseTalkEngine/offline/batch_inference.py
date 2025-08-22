@@ -152,18 +152,48 @@ class UltraFastMuseTalkService:
                         # 设置模型路径环境变量
                         os.environ['DISABLE_TORCH_COMPILE'] = '1'
                         
-                        # sd-vae可能没有config.json，直接加载
-                        sd_vae_path = "/opt/musetalk/models/sd-vae"  # 正确的路径
-                        print(f"GPU{device_id} 使用sd-vae模型路径: {sd_vae_path}")
-                        
-                        # 设置模型路径环境变量
+                        # 设置正确的模型路径
                         os.environ['MODEL_PATH'] = '/opt/musetalk/models'
+                        os.environ['VAE_PATH'] = '/opt/musetalk/models/sd-vae'
+                        os.environ['UNET_PATH'] = '/opt/musetalk/models/musetalk/pytorch_model.bin'
+                        os.environ['PE_PATH'] = '/opt/musetalk/models/musetalk/pytorch_model.bin'
+                        
+                        # 改变工作目录到有models链接的地方
+                        original_cwd = os.getcwd()
+                        
+                        # 先尝试创建符号链接
+                        if not os.path.exists('/opt/musetalk/repo/models'):
+                            try:
+                                os.symlink('/opt/musetalk/models', '/opt/musetalk/repo/models')
+                                print(f"GPU{device_id} 创建了models符号链接")
+                            except:
+                                pass
+                        
+                        # 切换到有models的目录
+                        os.chdir('/opt/musetalk/repo')
+                        
+                        print(f"GPU{device_id} 当前工作目录: {os.getcwd()}")
+                        print(f"GPU{device_id} models目录存在: {os.path.exists('models')}")
+                        print(f"GPU{device_id} sd-vae路径存在: {os.path.exists('models/sd-vae')}")
                         
                         # 直接加载模型，不检查config
                         try:
                             # 尝试默认加载
-                            vae, unet, pe = load_all_model()
-                            print(f"GPU{device_id} 模型加载成功")
+                            audio_processor, vae, unet, pe = load_all_model()
+                            print(f"GPU{device_id} 模型加载成功!")
+                            
+                            # 恢复原始工作目录
+                            os.chdir(original_cwd)
+                            
+                            # 存储模型到对应的GPU
+                            self.gpu_models[device] = {
+                                'vae': vae,
+                                'unet': unet,
+                                'pe': pe,
+                                'device': device
+                            }
+                            print(f"GPU{device_id} 模型加载完成")
+                            return device_id
                         except Exception as e:
                             # 如果失败，尝试不指定VAE类型
                             print(f"GPU{device_id} 默认加载失败: {e}")
@@ -174,9 +204,22 @@ class UltraFastMuseTalkService:
                             os.environ['UNET_PATH'] = '/opt/musetalk/models/musetalk'
                             
                             # 再次尝试
-                            vae, unet, pe = load_all_model()
+                            audio_processor, vae, unet, pe = load_all_model()
                             print(f"GPU{device_id} 模型加载成功（备用方式）")
                             
+                            # 恢复原始工作目录
+                            os.chdir(original_cwd)
+                            
+                            # 存储模型到对应的GPU
+                            self.gpu_models[device] = {
+                                'vae': vae,
+                                'unet': unet,
+                                'pe': pe,
+                                'device': device
+                            }
+                            print(f"GPU{device_id} 模型加载完成")
+                            return device_id
+                    
                     except Exception as e:
                         print(f"GPU{device_id} 模型加载失败: {e}")
                         # 检查是否是UNet模型问题
@@ -186,8 +229,19 @@ class UltraFastMuseTalkService:
                                 # 强制清理GPU内存
                                 torch.cuda.empty_cache()
                                 # 重新尝试加载
-                                vae, unet, pe = load_all_model(vae_type="sd-vae")
+                                audio_processor, vae, unet, pe = load_all_model(vae_type="sd-vae")
                                 print(f"GPU{device_id} 重新加载成功")
+                                # 恢复原始工作目录
+                                os.chdir(original_cwd)
+                                # 存储模型到对应的GPU
+                                self.gpu_models[device] = {
+                                    'vae': vae,
+                                    'unet': unet,
+                                    'pe': pe,
+                                    'device': device
+                                }
+                                print(f"GPU{device_id} 模型加载完成")
+                                return device_id
                             except Exception as e3:
                                 print(f"GPU{device_id} 重新加载也失败: {e3}")
                                 return None
@@ -346,29 +400,21 @@ class UltraFastMuseTalkService:
                         else:
                             print(f"GPU{device_id} 跳过编译（torch.compile不可用）")
                     
-                    self.gpu_models[device] = {
-                        'vae': vae,
-                        'unet': unet,
-                        'pe': pe,
-                        'device': device
-                    }
-                    
                     # 显存监控 - 验证模型是否真正加载
                     with torch.cuda.device(device):
                         torch.cuda.synchronize()
                         allocated = torch.cuda.memory_allocated() / (1024**3)
                         reserved = torch.cuda.memory_reserved() / (1024**3)
-                        free = torch.cuda.mem_get_info()[0] / (1024**3)
-                        total = torch.cuda.mem_get_info()[1] / (1024**3)
-                        print(f"GPU{device_id} 显存状态:")
-                        print(f"  - 已分配: {allocated:.2f}GB")
-                        print(f"  - 已预留: {reserved:.2f}GB")
-                        print(f"  - 可用: {free:.2f}GB")
-                        print(f"  - 总量: {total:.2f}GB")
-                        print(f"  - 模型占用: ~{reserved:.2f}GB")
+                        print(f"GPU{device_id} 模型加载后显存: 已分配 {allocated:.2f}GB, 已预留 {reserved:.2f}GB")
                     
                     print(f"GPU{device_id} 模型加载完成")
                     return device_id
+                except Exception as e:
+                    print(f"GPU{device_id} 其他错误，跳过此GPU")
+                    # 恢复原始工作目录
+                    if 'original_cwd' in locals():
+                        os.chdir(original_cwd)
+                    return None
             
             # SEQUENTIAL_LOADING_FIXED: 顺序初始化避免并发冲突
             print(f"开始顺序初始化{self.gpu_count}个GPU（避免并发冲突）...")
