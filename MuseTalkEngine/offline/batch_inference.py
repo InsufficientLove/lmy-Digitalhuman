@@ -527,24 +527,24 @@ class UltraFastMuseTalkService:
                 print(f"最小可用显存: {min_free_memory:.1f}GB")
                 
                 # 根据可用显存动态调整batch_size
-                # 实测：每帧需要约3GB显存（峰值），但实际使用中需要更保守
-                # 先使用极保守的设置确保能运行
+                # 采用批处理+释放策略：每批6帧，处理完释放
+                # 这样可以充分利用显存，又避免OOM
                 
                 if min_free_memory > 40:  # 40GB以上
-                    batch_size = 2  # 极保守，确保不OOM
-                    print(f"✅ 显存充足({min_free_memory:.1f}GB)，设置batch_size=2")
+                    batch_size = 6  # 每批6帧，处理完释放
+                    print(f"✅ 显存充足({min_free_memory:.1f}GB)，设置batch_size=6（批处理+释放）")
                 elif min_free_memory > 30:  # 30-40GB
-                    batch_size = 2  
-                    print(f"✅ 显存良好({min_free_memory:.1f}GB)，设置batch_size=2")
+                    batch_size = 6  
+                    print(f"✅ 显存良好({min_free_memory:.1f}GB)，设置batch_size=6（批处理+释放）")
                 elif min_free_memory > 20:  # 20-30GB
-                    batch_size = 2  
-                    print(f"⚠️ 显存中等({min_free_memory:.1f}GB)，设置batch_size=2")
+                    batch_size = 4  
+                    print(f"⚠️ 显存中等({min_free_memory:.1f}GB)，设置batch_size=4（批处理+释放）")
                 elif min_free_memory > 15:  # 15-20GB
-                    batch_size = 1  
-                    print(f"⚠️ 显存偏少({min_free_memory:.1f}GB)，设置batch_size=1")
+                    batch_size = 3  
+                    print(f"⚠️ 显存偏少({min_free_memory:.1f}GB)，设置batch_size=3（批处理+释放）")
                 elif min_free_memory > 10:  # 10-15GB
-                    batch_size = 1  
-                    print(f"❌ 显存紧张({min_free_memory:.1f}GB)，设置batch_size=1")
+                    batch_size = 2  
+                    print(f"❌ 显存紧张({min_free_memory:.1f}GB)，设置batch_size=2（批处理+释放）")
                 else:  # 10GB以下
                     batch_size = 1  
                     print(f"❌ 显存不足({min_free_memory:.1f}GB)，设置batch_size=1")
@@ -762,7 +762,19 @@ class UltraFastMuseTalkService:
                     
                     # 清理GPU内存
                     del whisper_batch, latent_batch, audio_features, pred_latents, recon_frames
+                    if 'timesteps' in locals():
+                        del timesteps
+                    
+                    # 强制同步和清理
+                    torch.cuda.synchronize(target_device)
                     torch.cuda.empty_cache()
+                    
+                    # 额外的清理步骤
+                    import gc
+                    gc.collect()
+                    torch.cuda.empty_cache()
+                    
+                    print(f"✅ 批次 {batch_idx} 完成，已释放GPU {target_device}显存")
                     
                     return batch_idx, result_frames
                     

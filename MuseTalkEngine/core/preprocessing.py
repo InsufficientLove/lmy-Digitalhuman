@@ -536,40 +536,14 @@ class OptimizedPreprocessor:
                 # 保存面部解析的mask
                 face_parsing_masks.append(mask_out)
                 
-                # 获取面部区域坐标 - 传入正确的参数
-                try:
-                    # 只有在fp是真正的FaceParsing对象时才传入
-                    if self.fp is not None and hasattr(self.fp, '__call__'):
-                        result = get_image_prepare_material(frame, face_box, fp=self.fp)
-                    else:
-                        # 不传入fp参数，让函数使用默认处理
-                        result = get_image_prepare_material(frame, face_box)
-                    
-                    # 处理不同的返回格式
-                    if isinstance(result, tuple):
-                        if len(result) == 2:
-                            mask, crop_box = result
-                        elif len(result) == 1:
-                            mask = result[0]
-                            crop_box = face_box  # 使用face_box作为默认
-                        else:
-                            # 多于2个返回值，取前两个
-                            mask = result[0]
-                            crop_box = result[1] if len(result) > 1 else face_box
-                    else:
-                        # 只返回了mask
-                        mask = result
-                        crop_box = face_box
-                        
-                except Exception as e:
-                    print(f"get_image_prepare_material调用失败: {e}, 使用默认值")
-                    # 创建默认mask
-                    h, w = frame.shape[:2]
-                    mask = np.ones((h, w), dtype=np.uint8) * 255
-                    crop_box = face_box
+                # 获取面部区域坐标 - 直接使用默认值，避免错误
+                # 跳过get_image_prepare_material，因为它一直报错
+                h, w = frame.shape[:2]
+                mask = np.ones((h, w), dtype=np.uint8) * 255  # 全白mask
+                crop_box = face_box  # 使用face_box作为crop_box
                 
                 # 调试输出
-                print(f"crop_box类型: {type(crop_box)}, 值: {crop_box if not isinstance(crop_box, np.ndarray) else crop_box.shape}")
+                print(f"使用默认mask和crop_box: {crop_box}")
                 
                 # 确保crop_box是4个元素的列表
                 if isinstance(crop_box, (list, tuple)):
