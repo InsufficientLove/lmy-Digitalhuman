@@ -872,24 +872,37 @@ class UltraFastMuseTalkService:
                     crop_box = mask_coords
                 elif isinstance(mask_coords, np.ndarray):
                     # 如果是numpy数组，尝试提取前4个值
-                    crop_box = mask_coords.flatten()[:4].tolist() if mask_coords.size >= 4 else [x1, y1, x2, y2]
+                    if mask_coords.size >= 4:
+                        crop_box = mask_coords.flatten()[:4].tolist()
+                    else:
+                        print(f"警告: mask_coords太小 {mask_coords.shape}, 使用face_box")
+                        crop_box = [x1, y1, x2, y2]
                 else:
                     # 使用face_box作为默认值
+                    print(f"警告: mask_coords类型异常 {type(mask_coords)}, 使用face_box")
                     crop_box = [x1, y1, x2, y2]
                 
-                combine_frame = get_image_blending(
-                    image=ori_frame,
-                    face=res_frame, 
-                    face_box=[x1, y1, x2, y2],
-                    mask_array=mask,
-                    crop_box=crop_box
-                )
+                # 确保crop_box是整数
+                crop_box = [int(x) for x in crop_box]
+                
+                try:
+                    combine_frame = get_image_blending(
+                        image=ori_frame,
+                        face=res_frame, 
+                        face_box=[x1, y1, x2, y2],
+                        mask_array=mask,
+                        crop_box=crop_box
+                    )
+                except Exception as blend_error:
+                    print(f"blending失败: {blend_error}, 使用原始帧")
+                    combine_frame = ori_frame
                 
                 return i, combine_frame
                 
             except Exception as e:
                 print(f"合成第{i}帧失败: {str(e)}")
-                return i, None
+                # 返回原始帧避免失败
+                return i, frame_list_cycle[i % len(frame_list_cycle)]
         
         # 32线程并行合成
         composed_frames = {}
@@ -1023,52 +1036,73 @@ class UltraFastMuseTalkService:
             # 直接内存生成，无临时文件
             print(f"直接生成视频: {len(video_frames)} 帧")
             
-            # 生成无音频视频
-            temp_video = output_path.replace('.mp4', '_temp.mp4')
-            imageio.mimwrite(
-                temp_video, video_frames, 'FFMPEG', 
-                fps=fps, codec='libx264', pixelformat='yuv420p',
-                output_params=['-preset', 'ultrafast', '-crf', '23']
-            )
+            if len(video_frames) == 0:
+                print("错误: 没有合成的帧，无法生成视频")
+                return False
             
-            # 并行音频合成
             try:
-                # 使用ffmpeg合成音频
-                import subprocess
+                # 确保输出目录存在
+                output_dir = os.path.dirname(output_path)
+                if output_dir and not os.path.exists(output_dir):
+                    os.makedirs(output_dir, exist_ok=True)
                 
-                # 构建ffmpeg命令
-                cmd = [
-                    'ffmpeg',
-                    '-i', temp_video,  # 输入视频
-                    '-i', audio_path,  # 输入音频
-                    '-c:v', 'copy',    # 复制视频流
-                    '-c:a', 'aac',     # 音频编码为AAC
-                    '-strict', 'experimental',
-                    '-shortest',       # 以最短的流为准
-                    '-y',             # 覆盖输出文件
-                    output_path
-                ]
+                # 创建临时视频（无音频）
+                temp_video = output_path.replace('.mp4', '_temp.mp4')
                 
-                # 执行ffmpeg命令
-                result = subprocess.run(cmd, capture_output=True, text=True)
+                # 使用imageio生成视频
+                import imageio
+                writer = imageio.get_writer(temp_video, fps=fps, codec='libx264', quality=8)
+                for frame in video_frames:
+                    if frame is not None:
+                        writer.append_data(frame)
+                writer.close()
                 
-                if result.returncode != 0:
-                    print(f"ffmpeg错误: {result.stderr}")
-                    # 如果失败，使用无音频版本
-                    os.rename(temp_video, output_path)
-                else:
-                    print(f"✅ 音频合成成功: {output_path}")
+                if not os.path.exists(temp_video):
+                    print(f"错误: 临时视频生成失败 {temp_video}")
+                    return False
                 
-                # 清理临时文件
-                if os.path.exists(temp_video):
-                    os.remove(temp_video)
+                # 并行音频合成
+                try:
+                    # 使用ffmpeg合成音频
+                    import subprocess
+                    
+                    # 构建ffmpeg命令
+                    cmd = [
+                        'ffmpeg',
+                        '-i', temp_video,  # 输入视频
+                        '-i', audio_path,  # 输入音频
+                        '-c:v', 'copy',    # 复制视频流
+                        '-c:a', 'aac',     # 音频编码为AAC
+                        '-strict', 'experimental',
+                        '-shortest',       # 以最短的流为准
+                        '-y',             # 覆盖输出文件
+                        output_path
+                    ]
+                    
+                    # 执行ffmpeg命令
+                    result = subprocess.run(cmd, capture_output=True, text=True)
+                    
+                    if result.returncode != 0:
+                        print(f"ffmpeg错误: {result.stderr}")
+                        # 如果失败，使用无音频版本
+                        os.rename(temp_video, output_path)
+                    else:
+                        print(f"✅ 音频合成成功: {output_path}")
+                    
+                    # 清理临时文件
+                    if os.path.exists(temp_video):
+                        os.remove(temp_video)
+                    
+                except Exception as e:
+                    print(f"音频合成失败，使用无音频版本: {str(e)}")
+                    if os.path.exists(temp_video):
+                        os.rename(temp_video, output_path)
+                
+                return True
                 
             except Exception as e:
-                print(f"音频合成失败，使用无音频版本: {str(e)}")
-                if os.path.exists(temp_video):
-                    os.rename(temp_video, output_path)
-            
-            return True
+                print(f"视频生成失败: {str(e)}")
+                return False
             
         except Exception as e:
             print(f"视频生成失败: {str(e)}")
