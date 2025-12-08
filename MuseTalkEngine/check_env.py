@@ -222,13 +222,32 @@ def check_model_files():
     
     # 导入路径配置
     try:
-        # 尝试从当前目录导入
-        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-        from config_paths import ModelPaths
-        print_success("成功导入 config_paths.py")
+        # 尝试多个可能的位置导入 config_paths
+        config_paths_locations = [
+            os.path.dirname(os.path.abspath(__file__)),  # 脚本所在目录
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),  # 上级目录
+            os.getcwd(),  # 当前工作目录
+            "/opt/musetalk/repo",  # 绝对路径
+        ]
+        
+        config_module = None
+        for location in config_paths_locations:
+            config_path = os.path.join(location, "config_paths.py")
+            if os.path.exists(config_path):
+                sys.path.insert(0, location)
+                from config_paths import ModelPaths
+                config_module = ModelPaths
+                print_success(f"成功导入 config_paths.py (从 {location})")
+                break
+        
+        if config_module is None:
+            raise ImportError("未找到 config_paths.py")
+            
     except ImportError as e:
         print_error(f"无法导入 config_paths.py: {e}")
-        print_warning("请确保 config_paths.py 在当前目录")
+        print_warning("尝试的位置:")
+        for loc in config_paths_locations:
+            print(f"   - {os.path.join(loc, 'config_paths.py')}")
         return False
     
     # 定义要检查的路径
