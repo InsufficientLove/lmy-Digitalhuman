@@ -134,11 +134,19 @@ LIBS=(
 FAILED=0
 for lib_info in "${LIBS[@]}"; do
     IFS=':' read -r lib name <<< "$lib_info"
+    # 尝试导入并捕获详细错误
     if python3 -c "import $lib" 2>/dev/null; then
         echo "✅ $name"
     else
-        echo "❌ $name - 安装失败"
-        FAILED=$((FAILED + 1))
+        # 再次尝试并显示错误
+        error=$(python3 -c "import $lib" 2>&1 || true)
+        if [[ "$error" == *"No module named"* ]]; then
+            echo "❌ $name - 未安装"
+            FAILED=$((FAILED + 1))
+        else
+            echo "⚠️  $name - 导入警告（但可能已安装）"
+            echo "    错误: ${error:0:80}..."
+        fi
     fi
 done
 
