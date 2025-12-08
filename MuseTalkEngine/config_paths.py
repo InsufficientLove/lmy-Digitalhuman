@@ -38,14 +38,10 @@ class ModelPaths:
     # UNET_PATH = MODEL_ROOT / "musetalk" / "unet.pth"  # 示例备用名称
     
     # 2. VAE 模型（Stable Diffusion VAE）
-    # 路径示例：/opt/musetalk/models/sd-vae-ft-mse/
+    # 路径示例：/opt/musetalk/models/sd-vae/
     # 可能的目录名：sd-vae-ft-mse, sd-vae, vae
-    VAE_PATH = MODEL_ROOT / "sd-vae-ft-mse"
-    VAE_TYPE = "sd-vae-ft-mse"  # 或 "sd-vae"
-    
-    # 如果目录名不同，请取消注释并修改：
-    # VAE_PATH = MODEL_ROOT / "sd-vae"
-    # VAE_TYPE = "sd-vae"
+    VAE_PATH = MODEL_ROOT / "sd-vae"
+    VAE_TYPE = "sd-vae"
     
     # 3. Whisper 模型（音频特征提取）
     # 路径示例：/opt/musetalk/models/whisper/tiny.pt
