@@ -1,8 +1,8 @@
 #!/bin/bash
-# MuseTalk 依赖安装脚本 - 锁定版本 + 国内镜像加速
+# MuseTalk 依赖安装脚本 - 锁定版本
 # 适用于：Ubuntu 22.04 + CUDA 12.x + Python 3.10
 
-set -e  # 遇到错误立即退出
+set -e
 
 echo "=========================================="
 echo "🔧 MuseTalk 依赖安装"
@@ -23,24 +23,6 @@ fi
 
 echo ""
 echo "=========================================="
-echo "配置 pip 国内镜像..."
-echo "=========================================="
-
-# 配置 pip 使用清华镜像
-mkdir -p ~/.pip
-cat > ~/.pip/pip.conf << 'EOF'
-[global]
-index-url = https://pypi.tuna.tsinghua.edu.cn/simple
-trusted-host = pypi.tuna.tsinghua.edu.cn
-
-[install]
-trusted-host = pypi.tuna.tsinghua.edu.cn
-EOF
-
-echo "✅ pip 镜像已配置为清华源（加速 pip 包下载）"
-echo ""
-
-echo "=========================================="
 echo "开始安装依赖..."
 echo "=========================================="
 
@@ -57,7 +39,6 @@ if python3 -c "import torch" 2>/dev/null; then
     echo "✅ PyTorch 已安装: $TORCH_VERSION"
 else
     echo "安装 PyTorch (CUDA 12.1)..."
-    echo "   约 2-3GB，使用官方源..."
     python3 -m pip install torch==2.1.2 torchvision==0.16.2 torchaudio==2.1.2 \
         --index-url https://download.pytorch.org/whl/cu121
 fi

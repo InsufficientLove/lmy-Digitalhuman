@@ -16,7 +16,6 @@ echo "=========================================="
 echo "安装单个包: $PACKAGE"
 echo "=========================================="
 
-# 使用清华镜像
 python3 -m pip install "$PACKAGE" --no-cache-dir
 
 echo ""
