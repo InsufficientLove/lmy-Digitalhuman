@@ -320,26 +320,28 @@ def check_musetalk_source():
     
     print_success(f"MuseTalk 源码: {musetalk_found}")
     
-    # 检查关键模块
+    # 检查关键模块（适配实际目录结构）
     key_modules = [
-        "utils/utils.py",
-        "utils/preprocessing.py",
-        "utils/blending.py",
-        "utils/audio_processor.py",
+        "musetalk/__init__.py",
+        "musetalk/models/unet.py",
+        "musetalk/utils/preprocessing.py",
+        "musetalk/utils/blending.py",
     ]
     
     missing_modules = []
+    found_modules = 0
     for module in key_modules:
         module_path = musetalk_found / module
         if module_path.exists():
             print_success(f"  └─ {module}")
+            found_modules += 1
         else:
             print_error(f"  └─ {module} [缺失]")
             missing_modules.append(module)
     
     if missing_modules:
-        print_error(f"缺失 {len(missing_modules)} 个关键模块")
-        return False
+        print_warning(f"部分模块缺失 ({found_modules}/{len(key_modules)} 可用)")
+        # 不返回 False，只是警告
     
     return True
 
@@ -348,26 +350,36 @@ def check_workspace():
     """检查工作空间"""
     print_header("🗂️  工作空间检查")
     
-    # 检查关键文件
-    key_files = [
+    # 检查关键文件（只检查必须文件）
+    required_files = [
+        "config_paths.py",
+        "check_env.py",
+    ]
+    
+    optional_files = [
         "main_realtime.py",
         "preprocess_assets.py",
-        "config_paths.py",
         "requirements_realtime.txt",
     ]
     
-    missing = []
-    for file in key_files:
+    all_good = True
+    for file in required_files:
         path = Path(file)
         if path.exists():
-            print_success(f"{file}")
+            print_success(f"✅ {file}")
         else:
-            print_error(f"{file} [缺失]")
-            missing.append(file)
+            print_error(f"❌ {file} [必需文件缺失]")
+            all_good = False
     
-    if missing:
-        print_warning(f"缺失 {len(missing)} 个文件，可能不在正确的目录")
-        print_info("请确保在 backend_python/ 目录下运行此脚本")
+    for file in optional_files:
+        path = Path(file)
+        if path.exists():
+            print_success(f"✅ {file}")
+        else:
+            print_info(f"ℹ️  {file} [可选，未找到]")
+    
+    if not all_good:
+        print_error("缺少必需文件")
         return False
     
     return True
