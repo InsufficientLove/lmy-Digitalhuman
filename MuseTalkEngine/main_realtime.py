@@ -47,8 +47,9 @@ class GlobalState:
     """全局状态 - 模型和资产缓存"""
     
     def __init__(self):
-        # GPU 配置
-        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        # GPU 配置（使用环境变量或默认 cuda:1）
+        gpu_id = int(os.environ.get("GPU_ID", "1"))  # 默认使用 GPU 1
+        self.device = torch.device(f"cuda:{gpu_id}" if torch.cuda.is_available() else "cpu")
         self.dtype = torch.float16  # 强制 FP16
         
         # 模型实例
@@ -83,7 +84,12 @@ class GlobalState:
             
             # 加载模型
             print("⚙️ 加载 VAE、UNet、PE...")
-            audio_processor, vae, unet, pe = load_all_model()
+            # load_all_model 返回 3 个值：vae, unet, pe
+            vae, unet, pe = load_all_model(device=self.device)
+            
+            # AudioProcessor 需要单独初始化
+            print("⚙️ 初始化 AudioProcessor...")
+            audio_processor = AudioProcessor()
             
             # 转换为 FP16 并移动到 GPU
             print("⚡ 转换为 FP16 并移动到 GPU...")
