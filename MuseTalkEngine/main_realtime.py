@@ -89,7 +89,9 @@ class GlobalState:
             
             # AudioProcessor 需要单独初始化
             print("⚙️ 初始化 AudioProcessor...")
-            audio_processor = AudioProcessor()
+            # 使用本地 Whisper 模型路径（避免网络下载）
+            whisper_path = os.environ.get('WHISPER_MODEL_PATH', '/opt/musetalk/models/whisper')
+            audio_processor = AudioProcessor(feature_extractor_path=whisper_path)
             
             # 转换为 FP16 并移动到 GPU
             print("⚡ 转换为 FP16 并移动到 GPU...")
