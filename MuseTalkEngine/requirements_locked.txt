@@ -29,7 +29,7 @@ scipy==1.11.4
 
 # ===== 深度学习工具 =====
 transformers==4.35.2
-diffusers==0.24.0
+diffusers>=0.24.0  # 需要兼容新版 huggingface_hub
 accelerate==0.25.0
 safetensors==0.4.1
 
