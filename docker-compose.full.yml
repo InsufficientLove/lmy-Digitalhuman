@@ -44,7 +44,7 @@ services:
       - ASPNETCORE_URLS=http://+:5000
       - MUSETALK_API_URL=http://musetalk-backend:8888
     ports:
-      - "5000:5000"
+      - "5001:5000"  # 改用 5001 端口
     depends_on:
       - musetalk-backend
     restart: unless-stopped
