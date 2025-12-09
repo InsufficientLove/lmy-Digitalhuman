@@ -440,6 +440,18 @@ async def root():
     }
 
 
+@app.get("/health")
+async def health():
+    """健康检查"""
+    return {
+        "status": "healthy",
+        "gpu_available": torch.cuda.is_available(),
+        "gpu_count": torch.cuda.device_count() if torch.cuda.is_available() else 0,
+        "models_loaded": state.vae is not None and state.unet is not None,
+        "device": str(state.device)
+    }
+
+
 @app.post("/stream")
 async def stream_inference(
     audio: UploadFile = File(...),
