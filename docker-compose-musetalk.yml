@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  musetalk:
+    build:
+      context: .
+      dockerfile: Dockerfile.musetalk
+    container_name: musetalk-realtime
+    runtime: nvidia
+    environment:
+      - PORT=8888
+      - GPU_ID=1
+      - WHISPER_MODEL_PATH=/models/whisper
+      - MUSE_TALK_DIR=/app/MuseTalk
+    volumes:
+      # 挂载模型目录（只读）
+      - /opt/musetalk/models:/models:ro
+      # 挂载资产目录（可读写）
+      - /opt/musetalk/assets:/app/assets:rw
+    ports:
+      - "8888:8888"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ['1']  # 使用 GPU 1
+              capabilities: [gpu]
+    restart: unless-stopped
+    networks:
+      - musetalk-net
+
+networks:
+  musetalk-net:
+    driver: bridge
