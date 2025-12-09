@@ -35,8 +35,8 @@ RUN pip3 install --no-cache-dir torch==2.1.2 torchvision==0.16.2 torchaudio==2.1
     pip3 install --no-cache-dir -r /app/requirements.txt
 
 # 复制项目文件
-COPY MuseTalkEngine/ /app/MuseTalkEngine/
-COPY MuseTalk/ /app/MuseTalk/
+COPY ./MuseTalkEngine /app/MuseTalkEngine
+COPY ./MuseTalk /app/MuseTalk
 
 # 设置工作目录
 WORKDIR /app/MuseTalkEngine
