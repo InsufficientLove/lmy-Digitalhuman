@@ -43,7 +43,7 @@ wwwroot/audio/*
 # 模型文件（太大，需要单独下载）
 checkpoints/
 gfpgan/
-MuseTalk/
+# MuseTalk/ 是源码，需要复制
 models/
 *.pth
 *.ckpt
