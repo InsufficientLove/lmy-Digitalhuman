@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  # Python 推理后端
+  musetalk-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.musetalk
+    container_name: musetalk-backend
+    runtime: nvidia
+    environment:
+      - PORT=8888
+      - GPU_ID=1
+      - WHISPER_MODEL_PATH=/models/whisper
+      - MUSE_TALK_DIR=/app/MuseTalk
+    volumes:
+      - /opt/musetalk/models:/models:ro
+      - /opt/musetalk/assets:/app/assets:rw
+    ports:
+      - "8888:8888"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ['1']
+              capabilities: [gpu]
+    restart: unless-stopped
+    networks:
+      - musetalk-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8888/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # C# WebUI 前端
+  musetalk-frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: musetalk-frontend
+    environment:
+      - ASPNETCORE_URLS=http://+:5000
+      - MUSETALK_API_URL=http://musetalk-backend:8888
+    ports:
+      - "5000:5000"
+    depends_on:
+      - musetalk-backend
+    restart: unless-stopped
+    networks:
+      - musetalk-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  musetalk-net:
+    driver: bridge
