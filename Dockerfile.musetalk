@@ -1,6 +1,6 @@
 # MuseTalk 实时推理服务 - Docker 镜像
-# 基于 NVIDIA CUDA 12.1 + Ubuntu 22.04
-FROM nvidia/cuda:12.1.0-cudnn8-runtime-ubuntu22.04
+# 基于 NVIDIA CUDA 12.4 + Ubuntu 22.04（最新稳定版）
+FROM nvidia/cuda:12.4.1-cudnn9-runtime-ubuntu22.04
 
 # 设置环境变量
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -32,6 +32,7 @@ COPY MuseTalkEngine/requirements_locked.txt /app/requirements.txt
 # 安装 Python 依赖
 RUN pip3 install --no-cache-dir torch==2.1.2 torchvision==0.16.2 torchaudio==2.1.2 \
     --index-url https://download.pytorch.org/whl/cu121 && \
+    pip3 install --no-cache-dir diffusers==0.30.3 && \
     pip3 install --no-cache-dir -r /app/requirements.txt
 
 # 复制项目文件
