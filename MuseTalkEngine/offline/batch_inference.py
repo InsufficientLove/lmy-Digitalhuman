@@ -95,7 +95,7 @@ class UltraFastMuseTalkService:
         self.shared_whisper = None
         self.shared_audio_processor = None
         self.shared_fp = None
-        self.weight_dtype = torch.float16  # 使用半精度提速
+        self.weight_dtype = torch.float32  # 使用float32确保稳定性（避免dtype错误）
         self.timesteps = None
         
         # 内存池和缓存优化
@@ -249,32 +249,32 @@ class UltraFastMuseTalkService:
                             print(f"GPU{device_id} 其他错误，跳过此GPU")
                             return None
                     
-                    # 优化模型 - 半精度+编译优化 (修复模型对象兼容性)
+                    # 优化模型 - 移到GPU并eval (不使用half以避免dtype错误)
                     print(f"GPU{device_id} 开始模型优化...")
                     
-                    # 修复VAE对象 - 使用.vae属性
+                    # 修复VAE对象 - 使用.vae属性（float32）
                     if hasattr(vae, 'vae'):
-                        vae.vae = vae.vae.to(device).half().eval()
+                        vae.vae = vae.vae.to(device).eval()
                     elif hasattr(vae, 'to'):
-                        vae = vae.to(device).half().eval()
+                        vae = vae.to(device).eval()
                     else:
                         print(f"警告: VAE对象结构不明，跳过优化")
                     
-                    # 修复UNet对象 - 使用.model属性  
+                    # 修复UNet对象 - 使用.model属性（float32）
                     if hasattr(unet, 'model'):
-                        unet.model = unet.model.to(device).half().eval()
+                        unet.model = unet.model.to(device).eval()
                     elif hasattr(unet, 'to'):
-                        unet = unet.to(device).half().eval()
+                        unet = unet.to(device).eval()
                     else:
                         print(f"警告: UNet对象结构不明，跳过优化")
                     
-                    # 修复PE对象
+                    # 修复PE对象（float32）
                     if hasattr(pe, 'to'):
-                        pe = pe.to(device).half().eval()
+                        pe = pe.to(device).eval()
                     else:
                         print(f"警告: PE对象没有.to()方法，跳过优化")
                     
-                    print(f"GPU{device_id} 半精度转换完成")
+                    print(f"GPU{device_id} 模型优化完成（使用float32以确保稳定性）")
                     
                     # 智能模型编译 - 使用更安全的编译模式
                     import platform
