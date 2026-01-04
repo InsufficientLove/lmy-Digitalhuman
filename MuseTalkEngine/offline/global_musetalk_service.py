@@ -141,8 +141,9 @@ class GlobalMuseTalkService:
             
             if hasattr(self, 'vae') and self.vae is not None:
                 try:
-                    self.vae.vae = self.vae.vae.half().to(self.device)
-                    print("VAE模型优化完成")
+                    # VAE 必须保持 Float32，避免 cuDNN 错误
+                    self.vae.vae = self.vae.vae.to(self.device, dtype=torch.float32)
+                    print("VAE模型优化完成（保持Float32避免cuDNN错误）")
                 except Exception as e:
                     print(f"VAE模型优化失败: {str(e)}")
             
@@ -384,7 +385,10 @@ class GlobalMuseTalkService:
                         
                         # 核心推理 - 复用全局模型
                         pred_latents = self.unet.model(latent_batch, self.timesteps, encoder_hidden_states=audio_feature_batch).sample
-                        recon = self.vae.decode_latents(pred_latents)
+                        
+                        # VAE 解码 - 转换为 Float32 避免 cuDNN 错误
+                        pred_latents_fp32 = pred_latents.to(dtype=torch.float32)
+                        recon = self.vae.decode_latents(pred_latents_fp32)
                         for res_frame in recon:
                             res_frame_list.append(res_frame)
                 
@@ -416,9 +420,23 @@ class GlobalMuseTalkService:
                     ori_frame = copy.deepcopy(frame_list_cycle[i % len(frame_list_cycle)])
                     
                     x1, y1, x2, y2 = bbox
+                    
+                    # 修复颜色问题：MuseTalk 模型输出是 RGB，需要转换为 BGR（OpenCV 格式）
+                    if len(res_frame.shape) == 3 and res_frame.shape[2] == 3:
+                        res_frame = cv2.cvtColor(res_frame.astype(np.uint8), cv2.COLOR_RGB2BGR)
+                    else:
+                        res_frame = res_frame.astype(np.uint8)
+                    
+                    # 修复尺寸匹配问题：确保 resize 后的尺寸与 bbox 完全一致
                     try:
-                        res_frame = cv2.resize(res_frame.astype(np.uint8), (x2-x1, y2-y1))
-                    except:
+                        target_w, target_h = x2 - x1, y2 - y1
+                        if target_w > 0 and target_h > 0:
+                            res_frame = cv2.resize(res_frame, (target_w, target_h))
+                        else:
+                            print(f"警告: bbox尺寸异常 ({target_w}x{target_h})")
+                            return None
+                    except Exception as e:
+                        print(f"Resize失败: {e}")
                         return None
                     
                     # 关键优化：使用官方get_image_blending，比get_image快10倍！

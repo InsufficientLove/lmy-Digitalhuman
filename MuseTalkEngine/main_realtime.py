@@ -96,13 +96,13 @@ class GlobalState:
             # 转换为 FP16 并移动到 GPU
             print("⚡ 转换为 FP16 并移动到 GPU...")
             
-            # VAE
+            # VAE - 必须保持 Float32，避免 cuDNN 错误
             if hasattr(vae, 'vae'):
-                vae.vae = vae.vae.to(self.device, dtype=self.dtype).eval()
-                print("  ✅ VAE -> FP16")
+                vae.vae = vae.vae.to(self.device, dtype=torch.float32).eval()
+                print("  ✅ VAE -> Float32 (避免cuDNN错误)")
             elif hasattr(vae, 'to'):
-                vae = vae.to(self.device, dtype=self.dtype).eval()
-                print("  ✅ VAE -> FP16")
+                vae = vae.to(self.device, dtype=torch.float32).eval()
+                print("  ✅ VAE -> Float32 (避免cuDNN错误)")
             
             # UNet
             if hasattr(unet, 'model'):
@@ -389,11 +389,12 @@ def inference_frame_batch(
                     latent_batch, timesteps, encoder_hidden_states=audio_features
                 )
             
-            # VAE 解码
+            # VAE 解码 - 转换为 Float32 避免 cuDNN 错误
+            pred_latents_fp32 = pred_latents[:, :4, :, :].to(dtype=torch.float32)
             if hasattr(state.vae, 'decode_latents'):
-                recon_frames = state.vae.decode_latents(pred_latents[:, :4, :, :])
+                recon_frames = state.vae.decode_latents(pred_latents_fp32)
             else:
-                recon_frames = state.vae.decode(pred_latents[:, :4, :, :]).sample
+                recon_frames = state.vae.decode(pred_latents_fp32).sample
         
         # 转换为 numpy
         if isinstance(recon_frames, torch.Tensor):
@@ -412,7 +413,19 @@ def inference_frame_batch(
             recon = (recon * 255).astype(np.uint8)
             if recon.shape[0] == 3:  # CHW -> HWC
                 recon = recon.transpose(1, 2, 0)
-            recon_resized = cv2.resize(recon, (x2 - x1, y2 - y1))
+            
+            # 修复颜色问题：MuseTalk 模型输出是 RGB，需要转换为 BGR（OpenCV 格式）
+            if len(recon.shape) == 3 and recon.shape[2] == 3:
+                recon = cv2.cvtColor(recon, cv2.COLOR_RGB2BGR)
+            
+            # 修复尺寸匹配问题：确保 resize 后的尺寸与 bbox 完全一致
+            target_w, target_h = x2 - x1, y2 - y1
+            if target_w > 0 and target_h > 0:
+                recon_resized = cv2.resize(recon, (target_w, target_h))
+            else:
+                print(f"警告: bbox尺寸异常 ({target_w}x{target_h})，使用原图")
+                generated_frames.append(orig_frame)
+                continue
             
             # 贴回原图
             result = orig_frame.copy()

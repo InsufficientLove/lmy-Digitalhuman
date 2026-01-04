@@ -137,11 +137,12 @@ class OptimizedPreprocessor:
                     raise e2
             
             # 修复模型对象兼容性 - 使用正确的属性结构
+            # VAE 必须保持 Float32 避免 cuDNN 错误
             if hasattr(vae, 'vae'):
-                vae.vae = vae.vae.to(device).half().eval()
+                vae.vae = vae.vae.to(device, dtype=torch.float32).eval()
                 self.vae = vae
             elif hasattr(vae, 'to'):
-                self.vae = vae.to(device).half().eval()
+                self.vae = vae.to(device, dtype=torch.float32).eval()
             else:
                 print("警告: VAE对象结构不明，跳过优化")
                 self.vae = vae
