@@ -509,9 +509,9 @@ namespace LmyDigitalHuman.Services.Core
                 var audioUrl = await GenerateAudioAsync(request.Text, 
                     request.VoiceSettings ?? template.DefaultVoiceSettings);
 
-                // 生成视频
+                // 生成视频（使用SystemName作为文件名）
                 var videoUrl = await GenerateVideoWithMuseTalkAsync(
-                    template.TemplateName, audioUrl, request.Quality);
+                    template.SystemName, audioUrl, request.Quality);
 
                 // 更新使用次数
                 template.UsageCount++;
@@ -1057,7 +1057,7 @@ namespace LmyDigitalHuman.Services.Core
             {
                 var previewText = "你好，我是您的专属数字人助手，很高兴为您服务！";
                 var audioUrl = await GenerateAudioAsync(previewText, template.DefaultVoiceSettings);
-                                        var videoUrl = await GenerateVideoWithMuseTalkAsync(template.TemplateName, audioUrl, "medium");
+                var videoUrl = await GenerateVideoWithMuseTalkAsync(template.SystemName, audioUrl, "medium");
                 template.PreviewVideoPath = videoUrl;
             }
             catch (Exception ex)

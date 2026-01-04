@@ -247,12 +247,19 @@ async function loadTemplates() {
         const result = await response.json();
         
         if (result.success && result.templates && result.templates.length > 0) {
-            grid.innerHTML = result.templates.map(template => createTemplateCard(template)).join('');
+            // 过滤掉状态为 error 的模板
+            const validTemplates = result.templates.filter(t => t.status !== 'error');
             
-            // 绑定删除按钮
-            grid.querySelectorAll('.btn-delete').forEach(btn => {
-                btn.addEventListener('click', () => deleteTemplate(btn.dataset.id));
-            });
+            if (validTemplates.length > 0) {
+                grid.innerHTML = validTemplates.map(template => createTemplateCard(template)).join('');
+                
+                // 绑定删除按钮
+                grid.querySelectorAll('.btn-delete').forEach(btn => {
+                    btn.addEventListener('click', () => deleteTemplate(btn.dataset.id));
+                });
+            } else {
+                grid.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 40px;">暂无可用模板，请先创建</p>';
+            }
         } else {
             grid.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 40px;">暂无模板，请先创建</p>';
         }
