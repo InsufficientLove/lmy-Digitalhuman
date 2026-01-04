@@ -169,6 +169,41 @@ namespace LmyDigitalHuman.Services.Offline
             }
         }
 
+        public async Task<VideoPreprocessingResult> PreprocessVideoAsync(string templateId, string videoPath)
+        {
+            try
+            {
+                _logger.LogInformation("开始预处理视频模板: TemplateId={TemplateId}, VideoPath={VideoPath}", 
+                    templateId, videoPath);
+                
+                // 使用共享目录路径，Python容器可以访问
+                var sharedVideoPath = $"/opt/musetalk/templates/{templateId}.mp4";
+                
+                var result = await _apiClient.PreprocessVideoAsync(templateId, sharedVideoPath);
+                
+                return new VideoPreprocessingResult
+                {
+                    Success = result.Success,
+                    TemplateId = templateId,
+                    BboxPath = result.BboxPath ?? string.Empty,
+                    VideoPath = sharedVideoPath,
+                    PreprocessingTime = 5000, // 视频预处理通常需要更长时间
+                    Message = result.Message ?? (result.Success ? "Success" : "Failed")
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "PreprocessVideoAsync failed: {TemplateId}", templateId);
+                return new VideoPreprocessingResult 
+                { 
+                    Success = false, 
+                    TemplateId = templateId, 
+                    PreprocessingTime = 0,
+                    Message = ex.Message
+                };
+            }
+        }
+
         public Task<bool> WarmupTemplateAsync(string templateId)
         {
             return Task.FromResult(true);

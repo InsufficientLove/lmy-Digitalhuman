@@ -74,36 +74,63 @@ namespace LmyDigitalHuman.Services.Core
             
             try
             {
-                _logger.LogInformation("开始创建数字人模板: DisplayName={DisplayName}, SystemName={SystemName}", 
-                    request.TemplateName, request.SystemName);
+                _logger.LogInformation("开始创建数字人模板: DisplayName={DisplayName}, SystemName={SystemName}, ResourceType={ResourceType}", 
+                    request.TemplateName, request.SystemName, request.ResourceType);
 
                 // 生成模板ID
                 var templateId = Guid.NewGuid().ToString("N");
-                
-                // 使用英文SystemName作为文件名，解决中文路径问题
-                var imageFileName = $"{request.SystemName}.jpg";
                 
                 // 确保使用完整的绝对路径
                 var fullTemplatesPath = Path.IsPathRooted(_templatesPath) 
                     ? _templatesPath 
                     : Path.Combine(Directory.GetCurrentDirectory(), _templatesPath);
                 
-                var imagePath = Path.Combine(fullTemplatesPath, imageFileName);
-                
                 // 确保目录存在
                 Directory.CreateDirectory(fullTemplatesPath);
                 
-                // 检查文件是否已存在（防止重名覆盖）
-                if (File.Exists(imagePath))
+                string filePath = "";
+                string fileUrl = "";
+                string resourceType = request.ResourceType ?? "image";
+                
+                // 处理图片或视频文件
+                if (resourceType == "image")
                 {
-                    _logger.LogWarning("模板文件已存在，将覆盖: {FileName}", imageFileName);
+                    // 使用英文SystemName作为文件名，解决中文路径问题
+                    var imageFileName = $"{request.SystemName}.jpg";
+                    filePath = Path.Combine(fullTemplatesPath, imageFileName);
+                    fileUrl = $"/templates/{imageFileName}";
+                    
+                    // 检查文件是否已存在（防止重名覆盖）
+                    if (File.Exists(filePath))
+                    {
+                        _logger.LogWarning("模板文件已存在，将覆盖: {FileName}", imageFileName);
+                    }
+                    
+                    _logger.LogInformation("保存模板图片到: {ImagePath}", filePath);
+                    
+                    using (var stream = new FileStream(filePath, FileMode.Create))
+                    {
+                        await request.ImageFile!.CopyToAsync(stream);
+                    }
                 }
-                
-                _logger.LogInformation("保存模板图片到: {ImagePath}", imagePath);
-                
-                using (var stream = new FileStream(imagePath, FileMode.Create))
+                else if (resourceType == "video")
                 {
-                    await request.ImageFile.CopyToAsync(stream);
+                    // 视频模板
+                    var videoFileName = $"{request.SystemName}.mp4";
+                    filePath = Path.Combine(fullTemplatesPath, videoFileName);
+                    fileUrl = $"/templates/{videoFileName}";
+                    
+                    if (File.Exists(filePath))
+                    {
+                        _logger.LogWarning("模板视频已存在，将覆盖: {FileName}", videoFileName);
+                    }
+                    
+                    _logger.LogInformation("保存模板视频到: {VideoPath}", filePath);
+                    
+                    using (var stream = new FileStream(filePath, FileMode.Create))
+                    {
+                        await request.VideoFile!.CopyToAsync(stream);
+                    }
                 }
 
                 // 创建模板对象
@@ -112,14 +139,13 @@ namespace LmyDigitalHuman.Services.Core
                     TemplateId = templateId,
                     DisplayName = request.TemplateName,  // 中文显示名
                     SystemName = request.SystemName,     // 英文系统名
+                    ResourceType = resourceType,          // 资源类型
                     Description = request.Description,
                     TemplateType = request.TemplateType,
                     Gender = request.Gender,
                     AgeRange = request.AgeRange,
                     Style = request.Style,
                     EnableEmotion = request.EnableEmotion,
-                    ImagePath = imagePath, // 使用实际物理路径，便于Python直接访问
-                    ImageUrl = $"/templates/{imageFileName}", // Web访问路径
                     DefaultVoiceSettings = request.DefaultVoiceSettings ?? new VoiceSettings(),
                     CustomParameters = request.CustomParameters ?? new Dictionary<string, object>(),
                     CreatedAt = DateTime.Now,
@@ -127,6 +153,18 @@ namespace LmyDigitalHuman.Services.Core
                     IsActive = true,
                     Status = "processing"
                 };
+                
+                // 根据资源类型设置不同的路径
+                if (resourceType == "image")
+                {
+                    template.ImagePath = filePath;
+                    template.ImageUrl = fileUrl;
+                }
+                else
+                {
+                    template.VideoPath = filePath;
+                    template.VideoUrl = fileUrl;
+                }
 
                 // 保存模板
                 _templates[templateId] = template;
@@ -135,17 +173,42 @@ namespace LmyDigitalHuman.Services.Core
                 // 🔄 改为同步执行预处理，确保预处理完成后再返回响应
                 try
                 {
-                    _logger.LogInformation("开始MuseTalk模板预处理: DisplayName={DisplayName}, SystemName={SystemName}", 
-                        template.DisplayName, template.SystemName);
+                    _logger.LogInformation("开始MuseTalk模板预处理: DisplayName={DisplayName}, SystemName={SystemName}, ResourceType={ResourceType}", 
+                        template.DisplayName, template.SystemName, resourceType);
                     
-                    // 进行MuseTalk预处理（永久化模型）
-                    // 使用SystemName（英文名）作为文件标识，避免中文路径问题
-                    var preprocessResult = await _museTalkService.PreprocessTemplateAsync(template.SystemName);
+                    bool preprocessSuccess = false;
+                    
+                    if (resourceType == "image")
+                    {
+                        // 图片模板预处理
+                        var preprocessResult = await _museTalkService.PreprocessTemplateAsync(template.SystemName);
+                        preprocessSuccess = preprocessResult.Success;
+                        
+                        if (!preprocessSuccess)
+                        {
+                            _logger.LogError("MuseTalk图片预处理失败: SystemName={SystemName}", template.SystemName);
+                        }
+                    }
+                    else if (resourceType == "video")
+                    {
+                        // 视频模板预处理
+                        var preprocessResult = await _museTalkService.PreprocessVideoAsync(template.SystemName, filePath);
+                        preprocessSuccess = preprocessResult.Success;
+                        
+                        if (preprocessSuccess && !string.IsNullOrEmpty(preprocessResult.BboxPath))
+                        {
+                            template.VideoBboxPath = preprocessResult.BboxPath;
+                            _logger.LogInformation("视频bbox路径: {BboxPath}", preprocessResult.BboxPath);
+                        }
+                        else
+                        {
+                            _logger.LogError("MuseTalk视频预处理失败: SystemName={SystemName}", template.SystemName);
+                        }
+                    }
                     
                     // 检查预处理结果
-                    if (!preprocessResult.Success)
+                    if (!preprocessSuccess)
                     {
-                        _logger.LogError("MuseTalk预处理失败: SystemName={SystemName}", template.SystemName);
                         template.Status = "error";
                         template.UpdatedAt = DateTime.Now;
                         await SaveTemplateToFileAsync(template);
@@ -169,8 +232,8 @@ namespace LmyDigitalHuman.Services.Core
                     template.UpdatedAt = DateTime.Now;
                     
                     await SaveTemplateToFileAsync(template); // 更新模板信息
-                    _logger.LogInformation("模板创建完成: DisplayName={DisplayName}, SystemName={SystemName}, 预处理已就绪", 
-                        template.DisplayName, template.SystemName);
+                    _logger.LogInformation("模板创建完成: DisplayName={DisplayName}, SystemName={SystemName}, ResourceType={ResourceType}, 预处理已就绪", 
+                        template.DisplayName, template.SystemName, resourceType);
                 }
                 catch (Exception ex)
                 {

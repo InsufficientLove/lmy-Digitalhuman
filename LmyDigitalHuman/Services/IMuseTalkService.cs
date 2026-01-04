@@ -23,6 +23,7 @@ namespace LmyDigitalHuman.Services
 
         // 预处理与优化
         Task<PreprocessingResult> PreprocessTemplateAsync(string templateId);
+        Task<VideoPreprocessingResult> PreprocessVideoAsync(string templateId, string videoPath);
         Task<bool> WarmupTemplateAsync(string templateId);
         Task<string> GetOptimalSettingsAsync(string templateId, string quality);
 

@@ -610,6 +610,19 @@ namespace LmyDigitalHuman.Models
     }
 
     /// <summary>
+    /// 视频预处理结果
+    /// </summary>
+    public class VideoPreprocessingResult
+    {
+        public bool Success { get; set; }
+        public string TemplateId { get; set; } = string.Empty;
+        public string BboxPath { get; set; } = string.Empty;
+        public string VideoPath { get; set; } = string.Empty;
+        public long PreprocessingTime { get; set; }
+        public string Message { get; set; } = string.Empty;
+    }
+
+    /// <summary>
     /// 音频优化结果
     /// </summary>
     public class AudioOptimizationResult

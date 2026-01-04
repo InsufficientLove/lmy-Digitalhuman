@@ -32,9 +32,30 @@ namespace LmyDigitalHuman.Controllers
         {
             try
             {
-                if (request.ImageFile == null || request.ImageFile.Length == 0)
+                // 验证资源类型
+                if (string.IsNullOrWhiteSpace(request.ResourceType))
                 {
-                    return BadRequest(new { error = "头像图片不能为空" });
+                    request.ResourceType = "image";
+                }
+
+                // 验证文件
+                if (request.ResourceType == "image")
+                {
+                    if (request.ImageFile == null || request.ImageFile.Length == 0)
+                    {
+                        return BadRequest(new { error = "图片文件不能为空" });
+                    }
+                }
+                else if (request.ResourceType == "video")
+                {
+                    if (request.VideoFile == null || request.VideoFile.Length == 0)
+                    {
+                        return BadRequest(new { error = "视频文件不能为空" });
+                    }
+                }
+                else
+                {
+                    return BadRequest(new { error = "不支持的资源类型" });
                 }
 
                 if (string.IsNullOrWhiteSpace(request.TemplateName))
@@ -53,8 +74,8 @@ namespace LmyDigitalHuman.Controllers
                     return BadRequest(new { error = "英文标识只能包含英文字母、数字、下划线和连字符" });
                 }
 
-                _logger.LogInformation("开始创建数字人模板: DisplayName={DisplayName}, SystemName={SystemName}", 
-                    request.TemplateName, request.SystemName);
+                _logger.LogInformation("开始创建数字人模板: DisplayName={DisplayName}, SystemName={SystemName}, ResourceType={ResourceType}", 
+                    request.TemplateName, request.SystemName, request.ResourceType);
 
                 var result = await _templateService.CreateTemplateAsync(request);
                 

@@ -99,6 +99,74 @@ namespace LmyDigitalHuman.Services.Offline
         }
 
         /// <summary>
+        /// 预处理视频模板
+        /// </summary>
+        public async Task<(bool Success, string? BboxPath, string? Message)> PreprocessVideoAsync(string templateId, string videoPath)
+        {
+            try
+            {
+                _logger.LogInformation("发送视频预处理请求: TemplateId={TemplateId}, VideoPath={VideoPath}", templateId, videoPath);
+                
+                var request = new
+                {
+                    template_id = templateId,
+                    video_path = videoPath,
+                    force = false
+                };
+
+                var json = JsonSerializer.Serialize(request);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+                
+                var response = await _httpClient.PostAsync("/api/preprocess_video", content);
+                
+                var responseText = await response.Content.ReadAsStringAsync();
+                _logger.LogInformation("视频预处理响应: StatusCode={StatusCode}, Content={Content}", 
+                    response.StatusCode, responseText);
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    var result = JsonSerializer.Deserialize<JsonElement>(responseText);
+                    
+                    if (result.TryGetProperty("success", out var successProp) && successProp.GetBoolean())
+                    {
+                        string? bboxPath = null;
+                        string? message = null;
+                        
+                        if (result.TryGetProperty("bbox_path", out var bboxPathProp))
+                        {
+                            bboxPath = bboxPathProp.GetString();
+                        }
+                        
+                        if (result.TryGetProperty("message", out var messageProp))
+                        {
+                            message = messageProp.GetString();
+                        }
+                        
+                        _logger.LogInformation("✅ 视频模板预处理成功: {TemplateId}, BboxPath={BboxPath}", templateId, bboxPath);
+                        return (true, bboxPath, message);
+                    }
+                    else
+                    {
+                        var message = result.TryGetProperty("message", out var msgProp) 
+                            ? msgProp.GetString() 
+                            : "Unknown error";
+                        _logger.LogError("视频预处理失败: {Message}", message);
+                        return (false, null, message);
+                    }
+                }
+                
+                _logger.LogError("视频预处理HTTP请求失败: StatusCode={StatusCode}, Response={Response}", 
+                    response.StatusCode, responseText);
+                return (false, null, $"HTTP {response.StatusCode}: {responseText}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "预处理视频模板时发生错误");
+                return (false, null, ex.Message);
+            }
+        }
+
+        /// <summary>
         /// 开始会话
         /// </summary>
         public async Task<string?> StartSessionAsync(string templateId)
