@@ -166,7 +166,7 @@ class UltraFastMuseTalkService:
                             try:
                                 os.symlink('/opt/musetalk/models', '/opt/musetalk/repo/models')
                                 print(f"GPU{device_id} 创建了models符号链接")
-                            except:
+                            except Exception:
                                 pass
                         
                         # 切换到有models的目录
@@ -406,15 +406,6 @@ class UltraFastMuseTalkService:
                         allocated = torch.cuda.memory_allocated() / (1024**3)
                         reserved = torch.cuda.memory_reserved() / (1024**3)
                         print(f"GPU{device_id} 模型加载后显存: 已分配 {allocated:.2f}GB, 已预留 {reserved:.2f}GB")
-                    
-                    print(f"GPU{device_id} 模型加载完成")
-                    return device_id
-                except Exception as e:
-                    print(f"GPU{device_id} 其他错误，跳过此GPU")
-                    # 恢复原始工作目录
-                    if 'original_cwd' in locals():
-                        os.chdir(original_cwd)
-                    return None
             
             # SEQUENTIAL_LOADING_FIXED: 顺序初始化避免并发冲突
             print(f"开始顺序初始化{self.gpu_count}个GPU（避免并发冲突）...")
@@ -506,7 +497,7 @@ class UltraFastMuseTalkService:
                     print("尝试创建备用AudioProcessor...")
                     self.shared_audio_processor = AudioProcessor(feature_extractor_path=None)
                     print("备用AudioProcessor创建成功")
-                except:
+                except Exception:
                     self.shared_audio_processor = None
                     print("AudioProcessor完全失败，音频功能将不可用")
             
