@@ -12,10 +12,10 @@ docker-compose up -d
 ### 2. 访问管理界面
 ```
 # 模板管理系统（推荐）
-http://192.168.20.250:101229/template-manager.html
+http://192.168.20.250:8126/template-manager.html
 
 # 主系统界面
-http://192.168.20.250:101229
+http://192.168.20.250:8126
 ```
 
 ### 3. 创建模板
@@ -27,9 +27,9 @@ http://192.168.20.250:101229
 
 | 容器 | 宿主机端口 | 容器内端口 | 作用 |
 |-----|---------|-----------|------|
-| traefik | 101225/101226 | 80/443 | 反向代理 + HTTPS |
-| musetalk-python | 101227/101228 | 28888/8766 | Python 推理引擎（GPU 0,1） |
-| lmy-digitalhuman | 101229 | 5000 | C# Web 前端 |
+| traefik | 8122/8123 | 80/443 | 反向代理 + HTTPS |
+| musetalk-python | 8124/8125 | 28888/8766 | Python 推理引擎（GPU 0,1） |
+| lmy-digitalhuman | 8126 | 5000 | C# Web 前端 |
 
 ---
 
@@ -45,7 +45,7 @@ http://192.168.20.250:101229
 - 🗑️ **快速删除**: 轻松管理模板
 
 ### 🎯 使用步骤
-1. 打开 `http://192.168.20.250:101229/template-manager.html`
+1. 打开 `http://192.168.20.250:8126/template-manager.html`
 2. 选择资源类型（图片/视频）
 3. 上传文件（支持拖拽）
 4. 填写模板信息（中文名、英文名、描述等）
@@ -87,8 +87,8 @@ docker-compose restart musetalk-python
 
 ```bash
 # 健康检查
-curl http://192.168.20.250:101227/health
-curl http://192.168.20.250:101229/health
+curl http://192.168.20.250:8124/health
+curl http://192.168.20.250:8126/health
 
 # 查看容器状态
 docker-compose ps
@@ -125,17 +125,17 @@ docker-compose logs -f musetalk-python
 
 ## 🔧 常见问题
 
-### Q: 为什么 127.0.0.1:101229 无法访问？
+### Q: 为什么 127.0.0.1:8126 无法访问？
 **A**: 使用内网IP访问
 ```
-http://192.168.20.250:101229  ✅ 正确
-http://127.0.0.1:101229      ❌ 无法访问
+http://192.168.20.250:8126  ✅ 正确
+http://127.0.0.1:8126      ❌ 无法访问
 ```
 **原因**: Docker 容器网络配置，C# 服务监听 `0.0.0.0:5000`，需要通过内网IP访问。
 
 ### Q: 如何创建初始模板？
 **A**: 通过 Web 界面创建
-1. 访问 `http://192.168.20.250:101229/template-manager.html`
+1. 访问 `http://192.168.20.250:8126/template-manager.html`
 2. 上传图片或视频
 3. 等待自动预处理完成
 
@@ -187,7 +187,7 @@ https://your-domain.com
 
 ### 图片模板预处理
 ```bash
-curl -X POST "http://192.168.20.250:101227/api/preprocess_template" \
+curl -X POST "http://192.168.20.250:8124/api/preprocess_template" \
   -H "Content-Type: application/json" \
   -d '{
     "template_id": "john",
@@ -198,7 +198,7 @@ curl -X POST "http://192.168.20.250:101227/api/preprocess_template" \
 
 ### 视频模板预处理
 ```bash
-curl -X POST "http://192.168.20.250:101227/api/preprocess_video" \
+curl -X POST "http://192.168.20.250:8124/api/preprocess_video" \
   -H "Content-Type: application/json" \
   -d '{
     "template_id": "mary",
@@ -209,7 +209,7 @@ curl -X POST "http://192.168.20.250:101227/api/preprocess_video" \
 
 ### 创建推理会话
 ```bash
-curl -X POST "http://192.168.20.250:101227/api/start_session" \
+curl -X POST "http://192.168.20.250:8124/api/start_session" \
   -H "Content-Type: application/json" \
   -d '{
     "session_id": "test001",
@@ -219,7 +219,7 @@ curl -X POST "http://192.168.20.250:101227/api/start_session" \
 
 ### 处理音频生成视频
 ```bash
-curl -X POST "http://192.168.20.250:101227/api/process_segment" \
+curl -X POST "http://192.168.20.250:8124/api/process_segment" \
   -F "session_id=test001" \
   -F "segment_index=0" \
   -F "audio=@input.wav"
@@ -227,7 +227,7 @@ curl -X POST "http://192.168.20.250:101227/api/process_segment" \
 
 ### 结束会话
 ```bash
-curl -X POST "http://192.168.20.250:101227/api/end_session" \
+curl -X POST "http://192.168.20.250:8124/api/end_session" \
   -H "Content-Type: application/json" \
   -d '{"session_id": "test001"}'
 ```
@@ -304,7 +304,7 @@ curl -X POST "http://192.168.20.250:101227/api/end_session" \
 for photo in /path/to/photos/*.jpg; do
     name=$(basename "$photo" .jpg)
     docker cp "$photo" lmy-digitalhuman:/app/wwwroot/templates/${name}.jpg
-    curl -X POST "http://192.168.20.250:101227/api/preprocess_template" \
+    curl -X POST "http://192.168.20.250:8124/api/preprocess_template" \
       -H "Content-Type: application/json" \
       -d "{\"template_id\": \"${name}\", \"image_path\": \"/app/wwwroot/templates/${name}.jpg\"}"
 done
@@ -444,12 +444,12 @@ docker-compose restart
 docker-compose up -d
 
 # 2. 访问管理界面
-# http://192.168.20.250:101229/template-manager.html
+# http://192.168.20.250:8126/template-manager.html
 
 # 3. 上传模板（图片或视频）
 
 # 4. 开始使用数字人系统
-# http://192.168.20.250:101229
+# http://192.168.20.250:8126
 ```
 
 **祝使用愉快！** 🎭✨

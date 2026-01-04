@@ -13,8 +13,8 @@ services:
       - --certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json
       - --log.level=INFO
     ports:
-      - "101225:80"
-      - "101226:443"
+      - "8122:80"
+      - "8123:443"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./letsencrypt:/letsencrypt
@@ -27,8 +27,8 @@ services:
     #   dockerfile: MuseTalkEngine/Dockerfile
     container_name: musetalk-python
     ports:
-      - "101227:28888"  # HTTP API端口
-      - "101228:8766"    # WebSocket端口（流式处理）
+      - "8124:28888"  # HTTP API端口
+      - "8125:8766"    # WebSocket端口（流式处理）
     # 关键：添加nvidia runtime让容器能访问GPU
     runtime: nvidia
     environment:
@@ -92,7 +92,7 @@ services:
       dockerfile: LmyDigitalHuman/Dockerfile
     container_name: lmy-digitalhuman
     ports:
-      - "101229:5000"  # C# Web前端
+      - "8126:5000"  # C# Web前端
     environment:
       - ASPNETCORE_URLS=http://0.0.0.0:5000
       - ASPNETCORE_ENVIRONMENT=Docker
