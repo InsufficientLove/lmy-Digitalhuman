@@ -129,7 +129,7 @@ class StreamingMuseTalkAPI:
     
     def preprocess_template(self, template_id: str, image_path: str, force: bool = False) -> Dict:
         """
-        预处理模板（由C#调用）
+        预处理图片模板（由C#调用）
         返回关键推理信息用于持久化
         
         Args:
@@ -138,7 +138,7 @@ class StreamingMuseTalkAPI:
             force: 是否强制重新处理（清除缓存）
         """
         try:
-            print(f"📋 预处理模板: {template_id} (force={force})")
+            print(f"📋 预处理图片模板: {template_id} (force={force})")
             
             # 检查缓存
             cache_path = os.path.join(self.template_cache_dir, template_id)
@@ -151,6 +151,7 @@ class StreamingMuseTalkAPI:
                     'success': True,
                     'template_id': template_id,
                     'cache_path': cache_path,
+                    'template_type': 'image',
                     'message': '模板已预处理（使用缓存）'
                 }
             
@@ -176,6 +177,7 @@ class StreamingMuseTalkAPI:
                 # 加载到内存缓存
                 self.template_cache[template_id] = {
                     'path': cache_path,
+                    'type': 'image',
                     'loaded_at': time.time()
                 }
                 
@@ -183,7 +185,8 @@ class StreamingMuseTalkAPI:
                     'success': True,
                     'template_id': template_id,
                     'cache_path': cache_path,
-                    'message': '模板预处理成功'
+                    'template_type': 'image',
+                    'message': '图片模板预处理成功'
                 }
             else:
                 # 预处理失败，清理缓存目录
@@ -194,11 +197,122 @@ class StreamingMuseTalkAPI:
                 
                 return {
                     'success': False,
-                    'message': '模板预处理失败'
+                    'message': '图片模板预处理失败'
                 }
                 
         except Exception as e:
-            print(f"❌ 模板预处理错误: {e}")
+            print(f"❌ 图片模板预处理错误: {e}")
+            return {
+                'success': False,
+                'message': str(e)
+            }
+    
+    def preprocess_video(self, template_id: str, video_path: str, force: bool = False) -> Dict:
+        """
+        预处理视频模板（由C#调用）
+        提取视频的人脸边界框信息
+        
+        Args:
+            template_id: 模板ID
+            video_path: 视频路径
+            force: 是否强制重新处理
+        """
+        try:
+            print(f"🎬 预处理视频模板: {template_id} (force={force})")
+            
+            # 检查缓存
+            preprocessed_dir = "/opt/musetalk/preprocessed"
+            os.makedirs(preprocessed_dir, exist_ok=True)
+            bbox_file = os.path.join(preprocessed_dir, f"{template_id}_bbox.pkl")
+            
+            # 如果不是强制重处理，且缓存存在，返回缓存
+            if not force and os.path.exists(bbox_file):
+                print(f"✅ 使用缓存视频: {template_id}")
+                return {
+                    'success': True,
+                    'template_id': template_id,
+                    'bbox_path': bbox_file,
+                    'video_path': video_path,
+                    'template_type': 'video',
+                    'message': '视频已预处理（使用缓存）'
+                }
+            
+            # 如果是强制重处理，删除旧缓存
+            if force and os.path.exists(bbox_file):
+                print(f"🗑️ 清理旧缓存: {template_id}")
+                os.remove(bbox_file)
+            
+            # 调用视频预处理脚本
+            import subprocess
+            import sys
+            
+            preprocess_script = "/opt/musetalk/repo/MuseTalkEngine/preprocess_assets.py"
+            
+            print(f"⚙️ 开始预处理视频: {video_path}")
+            
+            result = subprocess.run(
+                [sys.executable, preprocess_script, 
+                 "--video", video_path,
+                 "--output", preprocessed_dir],
+                capture_output=True,
+                text=True,
+                timeout=600  # 10分钟超时
+            )
+            
+            if result.returncode != 0:
+                print(f"❌ 视频预处理失败: {result.stderr}")
+                return {
+                    'success': False,
+                    'message': f'视频预处理失败: {result.stderr}'
+                }
+            
+            # 检查bbox文件是否生成
+            # 预处理脚本使用视频文件名作为输出
+            import os.path as osp
+            video_name = osp.splitext(osp.basename(video_path))[0]
+            generated_bbox = os.path.join(preprocessed_dir, f"{video_name}_bbox.pkl")
+            
+            if os.path.exists(generated_bbox):
+                # 重命名为template_id格式
+                if generated_bbox != bbox_file:
+                    import shutil
+                    shutil.move(generated_bbox, bbox_file)
+                
+                print(f"✅ 视频预处理成功: {bbox_file}")
+                
+                # 加载到内存缓存
+                self.template_cache[template_id] = {
+                    'bbox_path': bbox_file,
+                    'video_path': video_path,
+                    'type': 'video',
+                    'loaded_at': time.time()
+                }
+                
+                return {
+                    'success': True,
+                    'template_id': template_id,
+                    'bbox_path': bbox_file,
+                    'video_path': video_path,
+                    'template_type': 'video',
+                    'message': '视频模板预处理成功'
+                }
+            else:
+                print(f"❌ 未找到生成的bbox文件: {generated_bbox}")
+                return {
+                    'success': False,
+                    'message': '视频预处理失败：未生成bbox文件'
+                }
+                
+        except subprocess.TimeoutExpired:
+            print(f"❌ 视频预处理超时: {template_id}")
+            return {
+                'success': False,
+                'message': '视频预处理超时（超过10分钟）'
+            }
+        except Exception as e:
+            print(f"❌ 视频预处理错误: {e}")
+            import traceback
+            traceback.print_exc()
             return {
                 'success': False,
                 'message': str(e)
@@ -475,6 +589,12 @@ class PreprocessRequest(BaseModel):
     force: bool = False  # 是否强制重新处理
 
 
+class PreprocessVideoRequest(BaseModel):
+    template_id: str
+    video_path: str
+    force: bool = False  # 是否强制重新处理
+
+
 class SessionRequest(BaseModel):
     session_id: str
     template_id: str
@@ -507,9 +627,20 @@ async def initialize():
 
 @app.post("/api/preprocess_template")
 async def preprocess_template(request: PreprocessRequest):
-    """预处理模板"""
+    """预处理图片模板"""
     service = get_api_service()
     result = service.preprocess_template(request.template_id, request.image_path, request.force)
+    if result['success']:
+        return result
+    else:
+        raise HTTPException(status_code=400, detail=result['message'])
+
+
+@app.post("/api/preprocess_video")
+async def preprocess_video(request: PreprocessVideoRequest):
+    """预处理视频模板"""
+    service = get_api_service()
+    result = service.preprocess_video(request.template_id, request.video_path, request.force)
     if result['success']:
         return result
     else:

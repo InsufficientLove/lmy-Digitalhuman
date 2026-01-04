@@ -32,8 +32,21 @@ namespace LmyDigitalHuman.Models
         public string AgeRange { get; set; } = "adult"; // child, young, adult, elderly
         public string Style { get; set; } = "professional"; // professional, casual, friendly
         public bool EnableEmotion { get; set; } = true;
+        
+        // 模板资源类型
+        public string ResourceType { get; set; } = "image"; // image, video
+        
+        // 图片模板相关
         public string ImagePath { get; set; } = string.Empty;
         public string ImageUrl { get; set; } = string.Empty;
+        
+        // 视频模板相关
+        public string VideoPath { get; set; } = string.Empty;
+        public string VideoUrl { get; set; } = string.Empty;
+        public string VideoBboxPath { get; set; } = string.Empty; // 预处理的bbox文件路径
+        public double VideoDuration { get; set; } = 0; // 视频时长（秒）
+        public int VideoFrames { get; set; } = 0; // 视频总帧数
+        
         public string PreviewVideoPath { get; set; } = string.Empty;
         public string PreviewImageUrl { get; set; } = string.Empty;
         public VoiceSettings? DefaultVoiceSettings { get; set; }
@@ -815,8 +828,20 @@ namespace LmyDigitalHuman.Models
         [Required]
         public string SystemName { get; set; } = string.Empty;    // 系统名称（英文）
         
-        [Required]
-        public IFormFile ImageFile { get; set; } = default!;
+        /// <summary>
+        /// 资源类型：image 或 video
+        /// </summary>
+        public string ResourceType { get; set; } = "image";
+        
+        /// <summary>
+        /// 图片文件（当 ResourceType = image 时必填）
+        /// </summary>
+        public IFormFile? ImageFile { get; set; }
+        
+        /// <summary>
+        /// 视频文件（当 ResourceType = video 时必填）
+        /// </summary>
+        public IFormFile? VideoFile { get; set; }
         
         public string Description { get; set; } = string.Empty;
         public string TemplateType { get; set; } = "headshot";
