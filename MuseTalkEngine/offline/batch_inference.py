@@ -1186,7 +1186,13 @@ class UltraFastMuseTalkService:
                 writer = imageio.get_writer(temp_video, fps=fps, codec='libx264', quality=8, macro_block_size=1)
                 for frame in video_frames:
                     if frame is not None:
-                        writer.append_data(frame)
+                        # imageio 期望 RGB 格式，但 blending 后的帧是 BGR
+                        # 需要转回 RGB
+                        if len(frame.shape) == 3 and frame.shape[2] == 3:
+                            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                            writer.append_data(frame_rgb)
+                        else:
+                            writer.append_data(frame)
                 writer.close()
                 
                 if not os.path.exists(temp_video):
