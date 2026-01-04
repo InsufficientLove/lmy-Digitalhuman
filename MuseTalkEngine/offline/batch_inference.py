@@ -643,6 +643,26 @@ class UltraFastMuseTalkService:
                 print("错误: 音频特征提取失败")
                 return False
             
+            # 检测静态图片输入：如果只有一帧，根据音频长度复制帧
+            frame_list = cache_data['frame_list_cycle']
+            if len(frame_list) == 1:
+                target_frames = len(whisper_chunks)
+                print(f"🖼️ 检测到静态图片输入，复制帧: 1 -> {target_frames}")
+                
+                # 复制单帧到目标长度
+                static_frame = frame_list[0]
+                cache_data['frame_list_cycle'] = [static_frame] * target_frames
+                
+                # 同步其他循环数据
+                if 'coord_list_cycle' in cache_data and len(cache_data['coord_list_cycle']) == 1:
+                    cache_data['coord_list_cycle'] = [cache_data['coord_list_cycle'][0]] * target_frames
+                if 'mask_coords_list_cycle' in cache_data and len(cache_data['mask_coords_list_cycle']) == 1:
+                    cache_data['mask_coords_list_cycle'] = [cache_data['mask_coords_list_cycle'][0]] * target_frames
+                if 'mask_list_cycle' in cache_data and len(cache_data['mask_list_cycle']) == 1:
+                    cache_data['mask_list_cycle'] = [cache_data['mask_list_cycle'][0]] * target_frames
+                
+                print(f"✅ 静态图片帧扩展完成: {target_frames} 帧")
+            
             prep_time = time.time() - total_start
             print(f"并行预处理完成: {prep_time:.3f}s")
             
