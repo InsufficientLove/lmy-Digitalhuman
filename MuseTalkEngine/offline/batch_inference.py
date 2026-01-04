@@ -985,16 +985,17 @@ class UltraFastMuseTalkService:
                 y1 = max(0, min(y1, h))
                 y2 = max(0, min(y2, h))
                 
-                # 修复颜色问题：MuseTalk 模型输出是 RGB，需要转换为 BGR（OpenCV 格式）
+                # 关键修复 Bug 1：MuseTalk 模型输出是 RGB，需要转换为 BGR（OpenCV 格式）
                 if len(res_frame.shape) == 3 and res_frame.shape[2] == 3:
                     res_frame = cv2.cvtColor(res_frame.astype(np.uint8), cv2.COLOR_RGB2BGR)
                 else:
                     res_frame = res_frame.astype(np.uint8)
                 
-                # 修复尺寸匹配问题：确保 resize 后的尺寸与 bbox 完全一致
+                # 关键修复 Bug 2：强制 resize 推理结果以匹配 bbox 尺寸（避免 blending 失败）
                 target_w, target_h = x2 - x1, y2 - y1
                 if target_w > 0 and target_h > 0:
-                    res_frame = cv2.resize(res_frame, (target_w, target_h))
+                    # 无论res_frame原始尺寸如何，都强制resize到目标尺寸
+                    res_frame = cv2.resize(res_frame, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
                 else:
                     print(f"警告: bbox尺寸异常 ({target_w}x{target_h})，使用原始帧")
                     return i, ori_frame
@@ -1022,6 +1023,11 @@ class UltraFastMuseTalkService:
                 crop_box = [int(x) for x in crop_box]
                 
                 try:
+                    # 关键修复 Bug 2：在调用 blending 前再次确认尺寸匹配
+                    if res_frame.shape[0] != target_h or res_frame.shape[1] != target_w:
+                        print(f"⚠️ 尺寸不匹配，强制 resize: {res_frame.shape[:2]} -> ({target_h}, {target_w})")
+                        res_frame = cv2.resize(res_frame, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
+                    
                     combine_frame = get_image_blending(
                         image=ori_frame,
                         face=res_frame, 
@@ -1030,8 +1036,15 @@ class UltraFastMuseTalkService:
                         crop_box=crop_box
                     )
                 except Exception as blend_error:
-                    print(f"blending失败: {blend_error}, 使用原始帧")
-                    combine_frame = ori_frame
+                    print(f"❌ blending失败: {blend_error}")
+                    # 即使 blending 失败，也要尝试简单粘贴而不是放弃
+                    try:
+                        combine_frame = ori_frame.copy()
+                        combine_frame[y1:y2, x1:x2] = res_frame
+                        print(f"✅ 使用简单粘贴替代 blending")
+                    except Exception as paste_error:
+                        print(f"❌ 简单粘贴也失败: {paste_error}，使用原始帧")
+                        combine_frame = ori_frame
                 
                 return i, combine_frame
                 
@@ -1206,8 +1219,8 @@ class UltraFastMuseTalkService:
                 writer = imageio.get_writer(temp_video, fps=fps, codec='libx264', quality=8, macro_block_size=1)
                 for frame in video_frames:
                     if frame is not None:
-                        # imageio 期望 RGB 格式，但 blending 后的帧是 BGR
-                        # 需要转回 RGB
+                        # 关键修复 Bug 1：imageio 期望 RGB 格式，但 blending 后的帧是 BGR
+                        # 必须转回 RGB 才能正确写入视频
                         if len(frame.shape) == 3 and frame.shape[2] == 3:
                             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                             writer.append_data(frame_rgb)

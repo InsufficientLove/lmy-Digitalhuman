@@ -421,17 +421,18 @@ class GlobalMuseTalkService:
                     
                     x1, y1, x2, y2 = bbox
                     
-                    # 修复颜色问题：MuseTalk 模型输出是 RGB，需要转换为 BGR（OpenCV 格式）
+                    # 关键修复 Bug 1：MuseTalk 模型输出是 RGB，需要转换为 BGR（OpenCV 格式）
                     if len(res_frame.shape) == 3 and res_frame.shape[2] == 3:
                         res_frame = cv2.cvtColor(res_frame.astype(np.uint8), cv2.COLOR_RGB2BGR)
                     else:
                         res_frame = res_frame.astype(np.uint8)
                     
-                    # 修复尺寸匹配问题：确保 resize 后的尺寸与 bbox 完全一致
+                    # 关键修复 Bug 2：强制 resize 推理结果以匹配 bbox 尺寸（避免 blending 失败）
                     try:
                         target_w, target_h = x2 - x1, y2 - y1
                         if target_w > 0 and target_h > 0:
-                            res_frame = cv2.resize(res_frame, (target_w, target_h))
+                            # 强制 resize，确保尺寸完全匹配
+                            res_frame = cv2.resize(res_frame, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
                         else:
                             print(f"警告: bbox尺寸异常 ({target_w}x{target_h})")
                             return None
@@ -443,13 +444,29 @@ class GlobalMuseTalkService:
                     mask_coords = mask_coords_list_cycle[i % len(mask_coords_list_cycle)]
                     mask = mask_list_cycle[i % len(mask_list_cycle)]
                     
-                    combine_frame = get_image_blending(
-                        image=ori_frame,
-                        face=res_frame, 
-                        face_box=[x1, y1, x2, y2],
-                        mask_array=mask,
-                        crop_box=mask_coords
-                    )
+                    # 关键修复 Bug 2：在 blending 前再次确认尺寸匹配
+                    if res_frame.shape[0] != target_h or res_frame.shape[1] != target_w:
+                        print(f"⚠️ 尺寸不匹配，强制 resize: {res_frame.shape[:2]} -> ({target_h}, {target_w})")
+                        res_frame = cv2.resize(res_frame, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
+                    
+                    try:
+                        combine_frame = get_image_blending(
+                            image=ori_frame,
+                            face=res_frame, 
+                            face_box=[x1, y1, x2, y2],
+                            mask_array=mask,
+                            crop_box=mask_coords
+                        )
+                    except Exception as blend_error:
+                        print(f"❌ blending失败: {blend_error}")
+                        # 即使 blending 失败，也尝试简单粘贴
+                        try:
+                            combine_frame = ori_frame.copy()
+                            combine_frame[y1:y2, x1:x2] = res_frame
+                            print(f"✅ 使用简单粘贴替代 blending")
+                        except Exception as paste_error:
+                            print(f"❌ 简单粘贴也失败: {paste_error}")
+                            return None
                     
                     # 保存帧
                     frame_path = os.path.join(temp_frames_dir, f"{i:08d}.png")

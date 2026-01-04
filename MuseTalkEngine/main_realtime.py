@@ -207,9 +207,11 @@ class GlobalState:
             ret, frame = cap.read()
             if not ret:
                 break
+            # 关键修复 Bug 1：cv2.VideoCapture 读取的是 BGR 格式，转换为 RGB 供模型使用
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             frames.append(frame)
         cap.release()
-        print(f"  ✅ 加载 {len(frames)} 帧")
+        print(f"  ✅ 加载 {len(frames)} 帧 (已转换为 RGB)")
         
         # 加载边界框
         print(f"  - 读取边界框: {bbox_path}")
@@ -414,14 +416,14 @@ def inference_frame_batch(
             if recon.shape[0] == 3:  # CHW -> HWC
                 recon = recon.transpose(1, 2, 0)
             
-            # 修复颜色问题：MuseTalk 模型输出是 RGB，需要转换为 BGR（OpenCV 格式）
+            # 关键修复 Bug 1：MuseTalk 模型输出是 RGB，需要转换为 BGR（OpenCV 格式）
             if len(recon.shape) == 3 and recon.shape[2] == 3:
                 recon = cv2.cvtColor(recon, cv2.COLOR_RGB2BGR)
             
-            # 修复尺寸匹配问题：确保 resize 后的尺寸与 bbox 完全一致
+            # 关键修复 Bug 2：强制 resize 到目标尺寸（避免尺寸不匹配导致 blending 失败）
             target_w, target_h = x2 - x1, y2 - y1
             if target_w > 0 and target_h > 0:
-                recon_resized = cv2.resize(recon, (target_w, target_h))
+                recon_resized = cv2.resize(recon, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
             else:
                 print(f"警告: bbox尺寸异常 ({target_w}x{target_h})，使用原图")
                 generated_frames.append(orig_frame)

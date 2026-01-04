@@ -349,6 +349,10 @@ class OptimizedPreprocessor:
             if image is None:
                 raise ValueError(f"无法读取图像: {input_image_path}")
             
+            # 关键修复：cv2.imread读取的是BGR格式，需要转换为RGB供模型使用
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            print("✅ 输入图像已转换 BGR -> RGB")
+            
             # 跳过阴影修复，保持原始颜色
             # image = self.fix_face_shadows(image)
             print("保持原始颜色，跳过阴影修复")
@@ -357,7 +361,9 @@ class OptimizedPreprocessor:
             print("👤 面部检测和关键点提取...")
             # 保存临时图像文件给get_landmark_and_bbox使用
             temp_image_path = os.path.join(output_dir, "temp_image.jpg")
-            cv2.imwrite(temp_image_path, image)
+            # 关键修复：保存前转回BGR格式（因为cv2.imwrite期望BGR）
+            image_bgr = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+            cv2.imwrite(temp_image_path, image_bgr)
             
             # 调试：检查图像是否正确保存
             if os.path.exists(temp_image_path):
