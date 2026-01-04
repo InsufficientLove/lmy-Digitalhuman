@@ -61,7 +61,10 @@ class GPUInferenceWorker:
                     latent_batch, timesteps, 
                     encoder_hidden_states=audio_features
                 ).sample
-                recon_frames = self.gpu_models['vae'].decode_latents(pred_latents)
+                
+                # VAE 解码 - 转换为 Float32 避免 cuDNN 错误
+                pred_latents_fp32 = pred_latents.to(dtype=torch.float32)
+                recon_frames = self.gpu_models['vae'].decode_latents(pred_latents_fp32)
                 
         return recon_frames
         

@@ -253,11 +253,14 @@ class UltraFastMuseTalkService:
                     # 优化模型 - 半精度+编译优化 (使用autocast避免dtype错误)
                     print(f"GPU{device_id} 开始模型优化...")
                     
-                    # 修复VAE对象 - 使用.vae属性 + FP16
+                    # 修复VAE对象 - 保持 Float32（避免 cuDNN 错误）
+                    # VAE 在 FP16 下极不稳定，必须保持 Float32
                     if hasattr(vae, 'vae'):
-                        vae.vae = vae.vae.to(device).half().eval()
+                        vae.vae = vae.vae.to(device, dtype=torch.float32).eval()
+                        print(f"GPU{device_id} VAE 保持 Float32（避免cuDNN错误）")
                     elif hasattr(vae, 'to'):
-                        vae = vae.to(device).half().eval()
+                        vae = vae.to(device, dtype=torch.float32).eval()
+                        print(f"GPU{device_id} VAE 保持 Float32（避免cuDNN错误）")
                     else:
                         print(f"警告: VAE对象结构不明，跳过优化")
                     
@@ -789,8 +792,11 @@ class UltraFastMuseTalkService:
                             pred_latents = gpu_models['unet'].model(
                                 latent_batch, timesteps, encoder_hidden_states=audio_features
                             ).sample
-                            # VAE 解码
-                            recon_frames = gpu_models['vae'].decode_latents(pred_latents)
+                        
+                        # VAE 解码 - 必须在 autocast 外，且转换为 Float32
+                        # 这样避免 cuDNN FP16 错误
+                        pred_latents_fp32 = pred_latents.to(dtype=torch.float32)
+                        recon_frames = gpu_models['vae'].decode_latents(pred_latents_fp32)
                     
                     # 立即移回CPU释放GPU内存
                     # 检查返回类型，如果已经是numpy数组就直接使用
@@ -959,11 +965,19 @@ class UltraFastMuseTalkService:
                 y1 = max(0, min(y1, h))
                 y2 = max(0, min(y2, h))
                 
-                # 暂时不转换颜色，保持原样
-                # if len(res_frame.shape) == 3 and res_frame.shape[2] == 3:
-                #     res_frame = cv2.cvtColor(res_frame.astype(np.uint8), cv2.COLOR_BGR2RGB)
+                # 修复颜色问题：MuseTalk 模型输出是 RGB，需要转换为 BGR（OpenCV 格式）
+                if len(res_frame.shape) == 3 and res_frame.shape[2] == 3:
+                    res_frame = cv2.cvtColor(res_frame.astype(np.uint8), cv2.COLOR_RGB2BGR)
+                else:
+                    res_frame = res_frame.astype(np.uint8)
                 
-                res_frame = cv2.resize(res_frame.astype(np.uint8), (x2-x1, y2-y1))
+                # 修复尺寸匹配问题：确保 resize 后的尺寸与 bbox 完全一致
+                target_w, target_h = x2 - x1, y2 - y1
+                if target_w > 0 and target_h > 0:
+                    res_frame = cv2.resize(res_frame, (target_w, target_h))
+                else:
+                    print(f"警告: bbox尺寸异常 ({target_w}x{target_h})，使用原始帧")
+                    return i, ori_frame
                 
                 # 使用优化的blending
                 mask_coords = mask_coords_list_cycle[i % len(mask_coords_list_cycle)]
