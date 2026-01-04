@@ -24,6 +24,7 @@ import multiprocessing as mp
 from functools import partial
 import copy
 import gc
+from torch.cuda.amp import autocast
 try:
     from transformers import WhisperModel
     WHISPER_AVAILABLE = True
@@ -95,7 +96,7 @@ class UltraFastMuseTalkService:
         self.shared_whisper = None
         self.shared_audio_processor = None
         self.shared_fp = None
-        self.weight_dtype = torch.float32  # 使用float32确保稳定性（避免dtype错误）
+        self.weight_dtype = torch.float16  # 使用FP16提速，配合autocast避免dtype错误
         self.timesteps = None
         
         # 内存池和缓存优化
@@ -249,32 +250,32 @@ class UltraFastMuseTalkService:
                             print(f"GPU{device_id} 其他错误，跳过此GPU")
                             return None
                     
-                    # 优化模型 - 移到GPU并eval (不使用half以避免dtype错误)
+                    # 优化模型 - 半精度+编译优化 (使用autocast避免dtype错误)
                     print(f"GPU{device_id} 开始模型优化...")
                     
-                    # 修复VAE对象 - 使用.vae属性（float32）
+                    # 修复VAE对象 - 使用.vae属性 + FP16
                     if hasattr(vae, 'vae'):
-                        vae.vae = vae.vae.to(device).eval()
+                        vae.vae = vae.vae.to(device).half().eval()
                     elif hasattr(vae, 'to'):
-                        vae = vae.to(device).eval()
+                        vae = vae.to(device).half().eval()
                     else:
                         print(f"警告: VAE对象结构不明，跳过优化")
                     
-                    # 修复UNet对象 - 使用.model属性（float32）
+                    # 修复UNet对象 - 使用.model属性 + FP16
                     if hasattr(unet, 'model'):
-                        unet.model = unet.model.to(device).eval()
+                        unet.model = unet.model.to(device).half().eval()
                     elif hasattr(unet, 'to'):
-                        unet = unet.to(device).eval()
+                        unet = unet.to(device).half().eval()
                     else:
                         print(f"警告: UNet对象结构不明，跳过优化")
                     
-                    # 修复PE对象（float32）
+                    # 修复PE对象 + FP16
                     if hasattr(pe, 'to'):
-                        pe = pe.to(device).eval()
+                        pe = pe.to(device).half().eval()
                     else:
                         print(f"警告: PE对象没有.to()方法，跳过优化")
                     
-                    print(f"GPU{device_id} 模型优化完成（使用float32以确保稳定性）")
+                    print(f"GPU{device_id} 半精度转换完成（FP16 + autocast混合精度推理）")
                     
                     # 智能模型编译 - 使用更安全的编译模式
                     import platform
@@ -780,12 +781,16 @@ class UltraFastMuseTalkService:
                         if 'vae' not in gpu_models or gpu_models['vae'] is None:
                             raise ValueError(f"VAE模型在{target_device}上未初始化")
                         
-                        # 现在预处理直接生成8通道latent，不需要再进行通道数检查和转换
-                        audio_features = gpu_models['pe'](whisper_batch)
-                        pred_latents = gpu_models['unet'].model(
-                            latent_batch, timesteps, encoder_hidden_states=audio_features
-                        ).sample
-                        recon_frames = gpu_models['vae'].decode_latents(pred_latents)
+                        # 使用 autocast 包裹推理，自动处理 FP16/FP32 混合精度
+                        with autocast(dtype=torch.float16):
+                            # 音频特征提取
+                            audio_features = gpu_models['pe'](whisper_batch)
+                            # UNet 推理 - autocast 会自动处理 dtype 转换
+                            pred_latents = gpu_models['unet'].model(
+                                latent_batch, timesteps, encoder_hidden_states=audio_features
+                            ).sample
+                            # VAE 解码
+                            recon_frames = gpu_models['vae'].decode_latents(pred_latents)
                     
                     # 立即移回CPU释放GPU内存
                     # 检查返回类型，如果已经是numpy数组就直接使用
