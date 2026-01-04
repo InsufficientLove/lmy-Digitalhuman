@@ -77,8 +77,39 @@ namespace LmyDigitalHuman.Services.Core
                 _logger.LogInformation("开始创建数字人模板: DisplayName={DisplayName}, SystemName={SystemName}, ResourceType={ResourceType}", 
                     request.TemplateName, request.SystemName, request.ResourceType);
 
-                // 生成模板ID
-                var templateId = Guid.NewGuid().ToString("N");
+                // 检查是否已存在相同SystemName的模板
+                var existingTemplate = _templates.Values.FirstOrDefault(t => t.SystemName == request.SystemName);
+                string templateId;
+                bool isUpdate = false;
+                
+                if (existingTemplate != null)
+                {
+                    // 更新现有模板
+                    templateId = existingTemplate.TemplateId;
+                    isUpdate = true;
+                    _logger.LogInformation("检测到同名模板，将更新: TemplateId={TemplateId}, SystemName={SystemName}", 
+                        templateId, request.SystemName);
+                    
+                    // 删除旧的预处理缓存
+                    var oldCachePath = Path.Combine("/opt/musetalk/template_cache", request.SystemName);
+                    if (Directory.Exists(oldCachePath))
+                    {
+                        try
+                        {
+                            Directory.Delete(oldCachePath, true);
+                            _logger.LogInformation("已删除旧的预处理缓存: {Path}", oldCachePath);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "删除旧缓存失败: {Path}", oldCachePath);
+                        }
+                    }
+                }
+                else
+                {
+                    // 创建新模板
+                    templateId = Guid.NewGuid().ToString("N");
+                }
                 
                 // 确保使用完整的绝对路径
                 var fullTemplatesPath = Path.IsPathRooted(_templatesPath) 
@@ -274,7 +305,9 @@ namespace LmyDigitalHuman.Services.Core
                 {
                     Success = true,
                     TemplateId = templateId,
-                    Message = "数字人模板创建成功，正在后台预处理...",
+                    Message = isUpdate 
+                        ? $"模板已更新：{request.TemplateName}（{request.SystemName}），预处理完成后可用" 
+                        : $"模板创建成功：{request.TemplateName}（{request.SystemName}），预处理完成后可用",
                     Template = template,  // 状态仍为"processing"
                     ProcessingTime = $"{processingTime.TotalMilliseconds:F0}ms"
                 };
