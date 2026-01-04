@@ -178,8 +178,8 @@ class UltraFastMuseTalkService:
                         
                         # 直接加载模型，不检查config
                         try:
-                            # 尝试默认加载
-                            audio_processor, vae, unet, pe = load_all_model()
+                            # 尝试默认加载 - load_all_model返回3个值：vae, unet, pe
+                            vae, unet, pe = load_all_model()
                             print(f"GPU{device_id} 模型加载成功!")
                             
                             # 恢复原始工作目录
@@ -200,11 +200,11 @@ class UltraFastMuseTalkService:
                             print(f"GPU{device_id} 尝试备用加载方式...")
                             
                             # 设置环境变量指向模型
-                            os.environ['VAE_PATH'] = sd_vae_path
+                            os.environ['VAE_PATH'] = '/opt/musetalk/models/sd-vae'
                             os.environ['UNET_PATH'] = '/opt/musetalk/models/musetalk'
                             
                             # 再次尝试
-                            audio_processor, vae, unet, pe = load_all_model()
+                            vae, unet, pe = load_all_model()
                             print(f"GPU{device_id} 模型加载成功（备用方式）")
                             
                             # 恢复原始工作目录
@@ -229,7 +229,7 @@ class UltraFastMuseTalkService:
                                 # 强制清理GPU内存
                                 torch.cuda.empty_cache()
                                 # 重新尝试加载
-                                audio_processor, vae, unet, pe = load_all_model(vae_type="sd-vae")
+                                vae, unet, pe = load_all_model()
                                 print(f"GPU{device_id} 重新加载成功")
                                 # 恢复原始工作目录
                                 os.chdir(original_cwd)
