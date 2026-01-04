@@ -327,7 +327,7 @@ class UltraFastMuseTalkService:
                                     compile_options = strategy
                                     print(f"  使用编译策略 {idx+1}: {strategy['mode']}")
                                     break
-                                except:
+                                except Exception:
                                     continue
                             
                             if compile_options is None:
