@@ -496,41 +496,40 @@ class OptimizedPreprocessor:
                     print(f"警告: 关键点类型不正确: {type(landmarks)}")
                     continue
                 
-                # 面部解析 - 使用正确的方法调用
+                # 面部解析 - 简化逻辑，避免错误
                 try:
-                    # 尝试常见的面部解析方法
-                    if self.fp is not None and hasattr(self.fp, '__call__'):
+                    mask_out = None
+                    
+                    # 优先使用SimpleFaceParsing（更可靠）
+                    if isinstance(self.fp, SimpleFaceParsing):
+                        mask_out = self.fp(frame)
+                        if mask_out is not None:
+                            print(f"SimpleFaceParsing成功，mask shape: {mask_out.shape}, unique: {np.unique(mask_out)[:5]}")
+                    # 尝试原生FaceParsing
+                    elif self.fp is not None:
                         try:
                             result = self.fp(frame)
-                            # 检查返回值类型并正确处理
-                            if result is None:
-                                print("面部解析返回None，使用默认mask")
-                                mask_out = np.ones((frame.shape[0], frame.shape[1]), dtype=np.uint8) * 255
-                            elif isinstance(result, tuple) and len(result) > 0:
-                                mask_out = result[0] if isinstance(result[0], np.ndarray) else np.ones((frame.shape[0], frame.shape[1]), dtype=np.uint8) * 255
-                            elif isinstance(result, np.ndarray):
+                            # 严格类型检查
+                            if isinstance(result, np.ndarray) and len(result.shape) == 2:
                                 mask_out = result
-                            elif isinstance(result, (int, float)):
-                                # 如果返回数字，创建默认mask
-                                print(f"面部解析返回数字: {result}")
-                                mask_out = np.ones((frame.shape[0], frame.shape[1]), dtype=np.uint8) * 255
+                                print(f"FaceParsing成功，mask shape: {mask_out.shape}")
+                            elif isinstance(result, tuple) and len(result) > 0 and isinstance(result[0], np.ndarray):
+                                mask_out = result[0]
+                                print(f"FaceParsing返回tuple，使用第一个元素")
                             else:
-                                print(f"面部解析返回未知类型: {type(result)}")
-                                mask_out = np.ones((frame.shape[0], frame.shape[1]), dtype=np.uint8) * 255
-                        except (TypeError, ValueError) as te:
-                            print(f"面部解析调用错误（已处理）: {te}")
-                            mask_out = np.ones((frame.shape[0], frame.shape[1]), dtype=np.uint8) * 255
-                    elif self.fp is not None and hasattr(self.fp, 'parse'):
-                        mask_out = self.fp.parse(frame)
-                    elif self.fp is not None and hasattr(self.fp, 'predict'):
-                        mask_out = self.fp.predict(frame)
-                    else:
-                        print("面部解析失败: FaceParsing对象没有可用的解析方法")
-                        # 使用默认mask（全白，表示整个面部区域）
+                                print(f"FaceParsing返回非预期类型: {type(result)}，降级到SimpleFaceParsing")
+                                mask_out = SimpleFaceParsing()(frame)
+                        except Exception as fp_error:
+                            print(f"FaceParsing调用失败: {fp_error}，降级到SimpleFaceParsing")
+                            mask_out = SimpleFaceParsing()(frame)
+                    
+                    # 如果仍然失败，使用默认mask
+                    if mask_out is None or not isinstance(mask_out, np.ndarray):
+                        print("面部解析完全失败，使用默认全白mask")
                         mask_out = np.ones((frame.shape[0], frame.shape[1]), dtype=np.uint8) * 255
+                        
                 except Exception as e:
-                    print(f"面部解析出错: {e}")
-                    # 使用默认mask
+                    print(f"面部解析出错: {e}，使用默认mask")
                     mask_out = np.ones((frame.shape[0], frame.shape[1]), dtype=np.uint8) * 255
                 
                 # 保存面部解析的mask
