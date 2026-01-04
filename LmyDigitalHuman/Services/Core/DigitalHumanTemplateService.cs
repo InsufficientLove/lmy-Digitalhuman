@@ -1199,6 +1199,7 @@ namespace LmyDigitalHuman.Services.Core
                 // 调用MuseTalk服务生成视频
                 var request = new DigitalHumanRequest
                 {
+                    TemplateId = templateName,  // 使用SystemName作为TemplateId
                     AvatarImagePath = imagePath, // 使用物理路径
                     AudioPath = audioPath,
                     Quality = quality,
