@@ -395,22 +395,22 @@ class StreamingMuseTalkAPI:
             # 根据音频长度选择处理策略
             num_frames = int(duration * 25)  # 25fps
             
-            # 优化策略：先确保能生成视频，每帧都处理
-            # 基于实测：每帧需要约3GB显存，batch_size需要保守设置
+            # 优化策略：针对 RTX 4090D 优化 batch_size
+            # RTX 4090D 24GB 显存，batch_size=8 是安全且高效的选择
             if num_frames <= 25:  # 1秒以内
-                batch_size = 1  # 单帧处理最安全
+                batch_size = 8  # 4090D 优化
                 skip_frames = 1  # 不跳帧，每帧都处理
                 mode = 'realtime'
             elif num_frames <= 50:  # 2秒以内
-                batch_size = 1  # 单帧处理
+                batch_size = 8  # 4090D 优化
                 skip_frames = 1  # 不跳帧，每帧都处理
                 mode = 'fast'
             elif num_frames <= 100:  # 4秒以内
-                batch_size = 1  # 单帧处理
+                batch_size = 8  # 4090D 优化
                 skip_frames = 1  # 不跳帧，每帧都处理
                 mode = 'balanced'
             else:  # 4秒以上
-                batch_size = 1  # 单帧处理
+                batch_size = 8  # 4090D 优化
                 skip_frames = 1  # 不跳帧，每帧都处理
                 mode = 'quality'
             

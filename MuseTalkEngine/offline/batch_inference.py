@@ -36,7 +36,7 @@ import warnings
 warnings.filterwarnings("ignore")
 
 # GPU配置 - 直接定义，不从外部导入
-GPU_MEMORY_CONFIG = {'batch_size': {'default': 4}}
+GPU_MEMORY_CONFIG = {'batch_size': {'default': 8}}
 print("使用默认GPU配置")
 
 # 设置模型路径
@@ -587,8 +587,8 @@ class UltraFastMuseTalkService:
                     batch_size = 2  
                     print(f"❌ 显存紧张({min_free_memory:.1f}GB)，设置batch_size=2（批处理+释放）")
                 else:  # 10GB以下
-                    batch_size = 1  
-                    print(f"❌ 显存不足({min_free_memory:.1f}GB)，设置batch_size=1")
+                    batch_size = 4  
+                    print(f"❌ 显存偏少({min_free_memory:.1f}GB)，设置batch_size=4")
                     
                 print(f"基于可用显存({min_free_memory:.1f}GB)，设置batch_size={batch_size}")
                 
@@ -606,9 +606,9 @@ class UltraFastMuseTalkService:
                     
             except Exception as e:
                 print(f"显存检测失败: {e}")
-                # 如果检测失败，使用最保守值
-                batch_size = 1
-                print(f"使用最保守batch_size=1")
+                # 如果检测失败，使用保守值
+                batch_size = 4
+                print(f"使用保守batch_size=4（RTX 4090D 优化）")
         
         print(f"🔍 推理配置: GPU数={self.gpu_count}, batch_size={batch_size}")
         
