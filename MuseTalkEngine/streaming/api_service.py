@@ -242,29 +242,12 @@ class StreamingMuseTalkAPI:
                 print(f"🗑️ 清理旧缓存: {template_id}")
                 os.remove(bbox_file)
             
-            # 调用视频预处理脚本
-            import subprocess
-            import sys
-            
-            preprocess_script = "/opt/musetalk/repo/MuseTalkEngine/preprocess_assets.py"
-            
-            print(f"⚙️ 开始预处理视频: {video_path}")
-            
-            result = subprocess.run(
-                [sys.executable, preprocess_script, 
-                 "--video", video_path,
-                 "--output", preprocessed_dir],
-                capture_output=True,
-                text=True,
-                timeout=600  # 10分钟超时
-            )
-            
-            if result.returncode != 0:
-                print(f"❌ 视频预处理失败: {result.stderr}")
-                return {
-                    'success': False,
-                    'message': f'视频预处理失败: {result.stderr}'
-                }
+            # 视频预处理功能已移除（使用图片模板替代）
+            print(f"⚠️ 视频预处理功能已禁用，请使用图片模板")
+            return {
+                'success': False,
+                'message': '视频预处理功能已禁用，请使用图片模板（preprocess_template）'
+            }
             
             # 检查bbox文件是否生成
             # 预处理脚本使用视频文件名作为输出
