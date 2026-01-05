@@ -7,14 +7,17 @@ Ultra Fast Realtime Inference V2
 
 import sys
 import os
-# 强行将项目根目录加入 sys.path
+# 修复路径嵌套问题：repo/musetalk/musetalk/... (双层结构)
 # 当前文件在: repo/MuseTalkEngine/offline/batch_inference.py
-# 需要回退两级到: repo/
+# 需要回退两级到 repo/，然后进入 musetalk/ 子目录
 current_file_path = os.path.abspath(__file__)
-project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_file_path)))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
-print(f"DEBUG: Added {project_root} to sys.path")
+repo_root = os.path.dirname(os.path.dirname(os.path.dirname(current_file_path)))
+# 关键修复：将 repo/musetalk 加入 sys.path（包的父目录）
+package_parent_dir = os.path.join(repo_root, "musetalk")
+# 务必插入到最前面 (index 0)，优先从这里导入
+if package_parent_dir not in sys.path:
+    sys.path.insert(0, package_parent_dir)
+print(f"DEBUG: Added {package_parent_dir} to sys.path (package parent)")
 import json
 import pickle
 import torch
