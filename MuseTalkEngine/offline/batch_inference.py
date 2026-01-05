@@ -5,8 +5,16 @@ Ultra Fast Realtime Inference V2
 极致优化版本 - 目标：毫秒级响应，4GPU真并行，零等待
 """
 
-import os
 import sys
+import os
+# 强行将项目根目录加入 sys.path
+# 当前文件在: repo/MuseTalkEngine/offline/batch_inference.py
+# 需要回退两级到: repo/
+current_file_path = os.path.abspath(__file__)
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_file_path)))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+print(f"DEBUG: Added {project_root} to sys.path")
 import json
 import pickle
 import torch
