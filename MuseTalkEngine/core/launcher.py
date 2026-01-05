@@ -34,10 +34,10 @@ def init_templates():
         # 创建必要的目录
         template_cache_dir = os.environ.get('MUSE_TEMPLATE_CACHE_DIR', '/opt/musetalk/template_cache')
         os.makedirs(template_cache_dir, exist_ok=True)
-        os.makedirs("/opt/musetalk/repo/MuseTalk/models", exist_ok=True)
+        os.makedirs("/opt/musetalk/repo/musetalk/models", exist_ok=True)
         
-        # 软链接路径 - 为了兼容性，创建指向统一缓存目录的链接
-        link_path = "/opt/musetalk/repo/MuseTalk/models/templates"
+        # 软链接路径 - 为了兼容性，创建指向统一缓存目录的链接（修正为小写）
+        link_path = "/opt/musetalk/repo/musetalk/models/templates"
         target_path = template_cache_dir
         
         # 如果链接已存在且正确，跳过

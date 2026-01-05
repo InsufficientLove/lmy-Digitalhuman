@@ -54,8 +54,8 @@ print("使用默认GPU配置")
 os.environ['MODEL_PATH'] = '/opt/musetalk/models'
 os.environ['MUSETALK_MODEL_PATH'] = '/opt/musetalk/models'
 
-# 添加MuseTalk模块路径
-sys.path.append('/opt/musetalk/repo/MuseTalk')
+# 添加MuseTalk模块路径（注意：已通过顶部路径修复代码处理）
+# sys.path.append('/opt/musetalk/repo/musetalk')  # 已废弃，使用顶部的动态路径
 
 from musetalk.utils.face_parsing import FaceParsing
 from musetalk.utils.utils import datagen, load_all_model

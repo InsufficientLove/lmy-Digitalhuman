@@ -24,7 +24,7 @@ warnings.filterwarnings("ignore")
 
 # 添加MuseTalk模块路径
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'MuseTalk'))
-sys.path.append('/opt/musetalk/repo/MuseTalk')  # 添加实际的MuseTalk路径
+sys.path.append('/opt/musetalk/repo/musetalk')  # 添加实际的musetalk路径（小写）
 
 try:
     from musetalk.utils.face_parsing import FaceParsing

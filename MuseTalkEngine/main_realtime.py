@@ -29,7 +29,7 @@ from fastapi.responses import StreamingResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 # 添加 MuseTalk 路径
-MUSETALK_PATH = os.environ.get('MUSE_TALK_DIR', '/opt/musetalk/repo/MuseTalk')
+MUSETALK_PATH = os.environ.get('MUSE_TALK_DIR', '/opt/musetalk/repo/musetalk')
 sys.path.insert(0, MUSETALK_PATH)
 
 try:
