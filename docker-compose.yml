@@ -21,65 +21,45 @@ services:
     restart: unless-stopped
 
   musetalk-python:
-    image: musetalk-python:working  # 使用包含face-alignment的镜像
-    # build:
-    #   context: .
-    #   dockerfile: MuseTalkEngine/Dockerfile
+    image: musetalk-python:working
     container_name: musetalk-python
     ports:
-      - "8124:28888"  # HTTP API端口
-      - "8125:8766"    # WebSocket端口（流式处理）
-    # 关键：添加nvidia runtime让容器能访问GPU
+      - "8124:28888"
+      - "8125:8766"
     runtime: nvidia
     environment:
-      # GPU访问配置 - 使用所有GPU（0和1）
       - CUDA_VISIBLE_DEVICES=0,1
       - NVIDIA_VISIBLE_DEVICES=0,1
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
-      # torch.compile优化配置（仅在容器内生效，不影响宿主机）
-      - TORCH_CUDNN_V8_API_ENABLED=1  # 使用新的cuDNN API
-      - TORCH_COMPILE_DISABLE_CUDAGRAPHS=1  # 禁用CUDA图避免多线程TLS错误
-      - TORCHINDUCTOR_CACHE_DIR=/opt/musetalk/cache/torch_compile  # 持久化编译缓存
-      - TORCH_LOGS=-dynamo  # 减少编译日志输出
-      - TORCHINDUCTOR_AUTOTUNE_GEMM=1  # 启用GEMM自动调优
-      - DISABLE_TORCH_COMPILE=1  # 禁用torch.compile避免多GPU CUDA冲突
-      # 缓存目录配置
-      - TORCH_HOME=/opt/musetalk/cache/torch
-      - HF_HOME=/opt/musetalk/cache/huggingface
-      # TRANSFORMERS_CACHE已弃用，使用HF_HOME代替
-      # 路径配置
+      # 路径配置 (注意：这里全是小写 musetalk)
       - MUSE_MODELS_DIR=/opt/musetalk/models
       - MUSE_VIDEOS_DIR=/videos
       - MUSE_TEMP_DIR=/temp
-      - MUSE_TALK_DIR=/opt/musetalk/repo/MuseTalk
-      # 统一的模板缓存目录
+      - MUSE_TALK_DIR=/opt/musetalk/repo/musetalk
       - MUSE_TEMPLATE_CACHE_DIR=/opt/musetalk/template_cache
-      # 流式处理配置
-      - STREAMING_MODE=integrated  # integrated/realtime/basic
-      - SEGMENT_DURATION=1.0  # 音频分段长度（秒）
-      - SKIP_FRAMES=2  # 跳帧数（1=不跳帧，2=隔帧，3=每3帧1次）
-      - INTERPOLATION_METHOD=optical_flow  # linear/optical_flow/rife
+      # 性能配置
+      - STREAMING_MODE=integrated
+      - SEGMENT_DURATION=1.0
+      - SKIP_FRAMES=2
+      - INTERPOLATION_METHOD=optical_flow
     volumes:
+      # 代码挂载 (关键修正：宿主机小写 -> 容器小写)
       - ./MuseTalkEngine:/opt/musetalk/repo/MuseTalkEngine
-      - ./MuseTalk:/opt/musetalk/repo/MuseTalk
+      - ./musetalk:/opt/musetalk/repo/musetalk
       - ./LmyDigitalHuman:/opt/musetalk/repo/LmyDigitalHuman
-      # 模型目录挂载
+      # 模型挂载
       - /opt/musetalk/models:/opt/musetalk/models
-      - /opt/musetalk/models:/opt/musetalk/repo/MuseTalk/models
-      # 数据和结果目录（方便宿主机访问）
+      - /opt/musetalk/models:/opt/musetalk/repo/musetalk/models
+      # 数据与结果 (关键修正：把视频导流到 ./results)
       - ./data:/opt/musetalk/data
-      - ./results:/opt/musetalk/results
-      # 统一的模板预处理缓存目录（持久化）
+      - ./results:/videos 
+      # 缓存与模板
       - /opt/musetalk/template_cache:/opt/musetalk/template_cache
-      # 共享模板文件目录（C#上传的图片，Python需要访问）
       - /opt/musetalk/templates:/opt/musetalk/templates
-      # 缓存目录（避免重复下载）
       - /opt/musetalk/cache:/opt/musetalk/cache
-      - /opt/musetalk/videos:/videos
       - /opt/musetalk/temp:/temp
     working_dir: /opt/musetalk/repo
     command: ["python3", "MuseTalkEngine/streaming/api_service.py"]
-    # 需要主机已安装 nvidia-container-toolkit
     deploy:
       resources:
         reservations:
@@ -95,11 +75,10 @@ services:
       dockerfile: LmyDigitalHuman/Dockerfile
     container_name: lmy-digitalhuman
     ports:
-      - "8126:5000"  # C# Web前端
+      - "8126:5000"
     environment:
       - ASPNETCORE_URLS=http://0.0.0.0:5000
       - ASPNETCORE_ENVIRONMENT=Docker
-      # 统一的模板缓存目录
       - MUSE_TEMPLATE_CACHE_DIR=/opt/musetalk/template_cache
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -107,29 +86,19 @@ services:
       - musetalk-python
     volumes:
       - ./LmyDigitalHuman:/opt/musetalk/repo/LmyDigitalHuman
-      # 模型目录 - C#期望在/models路径
       - /opt/musetalk/models:/models
-      # 数据和结果目录（与Python端同步）
       - ./data:/app/data
-      - ./results:/app/results
-      # 统一的模板预处理缓存目录（持久化）- 与Python端使用相同的宿主机目录
+      # 关键修正：C# 也要映射 results 到 /videos，这样它才能读到 Python 生成的文件
+      - ./results:/videos
       - /opt/musetalk/template_cache:/opt/musetalk/template_cache
-      # 共享模板文件目录 - 映射到C#的wwwroot/templates
       - /opt/musetalk/templates:/app/wwwroot/templates
-      - /opt/musetalk/videos:/videos
       - /opt/musetalk/temp:/temp
     networks:
       - web
     labels:
       - "traefik.enable=true"
-      - "traefik.http.middlewares.https-redirect.redirectscheme.scheme=https"
       - "traefik.http.routers.lmy-web.rule=Host(`${DOMAIN}`)"
       - "traefik.http.routers.lmy-web.entrypoints=web"
-      - "traefik.http.routers.lmy-web.middlewares=https-redirect"
-      - "traefik.http.routers.lmy-websecure.rule=Host(`${DOMAIN}`)"
-      - "traefik.http.routers.lmy-websecure.entrypoints=websecure"
-      - "traefik.http.routers.lmy-websecure.tls=true"
-      - "traefik.http.routers.lmy-websecure.tls.certresolver=myresolver"
       - "traefik.http.services.lmy.loadbalancer.server.port=5000"
     restart: unless-stopped
 
