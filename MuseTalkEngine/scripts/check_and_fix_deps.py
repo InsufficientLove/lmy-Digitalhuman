@@ -94,9 +94,10 @@ def main():
                 return 1
         
         # 安装缺失的OpenMMLab包
+        # 注意：mmcv版本必须<2.2.0（mmdet兼容性要求）
         mmlab_packages = [
             ('mmengine', '>=0.8.4'),
-            ('mmcv', '>=2.0.1'),
+            ('mmcv', '==2.1.0'),  # 固定版本，避免2.2.0兼容性问题
             ('mmdet', '>=3.1.0'),
             ('mmpose', '>=1.1.0'),
         ]
@@ -126,7 +127,7 @@ def main():
         print("\n手动安装命令:")
         print("  pip install -U openmim")
         print("  mim install mmengine")
-        print("  mim install 'mmcv>=2.0.1'")
+        print("  mim install 'mmcv==2.1.0'")
         print("  mim install 'mmdet>=3.1.0'")
         print("  mim install 'mmpose>=1.1.0'")
         return 1

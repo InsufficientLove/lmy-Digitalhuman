@@ -12,9 +12,10 @@ WORKDIR /opt/musetalk/repo
 RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
 
 # 安装 OpenMMLab 基础库（关键依赖）
+# 注意：mmcv版本必须<2.2.0（mmdet兼容性要求）
 RUN pip install -U openmim && \
     mim install mmengine && \
-    mim install "mmcv>=2.0.1" && \
+    mim install "mmcv==2.1.0" && \
     mim install "mmdet>=3.1.0" && \
     mim install "mmpose>=1.1.0"
 

@@ -52,8 +52,8 @@ pip install -U openmim
 # 2. 安装mmengine
 mim install mmengine
 
-# 3. 安装mmcv
-mim install "mmcv>=2.0.1"
+# 3. 安装mmcv（固定版本2.1.0）
+mim install "mmcv==2.1.0"
 
 # 4. 安装mmdet
 mim install "mmdet>=3.1.0"
@@ -152,13 +152,33 @@ python3 streaming/api_service.py
 
 ## 故障排除
 
-### 问题1：mim命令未找到
+### 问题1：mmcv版本兼容性错误
+```
+AssertionError: MMCV==2.2.0 is used but incompatible.
+Please install mmcv>=2.0.0rc4, <2.2.0.
+```
+
+**原因**：mmcv 2.2.0与mmdet不兼容。
+
+**解决**：
+```bash
+# 方案A：使用修复脚本
+bash scripts/fix_mmcv_version.sh
+
+# 方案B：手动修复
+pip uninstall mmcv -y
+mim install "mmcv==2.1.0"
+mim install "mmdet>=3.1.0"
+mim install "mmpose>=1.1.0"
+```
+
+### 问题2：mim命令未找到
 ```bash
 # 先安装openmim
 pip install -U openmim
 ```
 
-### 问题2：pip安装超时
+### 问题3：pip安装超时
 ```bash
 # 使用国内镜像源
 pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
@@ -167,7 +187,7 @@ pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
 pip install --proxy=http://proxy.example.com:8080 openmim
 ```
 
-### 问题3：CUDA版本不匹配
+### 问题4：CUDA版本不匹配
 ```bash
 # 检查CUDA版本
 nvidia-smi
@@ -180,7 +200,7 @@ mim install "mmcv>=2.0.1" -f https://download.openmmlab.com/mmcv/dist/cu118/torc
 mim install "mmcv>=2.0.1" -f https://download.openmmlab.com/mmcv/dist/cu121/torch2.1.0/index.html
 ```
 
-### 问题4：权限不足
+### 问题5：权限不足
 ```bash
 # 使用sudo（如果在系统级Python）
 sudo pip install -U openmim

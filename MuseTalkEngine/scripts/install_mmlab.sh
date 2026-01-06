@@ -26,10 +26,10 @@ echo ""
 echo "步骤 2/5: 安装mmengine"
 mim install mmengine
 
-# 安装mmcv
+# 安装mmcv（固定版本2.1.0，避免2.2.0兼容性问题）
 echo ""
 echo "步骤 3/5: 安装mmcv"
-mim install "mmcv>=2.0.1"
+mim install "mmcv==2.1.0"
 
 # 安装mmdet
 echo ""
