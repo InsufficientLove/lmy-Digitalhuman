@@ -21,8 +21,11 @@ services:
     restart: unless-stopped
 
   musetalk-python:
-    image: musetalk-python:working
+    build:
+      context: .
+      dockerfile: MuseTalkEngine/Dockerfile
     container_name: musetalk-python
+    image: musetalk-python:latest
     ports:
       - "8124:28888"
       - "8125:8766"
