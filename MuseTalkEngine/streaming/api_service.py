@@ -684,57 +684,87 @@ async def health_check():
     return {"status": "healthy", "timestamp": time.time()}
 
 
-@app.websocket("/ws/chat")
-async def websocket_chat(websocket: WebSocket):
+@app.websocket("/ws/realtime")
+async def websocket_realtime(websocket: WebSocket):
     """
-    WebSocket流式对话端点
+    WebSocket实时流式端点 - Zero Disk I/O
     
     Protocol:
-    1. Client -> Server: {"command": "init", "template_id": "xxx"}
-    2. Server -> Client: {"status": "ready"}
-    3. Client -> Server: {"command": "audio", "data": "base64_audio_bytes"}
-    4. Server -> Client: {"type": "frame", "data": "base64_jpeg_bytes"}
-    5. Client -> Server: {"command": "close"}
-    6. Server -> Client: {"status": "closed"}
+    1. Client -> Server: {"type": "init", "avatar_id": "xxx", "avatar_source": "/path/to/image_or_video"}
+    2. Server -> Client: {"status": "ready", "is_static_photo": bool}
+    3. Client -> Server: Binary Audio Chunk (PCM/WAV bytes)
+    4. Server -> Client: Binary JPEG Frame (repeat for all frames)
+    5. Server -> Client: {"type": "segment_complete", "frame_count": N}
+    6. Client -> Server: {"type": "close"}
     """
     await websocket.accept()
-    service = get_api_service()
+    
+    # 导入实时引擎
+    from streaming.realtime_inference import get_realtime_engine
+    engine = get_realtime_engine()
+    
     session_id = None
-    template_id = None
     
     try:
-        print("🔗 WebSocket客户端连接")
+        print("🔗 WebSocket客户端连接（实时流式模式）")
         
         # 主消息循环
         while True:
             try:
-                # 接收客户端消息
-                data = await websocket.receive_json()
-                command = data.get('command', '')
+                # 接收消息（JSON或Binary）
+                message = await websocket.receive()
                 
-                if command == 'init':
-                    # 初始化会话
-                    template_id = data.get('template_id')
-                    session_id = f"ws_{int(time.time() * 1000)}"
+                # 判断消息类型
+                if 'text' in message:
+                    # JSON命令
+                    data = json.loads(message['text'])
+                    msg_type = data.get('type', '')
                     
-                    print(f"📝 初始化会话: {session_id}, 模板: {template_id}")
+                    if msg_type == 'init':
+                        # 初始化会话
+                        avatar_id = data.get('avatar_id')
+                        avatar_source = data.get('avatar_source')
+                        session_id = f"rt_{int(time.time() * 1000)}"
+                        
+                        print(f"📝 初始化实时会话: {session_id}")
+                        print(f"   Avatar ID: {avatar_id}")
+                        print(f"   Avatar Source: {avatar_source}")
+                        
+                        # 创建会话（Input Polymorphism: 自动识别图片/视频）
+                        result = engine.create_session(session_id, avatar_id, avatar_source)
+                        
+                        if result['success']:
+                            await websocket.send_json({
+                                "status": "ready",
+                                "session_id": session_id,
+                                "is_static_photo": result.get('is_static_photo', False),
+                                "frame_count": result.get('frame_count', 0),
+                                "message": "会话已就绪 - Zero Disk I/O模式"
+                            })
+                        else:
+                            await websocket.send_json({
+                                "status": "error",
+                                "message": result.get('message', '初始化失败')
+                            })
                     
-                    # 预加载模板
-                    result = service.start_session(session_id, template_id)
-                    if result['success']:
+                    elif msg_type == 'close':
+                        # 关闭会话
+                        if session_id:
+                            engine.close_session(session_id)
                         await websocket.send_json({
-                            "status": "ready",
-                            "session_id": session_id,
-                            "message": "会话已就绪"
+                            "status": "closed",
+                            "message": "会话已关闭"
                         })
+                        break
+                    
                     else:
                         await websocket.send_json({
                             "status": "error",
-                            "message": result.get('message', '初始化失败')
+                            "message": f"未知命令类型: {msg_type}"
                         })
                 
-                elif command == 'audio':
-                    # 处理音频流
+                elif 'bytes' in message:
+                    # Binary Audio Chunk
                     if not session_id:
                         await websocket.send_json({
                             "status": "error",
@@ -742,117 +772,41 @@ async def websocket_chat(websocket: WebSocket):
                         })
                         continue
                     
-                    # 获取音频数据
-                    audio_base64 = data.get('data', '')
-                    if not audio_base64:
+                    audio_bytes = message['bytes']
+                    print(f"🎤 收到音频块: {len(audio_bytes)} 字节")
+                    
+                    # Part 2.2: Zero Disk I/O - 纯内存处理
+                    # 处理音频，生成JPEG帧流
+                    jpeg_frames = engine.process_audio_chunk(
+                        session_id, 
+                        audio_bytes, 
+                        fps=25
+                    )
+                    
+                    if len(jpeg_frames) == 0:
                         await websocket.send_json({
                             "status": "error",
-                            "message": "音频数据为空"
+                            "message": "推理失败"
                         })
                         continue
                     
-                    # 解码音频
-                    try:
-                        audio_bytes = base64.b64decode(audio_base64)
-                        
-                        # 保存临时音频文件（零磁盘IO：使用内存临时文件）
-                        import tempfile
-                        with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp:
-                            tmp.write(audio_bytes)
-                            audio_path = tmp.name
-                        
-                        # 推理生成帧（Zero Disk IO - 直接返回字节流）
-                        segment_index = data.get('segment_index', 0)
-                        
-                        # 使用流式处理（不保存视频文件）
-                        result = service.process_audio_segment(
-                            session_id,
-                            audio_path,
-                            segment_index,
-                            is_final=False
-                        )
-                        
-                        # 清理临时音频
-                        os.unlink(audio_path)
-                        
-                        if result['success'] and 'video_path' in result:
-                            # 读取视频帧并转换为JPEG流
-                            video_path = result['video_path']
-                            
-                            if os.path.exists(video_path):
-                                # 读取视频帧
-                                cap = cv2.VideoCapture(video_path)
-                                frame_count = 0
-                                
-                                while True:
-                                    ret, frame = cap.read()
-                                    if not ret:
-                                        break
-                                    
-                                    # 转换为JPEG
-                                    # 注意：cv2.VideoCapture读取的是BGR格式
-                                    # cv2.imencode期望BGR格式输入，输出的JPEG自动是RGB
-                                    # 所以这里直接编码，不需要颜色转换
-                                    _, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
-                                    jpeg_bytes = buffer.tobytes()
-                                    jpeg_base64 = base64.b64encode(jpeg_bytes).decode('utf-8')
-                                    
-                                    # 发送帧
-                                    await websocket.send_json({
-                                        "type": "frame",
-                                        "data": jpeg_base64,
-                                        "frame_index": frame_count,
-                                        "segment_index": segment_index
-                                    })
-                                    
-                                    frame_count += 1
-                                
-                                cap.release()
-                                
-                                # 清理视频文件（可选：如果要完全Zero Disk IO）
-                                try:
-                                    os.unlink(video_path)
-                                except:
-                                    pass
-                                
-                                # 发送段完成信号
-                                await websocket.send_json({
-                                    "type": "segment_complete",
-                                    "segment_index": segment_index,
-                                    "frame_count": frame_count
-                                })
-                            else:
-                                await websocket.send_json({
-                                    "status": "error",
-                                    "message": f"视频文件不存在: {video_path}"
-                                })
-                        else:
-                            await websocket.send_json({
-                                "status": "error",
-                                "message": result.get('message', '处理失败')
-                            })
+                    # 逐帧发送JPEG字节流
+                    for frame_idx, jpeg_bytes in enumerate(jpeg_frames):
+                        # 发送二进制JPEG帧
+                        await websocket.send_bytes(jpeg_bytes)
+                        print(f"   📤 发送帧 {frame_idx + 1}/{len(jpeg_frames)}")
                     
-                    except Exception as audio_error:
-                        print(f"❌ 音频处理错误: {audio_error}")
-                        await websocket.send_json({
-                            "status": "error",
-                            "message": f"音频处理失败: {str(audio_error)}"
-                        })
-                
-                elif command == 'close':
-                    # 关闭会话
-                    if session_id:
-                        service.end_session(session_id)
+                    # 发送段完成信号
                     await websocket.send_json({
-                        "status": "closed",
-                        "message": "会话已关闭"
+                        "type": "segment_complete",
+                        "frame_count": len(jpeg_frames)
                     })
-                    break
+                    print(f"✅ 音频块处理完成，生成 {len(jpeg_frames)} 帧")
                 
                 else:
                     await websocket.send_json({
                         "status": "error",
-                        "message": f"未知命令: {command}"
+                        "message": "未知消息格式"
                     })
             
             except WebSocketDisconnect:
@@ -860,6 +814,8 @@ async def websocket_chat(websocket: WebSocket):
                 break
             except Exception as e:
                 print(f"❌ WebSocket消息处理错误: {e}")
+                import traceback
+                traceback.print_exc()
                 try:
                     await websocket.send_json({
                         "status": "error",
@@ -870,11 +826,13 @@ async def websocket_chat(websocket: WebSocket):
     
     except Exception as e:
         print(f"❌ WebSocket连接错误: {e}")
+        import traceback
+        traceback.print_exc()
     finally:
         # 清理会话
         if session_id:
             try:
-                service.end_session(session_id)
+                engine.close_session(session_id)
             except:
                 pass
         print("✅ WebSocket连接已关闭")
@@ -882,8 +840,19 @@ async def websocket_chat(websocket: WebSocket):
 
 def start_api_server(host='0.0.0.0', port=28888):
     """启动API服务器"""
-    print(f"🌐 启动MuseTalk API服务: http://{host}:{port}")
-    print(f"🔌 WebSocket端点: ws://{host}:{port}/ws/chat")
+    print("=" * 60)
+    print("🌐 MuseTalk Streaming API Server")
+    print("=" * 60)
+    print(f"HTTP API: http://{host}:{port}")
+    print(f"WebSocket (实时流式): ws://{host}:{port}/ws/realtime")
+    print("")
+    print("特性:")
+    print("  ✅ Zero Disk I/O - 纯内存流式处理")
+    print("  ✅ Input Polymorphism - 自动识别图片/视频")
+    print("  ✅ Color Space Integrity - 严格BGR/RGB转换")
+    print("  ✅ Geometry Alignment - 强制Resize防止嘴型静止")
+    print("  ✅ VAE Float32 - 防止cuDNN错误")
+    print("=" * 60)
     uvicorn.run(app, host=host, port=port)
 
 
