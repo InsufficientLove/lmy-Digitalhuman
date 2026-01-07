@@ -794,6 +794,9 @@ class UltraFastMuseTalkService:
                     return batch_idx, []
             
             try:
+                # 紧急修复：批次前强制清理，防止显存累积
+                with torch.cuda.device(target_device):
+                    torch.cuda.empty_cache()
                 
                 # 关键：数据移动到目标GPU
                 with torch.cuda.device(target_device):
@@ -828,20 +831,46 @@ class UltraFastMuseTalkService:
                         # VAE 解码 - 必须在 autocast 外，且转换为 Float32
                         # 这样避免 cuDNN FP16 错误
                         pred_latents_fp32 = pred_latents.to(dtype=torch.float32)
+                        # 立即删除FP16版本，释放显存
+                        del pred_latents
+                        
                         recon_frames = gpu_models['vae'].decode_latents(pred_latents_fp32)
+                    
+                    # 紧急修复：立即删除pred_latents_fp32，避免显存累积
+                    del pred_latents_fp32
                     
                     # 立即移回CPU释放GPU内存
                     # 检查返回类型，如果已经是numpy数组就直接使用
                     if isinstance(recon_frames, list):
-                        result_frames = recon_frames
+                        # 如果是list of tensors，立即转CPU
+                        result_frames = []
+                        for frame in recon_frames:
+                            if hasattr(frame, 'cpu'):
+                                result_frames.append(frame.cpu().numpy())
+                            else:
+                                result_frames.append(frame)
+                        del recon_frames  # 立即删除GPU tensor列表
                     elif isinstance(recon_frames, np.ndarray):
                         result_frames = [recon_frames[i] for i in range(recon_frames.shape[0])]
+                    elif isinstance(recon_frames, torch.Tensor):
+                        # 如果是单个大tensor，立即转CPU并拆分
+                        recon_cpu = recon_frames.cpu()
+                        del recon_frames  # 立即删除GPU tensor
+                        result_frames = [recon_cpu[i].numpy() for i in range(recon_cpu.shape[0])]
+                        del recon_cpu
                     else:
                         # 如果是torch tensor，转换为numpy
                         result_frames = [frame.cpu().numpy() if hasattr(frame, 'cpu') else frame for frame in recon_frames]
+                        if hasattr(recon_frames, '__iter__'):
+                            del recon_frames
                     
-                    # 清理GPU内存
-                    del whisper_batch, latent_batch, audio_features, pred_latents, recon_frames
+                    # 清理GPU内存（按顺序删除）
+                    if 'audio_features' in locals():
+                        del audio_features
+                    if 'whisper_batch' in locals():
+                        del whisper_batch
+                    if 'latent_batch' in locals():
+                        del latent_batch
                     if 'timesteps' in locals():
                         del timesteps
                     
