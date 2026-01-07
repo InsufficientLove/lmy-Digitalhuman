@@ -655,25 +655,29 @@ class UltraFastMuseTalkService:
                 print("错误: 音频特征提取失败")
                 return False
             
-            # 检测静态图片输入：如果只有一帧，根据音频长度复制帧
+            # 紧急修复OOM：静态图片模式不复制帧（使用模运算循环引用）
             frame_list = cache_data['frame_list_cycle']
             if len(frame_list) == 1:
                 target_frames = len(whisper_chunks)
-                print(f"🖼️ 检测到静态图片输入，复制帧: 1 -> {target_frames}")
+                print(f"🖼️ 检测到静态图片输入")
+                print(f"⚠️ OOM修复：不复制帧，使用模运算循环引用（节省内存）")
+                print(f"   原始帧数: 1, 音频帧数: {target_frames}")
                 
-                # 复制单帧到目标长度
-                static_frame = frame_list[0]
-                cache_data['frame_list_cycle'] = [static_frame] * target_frames
+                # 不复制帧！保持原样，在合成时使用 i % len(frame_list) 循环引用
+                # cache_data['frame_list_cycle'] 保持 [single_frame] (1个元素)
+                # 这样可以避免占用大量内存
                 
-                # 同步其他循环数据
-                if 'coord_list_cycle' in cache_data and len(cache_data['coord_list_cycle']) == 1:
-                    cache_data['coord_list_cycle'] = [cache_data['coord_list_cycle'][0]] * target_frames
-                if 'mask_coords_list_cycle' in cache_data and len(cache_data['mask_coords_list_cycle']) == 1:
-                    cache_data['mask_coords_list_cycle'] = [cache_data['mask_coords_list_cycle'][0]] * target_frames
-                if 'mask_list_cycle' in cache_data and len(cache_data['mask_list_cycle']) == 1:
-                    cache_data['mask_list_cycle'] = [cache_data['mask_list_cycle'][0]] * target_frames
+                # 同样处理latents：不复制，保持1个元素
+                if 'input_latent_list_cycle' in cache_data:
+                    latents = cache_data['input_latent_list_cycle']
+                    if len(latents) == 1:
+                        print(f"   Latents: 保持1个元素（循环引用）")
+                        # 确保latent在CPU上（防止GPU内存占用）
+                        if isinstance(latents[0], torch.Tensor) and latents[0].is_cuda:
+                            cache_data['input_latent_list_cycle'] = [latents[0].cpu()]
+                            print(f"   ✅ 已将latent移至CPU")
                 
-                print(f"✅ 静态图片帧扩展完成: {target_frames} 帧")
+                print(f"✅ 静态图片模式配置完成（CPU驻留，循环引用）")
             
             prep_time = time.time() - total_start
             print(f"并行预处理完成: {prep_time:.3f}s")
@@ -733,6 +737,20 @@ class UltraFastMuseTalkService:
                 torch.cuda.empty_cache()
         
         input_latent_list_cycle = cache_data['input_latent_list_cycle']
+        
+        # 紧急修复OOM：确保input_latent_list_cycle在CPU上（防止全量GPU占用）
+        cpu_latents = []
+        for latent in input_latent_list_cycle:
+            if isinstance(latent, torch.Tensor):
+                if latent.is_cuda:
+                    cpu_latents.append(latent.cpu())
+                else:
+                    cpu_latents.append(latent)
+            else:
+                cpu_latents.append(latent)
+        input_latent_list_cycle = cpu_latents
+        print(f"✅ 确保{len(input_latent_list_cycle)}个latents在CPU上")
+        
         video_num = len(whisper_chunks)
         
         # 添加批次优化建议
@@ -1164,6 +1182,22 @@ class UltraFastMuseTalkService:
                 audio_padding_length_left=2,
                 audio_padding_length_right=2,
             )
+            
+            # 紧急修复OOM：确保whisper_chunks在CPU上（防止全量占用GPU显存）
+            if isinstance(whisper_chunks, torch.Tensor):
+                if whisper_chunks.is_cuda:
+                    whisper_chunks = whisper_chunks.cpu()
+                    print(f"✅ whisper_chunks已移至CPU（{whisper_chunks.shape}）")
+            elif isinstance(whisper_chunks, list):
+                cpu_chunks = []
+                for chunk in whisper_chunks:
+                    if isinstance(chunk, torch.Tensor) and chunk.is_cuda:
+                        cpu_chunks.append(chunk.cpu())
+                    else:
+                        cpu_chunks.append(chunk)
+                whisper_chunks = cpu_chunks
+                print(f"✅ whisper_chunks已移至CPU（{len(whisper_chunks)}个）")
+            
             return whisper_chunks
         except Exception as e:
             print(f"音频特征提取失败: {str(e)}")
