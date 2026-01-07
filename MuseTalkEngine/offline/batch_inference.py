@@ -843,15 +843,6 @@ class UltraFastMuseTalkService:
                             print(f"🔍 DEBUG批次{batch_idx}: whisper_batch.shape = {whisper_batch.shape}")
                             print(f"🔍 DEBUG批次{batch_idx}: latent_batch.shape = {latent_batch.shape}")
                             
-                            # 紧急修复：检查latent通道数（关键发现！）
-                            if latent_batch.shape[1] == 8:
-                                print(f"⚠️ 检测到8通道latent，VAE只支持4通道！")
-                                print(f"   原因：masked_latent(4ch) + reference_latent(4ch) = 8ch")
-                                print(f"   修复：仅使用前4通道（reference latent）")
-                                # 仅使用前4通道（或后4通道）
-                                latent_batch = latent_batch[:, :4, :, :]
-                                print(f"   修复后: latent_batch.shape = {latent_batch.shape}")
-                            
                             # 音频特征提取
                             audio_features = gpu_models['pe'](whisper_batch)
                             
@@ -866,11 +857,23 @@ class UltraFastMuseTalkService:
                                 print(f"   这会导致Attention爆炸！")
                             
                             # UNet 推理 - autocast 会自动处理 dtype 转换
+                            # 注意：UNet需要8通道输入（masked + reference）
                             pred_latents = gpu_models['unet'].model(
                                 latent_batch, timesteps, encoder_hidden_states=audio_features
                             ).sample
                             
                             print(f"🔍 DEBUG批次{batch_idx}: pred_latents.shape = {pred_latents.shape}")
+                            
+                            # 紧急修复：UNet输出后检查通道数（VAE只支持4通道）
+                            if pred_latents.shape[1] == 8:
+                                print(f"⚠️ UNet输出8通道，VAE需要4通道")
+                                print(f"   修复：取前4通道传给VAE")
+                                pred_latents = pred_latents[:, :4, :, :]
+                                print(f"   修复后: pred_latents.shape = {pred_latents.shape}")
+                            elif pred_latents.shape[1] == 4:
+                                print(f"✅ UNet输出4通道，直接传给VAE")
+                            else:
+                                print(f"⚠️ 警告：pred_latents通道数异常: {pred_latents.shape[1]}")
                         
                         # VAE 解码 - 必须在 autocast 外，且转换为 Float32
                         # 这样避免 cuDNN FP16 错误
