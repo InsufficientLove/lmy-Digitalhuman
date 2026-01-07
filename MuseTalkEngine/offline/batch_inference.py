@@ -582,24 +582,25 @@ class UltraFastMuseTalkService:
                 # 采用批处理+释放策略：每批6帧，处理完释放
                 # 这样可以充分利用显存，又避免OOM
                 
+                # 紧急修复OOM：降低batch_size到保守值4
                 if min_free_memory > 40:  # 40GB以上
-                    batch_size = 6  # 每批6帧，处理完释放
-                    print(f"✅ 显存充足({min_free_memory:.1f}GB)，设置batch_size=6（批处理+释放）")
+                    batch_size = 4  # 保守值，避免峰值OOM
+                    print(f"✅ 显存充足({min_free_memory:.1f}GB)，设置batch_size=4（保守模式）")
                 elif min_free_memory > 30:  # 30-40GB
-                    batch_size = 6  
-                    print(f"✅ 显存良好({min_free_memory:.1f}GB)，设置batch_size=6（批处理+释放）")
-                elif min_free_memory > 20:  # 20-30GB
                     batch_size = 4  
-                    print(f"⚠️ 显存中等({min_free_memory:.1f}GB)，设置batch_size=4（批处理+释放）")
-                elif min_free_memory > 15:  # 15-20GB
+                    print(f"✅ 显存良好({min_free_memory:.1f}GB)，设置batch_size=4（保守模式）")
+                elif min_free_memory > 20:  # 20-30GB
                     batch_size = 3  
-                    print(f"⚠️ 显存偏少({min_free_memory:.1f}GB)，设置batch_size=3（批处理+释放）")
+                    print(f"⚠️ 显存中等({min_free_memory:.1f}GB)，设置batch_size=3（安全模式）")
+                elif min_free_memory > 15:  # 15-20GB
+                    batch_size = 2  
+                    print(f"⚠️ 显存偏少({min_free_memory:.1f}GB)，设置batch_size=2（最小批次）")
                 elif min_free_memory > 10:  # 10-15GB
                     batch_size = 2  
-                    print(f"❌ 显存紧张({min_free_memory:.1f}GB)，设置batch_size=2（批处理+释放）")
+                    print(f"❌ 显存紧张({min_free_memory:.1f}GB)，设置batch_size=2（最小批次）")
                 else:  # 10GB以下
-                    batch_size = 4  
-                    print(f"❌ 显存偏少({min_free_memory:.1f}GB)，设置batch_size=4")
+                    batch_size = 2  
+                    print(f"❌ 显存严重不足({min_free_memory:.1f}GB)，设置batch_size=2（最小批次）")
                     
                 print(f"基于可用显存({min_free_memory:.1f}GB)，设置batch_size={batch_size}")
                 
@@ -1033,12 +1034,18 @@ class UltraFastMuseTalkService:
                 # 确保crop_box是整数
                 crop_box = [int(x) for x in crop_box]
                 
+                # 紧急修复：删除try-except fallback（避免灰色方框）
+                # 强制确认尺寸匹配
+                if res_frame.shape[0] != target_h or res_frame.shape[1] != target_w:
+                    print(f"⚠️ 尺寸不匹配，强制 resize: {res_frame.shape[:2]} -> ({target_h}, {target_w})")
+                    res_frame = cv2.resize(res_frame, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
+                
+                # 确保mask也匹配尺寸
+                if mask.shape[:2] != (target_h, target_w):
+                    mask = cv2.resize(mask, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
+                
+                # 使用mask进行alpha blending（正确的融合方式）
                 try:
-                    # 关键修复 Bug 2：在调用 blending 前再次确认尺寸匹配
-                    if res_frame.shape[0] != target_h or res_frame.shape[1] != target_w:
-                        print(f"⚠️ 尺寸不匹配，强制 resize: {res_frame.shape[:2]} -> ({target_h}, {target_w})")
-                        res_frame = cv2.resize(res_frame, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
-                    
                     combine_frame = get_image_blending(
                         image=ori_frame,
                         face=res_frame, 
@@ -1047,15 +1054,19 @@ class UltraFastMuseTalkService:
                         crop_box=crop_box
                     )
                 except Exception as blend_error:
-                    print(f"❌ blending失败: {blend_error}")
-                    # 即使 blending 失败，也要尝试简单粘贴而不是放弃
-                    try:
-                        combine_frame = ori_frame.copy()
-                        combine_frame[y1:y2, x1:x2] = res_frame
-                        print(f"✅ 使用简单粘贴替代 blending")
-                    except Exception as paste_error:
-                        print(f"❌ 简单粘贴也失败: {paste_error}，使用原始帧")
-                        combine_frame = ori_frame
+                    print(f"❌ blending失败: {blend_error}, 使用mask alpha blending")
+                    # 使用mask进行alpha blending（避免灰色方框）
+                    combine_frame = ori_frame.copy()
+                    if len(mask.shape) == 2:
+                        mask_3ch = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR).astype(np.float32) / 255.0
+                    else:
+                        mask_3ch = mask.astype(np.float32) / 255.0
+                    
+                    # Alpha blending: result = foreground * alpha + background * (1 - alpha)
+                    res_frame_float = res_frame.astype(np.float32)
+                    ori_region = combine_frame[y1:y2, x1:x2].astype(np.float32)
+                    blended = res_frame_float * mask_3ch + ori_region * (1 - mask_3ch)
+                    combine_frame[y1:y2, x1:x2] = blended.astype(np.uint8)
                 
                 return i, combine_frame
                 
