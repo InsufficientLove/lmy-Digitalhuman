@@ -1258,6 +1258,28 @@ class UltraFastMuseTalkService:
             with open(cache_file, 'rb') as f:
                 cache_data = pickle.load(f)
             
+            # 紧急修复OOM：确保cache_data中所有tensor都在CPU上
+            print(f"🔍 检查cache_data中的tensor位置...")
+            if 'input_latent_list_cycle' in cache_data:
+                latents = cache_data['input_latent_list_cycle']
+                cpu_latents = []
+                gpu_count = 0
+                for i, latent in enumerate(latents):
+                    if isinstance(latent, torch.Tensor):
+                        if latent.is_cuda:
+                            cpu_latents.append(latent.cpu())
+                            gpu_count += 1
+                        else:
+                            cpu_latents.append(latent)
+                    else:
+                        cpu_latents.append(latent)
+                
+                if gpu_count > 0:
+                    cache_data['input_latent_list_cycle'] = cpu_latents
+                    print(f"⚠️ 发现{gpu_count}个latents在GPU上，已全部移至CPU")
+                else:
+                    print(f"✅ 所有{len(latents)}个latents已在CPU上")
+            
             return cache_data
             
         except Exception as e:
