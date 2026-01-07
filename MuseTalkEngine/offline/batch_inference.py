@@ -839,12 +839,29 @@ class UltraFastMuseTalkService:
                         
                         # 使用 autocast 包裹推理，自动处理 FP16/FP32 混合精度
                         with autocast(dtype=torch.float16):
+                            # 紧急DEBUG：检查输入维度（防止Attention爆炸）
+                            print(f"🔍 DEBUG批次{batch_idx}: whisper_batch.shape = {whisper_batch.shape}")
+                            print(f"🔍 DEBUG批次{batch_idx}: latent_batch.shape = {latent_batch.shape}")
+                            
                             # 音频特征提取
                             audio_features = gpu_models['pe'](whisper_batch)
+                            
+                            # 紧急DEBUG：检查audio_features维度（关键！）
+                            print(f"🔍 DEBUG批次{batch_idx}: audio_features.shape = {audio_features.shape}")
+                            print(f"   预期: [batch_size={whisper_batch.shape[0]}, seq_len, dim]")
+                            
+                            # 验证：如果audio_features是全量的，说明出现了bug
+                            if audio_features.shape[0] != whisper_batch.shape[0]:
+                                print(f"⚠️ 警告：audio_features维度异常！")
+                                print(f"   audio_features[0]={audio_features.shape[0]} != batch_size={whisper_batch.shape[0]}")
+                                print(f"   这会导致Attention爆炸！")
+                            
                             # UNet 推理 - autocast 会自动处理 dtype 转换
                             pred_latents = gpu_models['unet'].model(
                                 latent_batch, timesteps, encoder_hidden_states=audio_features
                             ).sample
+                            
+                            print(f"🔍 DEBUG批次{batch_idx}: pred_latents.shape = {pred_latents.shape}")
                         
                         # VAE 解码 - 必须在 autocast 外，且转换为 Float32
                         # 这样避免 cuDNN FP16 错误
@@ -1081,15 +1098,20 @@ class UltraFastMuseTalkService:
                 # 确保crop_box是整数
                 crop_box = [int(x) for x in crop_box]
                 
-                # 紧急修复：删除try-except fallback（避免灰色方框）
-                # 强制确认尺寸匹配
-                if res_frame.shape[0] != target_h or res_frame.shape[1] != target_w:
-                    print(f"⚠️ 尺寸不匹配，强制 resize: {res_frame.shape[:2]} -> ({target_h}, {target_w})")
-                    res_frame = cv2.resize(res_frame, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
+                # 紧急修复：强制缩放修复（用户要求的LANCZOS4高质量插值）
+                w = x2 - x1
+                h = y2 - y1
                 
-                # 确保mask也匹配尺寸
-                if mask.shape[:2] != (target_h, target_w):
-                    mask = cv2.resize(mask, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
+                # 1. 检查pred_img尺寸
+                if res_frame.shape[0] != h or res_frame.shape[1] != w:
+                    print(f"⚠️ 尺寸不匹配，强制 resize: {res_frame.shape[:2]} -> ({h}, {w})")
+                    # 2. 强制缩放（使用LANCZOS4高质量插值）
+                    res_frame = cv2.resize(res_frame, (w, h), interpolation=cv2.INTER_LANCZOS4)
+                    print(f"✅ resize完成，使用INTER_LANCZOS4")
+                
+                # 确保mask也匹配尺寸（使用LINEAR插值，mask不需要高质量）
+                if mask.shape[:2] != (h, w):
+                    mask = cv2.resize(mask, (w, h), interpolation=cv2.INTER_LINEAR)
                 
                 # 使用mask进行alpha blending（正确的融合方式）
                 try:
