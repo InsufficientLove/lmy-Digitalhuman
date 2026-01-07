@@ -843,6 +843,15 @@ class UltraFastMuseTalkService:
                             print(f"🔍 DEBUG批次{batch_idx}: whisper_batch.shape = {whisper_batch.shape}")
                             print(f"🔍 DEBUG批次{batch_idx}: latent_batch.shape = {latent_batch.shape}")
                             
+                            # 紧急修复：检查latent通道数（关键发现！）
+                            if latent_batch.shape[1] == 8:
+                                print(f"⚠️ 检测到8通道latent，VAE只支持4通道！")
+                                print(f"   原因：masked_latent(4ch) + reference_latent(4ch) = 8ch")
+                                print(f"   修复：仅使用前4通道（reference latent）")
+                                # 仅使用前4通道（或后4通道）
+                                latent_batch = latent_batch[:, :4, :, :]
+                                print(f"   修复后: latent_batch.shape = {latent_batch.shape}")
+                            
                             # 音频特征提取
                             audio_features = gpu_models['pe'](whisper_batch)
                             
