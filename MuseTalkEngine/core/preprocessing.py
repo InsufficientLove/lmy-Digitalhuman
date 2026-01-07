@@ -574,10 +574,22 @@ class OptimizedPreprocessor:
             print("VAE编码...")
             input_latent_list = []
             
-            def encode_frame(frame, mask=None):
+            # 紧急修复：添加face_box参数，crop到256x256
+            def encode_frame(frame, face_box, mask=None):
                 with torch.no_grad():
-                    frame_tensor = torch.from_numpy(frame).float().to(self.device) / 127.5 - 1.0
+                    # 关键修复：Crop人脸区域并resize到256x256（MuseTalk标准输入）
+                    x1, y1, x2, y2 = face_box
+                    face_crop = frame[y1:y2, x1:x2]
+                    
+                    # Resize到256x256（标准MuseTalk输入尺寸）
+                    face_256 = cv2.resize(face_crop, (256, 256), interpolation=cv2.INTER_LANCZOS4)
+                    print(f"✅ Face crop: {face_crop.shape} → 256x256")
+                    
+                    # 转换为tensor
+                    frame_tensor = torch.from_numpy(face_256).float().to(self.device) / 127.5 - 1.0
                     frame_tensor = frame_tensor.permute(2, 0, 1).unsqueeze(0)
+                    
+                    print(f"   Tensor输入VAE: {frame_tensor.shape}")
                     
                     # 编码原始帧得到reference latent (4通道)
                     # VAE可能有不同的编码方法名
@@ -597,15 +609,15 @@ class OptimizedPreprocessor:
                     
                     # 如果有mask，创建masked版本
                     if mask is not None and mask.size > 0:
-                        # 调试：打印mask信息
-                        print(f"Face parsing mask shape: {mask.shape}, dtype: {mask.dtype}, unique values: {np.unique(mask)[:5]}")
+                        # 关键修复：Crop mask到人脸区域并resize到256x256
+                        mask_crop = mask[y1:y2, x1:x2]
+                        mask_256 = cv2.resize(mask_crop, (256, 256), interpolation=cv2.INTER_LINEAR)
+                        print(f"   Mask crop: {mask_crop.shape} → 256x256")
                         
                         # 处理面部解析mask
-                        # 面部解析mask通常包含不同的标签值（0=背景，1-19=不同面部区域）
-                        # 创建二值mask：非背景区域为1，背景为0
-                        binary_mask = (mask > 0).astype(np.float32)
+                        binary_mask = (mask_256 > 0).astype(np.float32)
                         
-                        # 如果需要，可以对mask进行平滑处理
+                        # 平滑处理
                         from scipy.ndimage import gaussian_filter
                         binary_mask = gaussian_filter(binary_mask, sigma=1.0)
                         
@@ -615,15 +627,6 @@ class OptimizedPreprocessor:
                         # 调整mask维度以匹配frame_tensor
                         if len(mask_tensor.shape) == 2:  # [H, W]
                             mask_tensor = mask_tensor.unsqueeze(0).unsqueeze(0)  # [1, 1, H, W]
-                        
-                        # 如果mask和frame尺寸不匹配，进行resize
-                        if mask_tensor.shape[-2:] != frame_tensor.shape[-2:]:
-                            mask_tensor = torch.nn.functional.interpolate(
-                                mask_tensor, 
-                                size=frame_tensor.shape[-2:], 
-                                mode='bilinear', 
-                                align_corners=False
-                            )
                         
                         # 扩展mask到3通道
                         mask_tensor = mask_tensor.repeat(1, 3, 1, 1)  # [1, 3, H, W]
@@ -643,11 +646,19 @@ class OptimizedPreprocessor:
             
             # 并行编码多帧
             with ThreadPoolExecutor(max_workers=4) as executor:
-                # 将frame和对应的face parsing mask一起传递
+                # 将frame、face_box和对应的face parsing mask一起传递
                 futures = []
                 for i, frame in enumerate(frame_list):
+                    # 获取对应的face_box（从mask_coords_list中）
+                    if i < len(mask_coords_list):
+                        face_box = mask_coords_list[i]
+                    else:
+                        # 使用默认值（全图的中心区域）
+                        h, w = frame.shape[:2]
+                        face_box = [w//4, h//4, 3*w//4, 3*h//4]
+                    
                     face_mask = face_parsing_masks[i] if i < len(face_parsing_masks) else None
-                    futures.append(executor.submit(encode_frame, frame, face_mask))
+                    futures.append(executor.submit(encode_frame, frame, face_box, face_mask))
                 
                 for future in as_completed(futures):
                     latent = future.result()
