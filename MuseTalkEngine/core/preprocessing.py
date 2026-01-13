@@ -183,6 +183,37 @@ class OptimizedPreprocessor:
             print(f"模型初始化失败: {str(e)}")
             return False
     
+    def _create_lower_face_gradient_mask(self, width, height):
+        """
+        创建下半脸渐变遮罩（兜底方案）
+        只保留图像下半部分，边缘羽化，避免方形边框
+        """
+        mask = np.zeros((height, width), dtype=np.uint8)
+        
+        # 1. 创建椭圆形面部区域（覆盖下半脸）
+        center_x, center_y = width // 2, int(height * 0.6)  # 中心偏下
+        axis_x = int(width * 0.35)   # 横向半轴（脸宽）
+        axis_y = int(height * 0.25)  # 纵向半轴（嘴部区域）
+        
+        # 绘制椭圆
+        cv2.ellipse(mask, (center_x, center_y), (axis_x, axis_y), 
+                    0, 0, 360, 255, -1)
+        
+        # 2. 高斯模糊羽化边缘（消除硬边）
+        blur_kernel = max(int(min(width, height) * 0.1), 51)
+        if blur_kernel % 2 == 0:
+            blur_kernel += 1
+        mask = cv2.GaussianBlur(mask, (blur_kernel, blur_kernel), 0)
+        
+        # 3. 顶部渐变衰减（只保留下半部分）
+        for y in range(int(height * 0.4)):
+            alpha = y / (height * 0.4)  # 0 到 1 的渐变
+            mask[y, :] = (mask[y, :] * alpha).astype(np.uint8)
+        
+        print(f"✅ 创建渐变遮罩: {width}x{height}, 中心=({center_x},{center_y}), 椭圆=({axis_x},{axis_y})")
+        
+        return mask
+    
     def fix_face_shadows(self, image):
         """修复面部阴影 - 极速版"""
         try:
@@ -471,7 +502,7 @@ class OptimizedPreprocessor:
                         "这可能表示人脸检测质量不佳，请使用更清晰的图片。"
                     )
                 
-                # 面部解析 - 简化逻辑，避免错误
+                # 面部解析 - 修复格式不匹配问题
                 try:
                     mask_out = None
                     
@@ -479,33 +510,65 @@ class OptimizedPreprocessor:
                     if isinstance(self.fp, SimpleFaceParsing):
                         mask_out = self.fp(frame)
                         if mask_out is not None:
-                            print(f"SimpleFaceParsing成功，mask shape: {mask_out.shape}, unique: {np.unique(mask_out)[:5]}")
+                            print(f"✅ SimpleFaceParsing成功，mask shape: {mask_out.shape}, unique: {np.unique(mask_out)[:5]}")
                     # 尝试原生FaceParsing
                     elif self.fp is not None:
                         try:
-                            result = self.fp(frame)
-                            # 严格类型检查
-                            if isinstance(result, np.ndarray) and len(result.shape) == 2:
+                            # 🔥 修复1：FaceParsing 期望 PIL.Image 输入
+                            from PIL import Image
+                            
+                            # 转换 numpy 数组为 PIL Image
+                            # frame 是 RGB 格式的 numpy 数组
+                            pil_image = Image.fromarray(frame.astype(np.uint8))
+                            
+                            print(f"🔍 DEBUG: 调用 FaceParsing，输入类型={type(pil_image)}, 尺寸={pil_image.size}")
+                            
+                            # 调用 FaceParsing（mode="raw" 用于标准面部解析）
+                            result = self.fp(pil_image, mode="raw")
+                            
+                            print(f"🔍 DEBUG: FaceParsing 返回类型={type(result)}")
+                            
+                            # 🔥 修复2：FaceParsing 返回 PIL.Image，需要转换为 numpy
+                            if hasattr(result, 'size'):  # PIL.Image 对象
+                                mask_out = np.array(result)
+                                print(f"✅ FaceParsing成功（PIL->numpy），mask shape: {mask_out.shape}, unique: {np.unique(mask_out)[:10]}")
+                            elif isinstance(result, np.ndarray):
                                 mask_out = result
-                                print(f"FaceParsing成功，mask shape: {mask_out.shape}")
-                            elif isinstance(result, tuple) and len(result) > 0 and isinstance(result[0], np.ndarray):
-                                mask_out = result[0]
-                                print(f"FaceParsing返回tuple，使用第一个元素")
+                                print(f"✅ FaceParsing成功（numpy），mask shape: {mask_out.shape}")
+                            elif isinstance(result, tuple) and len(result) > 0:
+                                # 如果返回元组，取第一个元素
+                                if hasattr(result[0], 'size'):
+                                    mask_out = np.array(result[0])
+                                else:
+                                    mask_out = result[0]
+                                print(f"✅ FaceParsing返回tuple，使用第一个元素")
                             else:
-                                print(f"FaceParsing返回非预期类型: {type(result)}，降级到SimpleFaceParsing")
-                                mask_out = SimpleFaceParsing()(frame)
+                                raise ValueError(f"FaceParsing返回未知类型: {type(result)}")
+                                
                         except Exception as fp_error:
-                            print(f"FaceParsing调用失败: {fp_error}，降级到SimpleFaceParsing")
+                            print(f"❌ FaceParsing调用失败: {fp_error}")
+                            print(f"   错误详情: {type(fp_error).__name__}")
+                            import traceback
+                            traceback.print_exc()
+                            
+                            # 降级到 SimpleFaceParsing
+                            print("   降级到 SimpleFaceParsing...")
                             mask_out = SimpleFaceParsing()(frame)
                     
-                    # 如果仍然失败，使用默认mask
+                    # 🔥 修复3：改进 fallback - 使用下半脸渐变遮罩而不是全白
                     if mask_out is None or not isinstance(mask_out, np.ndarray):
-                        print("面部解析完全失败，使用默认全白mask")
-                        mask_out = np.ones((frame.shape[0], frame.shape[1]), dtype=np.uint8) * 255
+                        print("⚠️ 面部解析完全失败，使用渐变遮罩（下半脸）")
+                        h, w = frame.shape[:2]
+                        mask_out = self._create_lower_face_gradient_mask(w, h)
                         
                 except Exception as e:
-                    print(f"面部解析出错: {e}，使用默认mask")
-                    mask_out = np.ones((frame.shape[0], frame.shape[1]), dtype=np.uint8) * 255
+                    print(f"❌ 面部解析出错: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    
+                    # 使用渐变遮罩
+                    h, w = frame.shape[:2]
+                    mask_out = self._create_lower_face_gradient_mask(w, h)
                 
                 # 保存面部解析的mask
                 face_parsing_masks.append(mask_out)
