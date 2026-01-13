@@ -39,6 +39,9 @@ namespace LmyDigitalHuman.Services.Offline
         {
             try
             {
+                // #region agent log
+                await System.IO.File.AppendAllTextAsync(@"f:\AICode\Digitalhuman\lmy-DigitalhumanV5\lmy-Digitalhuman\.cursor\debug.log", System.Text.Json.JsonSerializer.Serialize(new{sessionId="debug-session",runId="initial",hypothesisId="A,B",location="OptimizedMuseTalkService.cs:40",message="GenerateVideoAsync入口",data=new{requestTemplateId=request.TemplateId,audioPath=request.AudioPath},timestamp=DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()})+"\n");
+                // #endregion
                 var contentRoot = _pathManager.GetContentRootPath();
                 var videosDir = Path.Combine(contentRoot, "wwwroot", "videos");
                 Directory.CreateDirectory(videosDir);

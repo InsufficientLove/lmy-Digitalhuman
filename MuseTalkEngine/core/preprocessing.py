@@ -370,7 +370,14 @@ class OptimizedPreprocessor:
                 img_check = cv2.imread(temp_image_path)
                 print(f"临时图像: {img_check.shape if img_check is not None else 'None'}")
             
-            coord_list, frame_list = get_landmark_and_bbox([temp_image_path])
+            coord_list, frame_list = get_landmark_and_bbox([temp_image_path], device=self.device)
+            
+            # 获取原始尺寸
+            if frame_list and len(frame_list) > 0:
+                original_h, original_w = frame_list[0].shape[:2]
+                original_size = (original_w, original_h)
+            else:
+                original_size = (0, 0)
             
             # 调试：打印返回值
             print(f"coord_list长度: {len(coord_list) if coord_list else 0}")
@@ -674,6 +681,29 @@ class OptimizedPreprocessor:
                 if latent_shape[1] != 8:
                     print(f"⚠️ 警告: Latent通道数为{latent_shape[1]}，期望为8通道")
             
+            # 🔥 关键修复：确保坐标和mask列表不为空
+            if len(mask_coords_list) == 0:
+                print("⚠️ 警告: mask_coords_list为空，添加默认值")
+                # 使用默认的全图坐标
+                h, w = frame_list[0].shape[:2]
+                default_coords = [0, 0, w, h]
+                mask_coords_list.append(default_coords)
+                print(f"   添加默认坐标: {default_coords}")
+            
+            if len(mask_list) == 0:
+                print("⚠️ 警告: mask_list为空，添加默认mask")
+                # 使用全白mask
+                h, w = frame_list[0].shape[:2]
+                default_mask = np.ones((h, w), dtype=np.uint8) * 255
+                mask_list.append(default_mask)
+                print(f"   添加默认mask: {default_mask.shape}")
+            
+            if len(coord_list) == 0:
+                print("⚠️ 警告: coord_list为空，添加默认值")
+                # 使用mask_coords_list的第一个元素
+                coord_list.append(mask_coords_list[0])
+                print(f"   添加默认coord: {coord_list[0]}")
+            
             # 如果只有一帧，复制创建循环
             if len(input_latent_list) == 1:
                 input_latent_list_cycle = input_latent_list * 2
@@ -694,9 +724,12 @@ class OptimizedPreprocessor:
             cache_data = {
                 'input_latent_list_cycle': input_latent_list_cycle,
                 'coord_list_cycle': coord_list_cycle,
-                'frame_list_cycle': frame_list_cycle,
+                # 'frame_list_cycle': frame_list_cycle, # 移除原始帧以减小缓存大小，改为推理时读取
                 'mask_coords_list_cycle': mask_coords_list_cycle,
                 'mask_list_cycle': mask_list_cycle,
+                'original_size': original_size,
+                'template_path': template_path,
+                'input_image_path': input_image_path # 保存具体使用的图像路径
             }
             
             # 保存缓存文件到模板子目录

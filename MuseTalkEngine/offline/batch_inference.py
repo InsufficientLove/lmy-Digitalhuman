@@ -656,12 +656,14 @@ class UltraFastMuseTalkService:
                 return False
             
             # 紧急修复OOM：静态图片模式不复制帧（使用模运算循环引用）
-            frame_list = cache_data['frame_list_cycle']
-            if len(frame_list) == 1:
+            # frame_list = cache_data['frame_list_cycle'] # 可能不存在
+            latents_len = len(cache_data['input_latent_list_cycle'])
+            
+            if latents_len <= 2: # 静态图片（通常为1或2帧）
                 target_frames = len(whisper_chunks)
-                print(f"🖼️ 检测到静态图片输入")
+                print(f"🖼️ 检测到静态图片输入 (Latents: {latents_len})")
                 print(f"⚠️ OOM修复：不复制帧，使用模运算循环引用（节省内存）")
-                print(f"   原始帧数: 1, 音频帧数: {target_frames}")
+                print(f"   原始帧数: {latents_len}, 音频帧数: {target_frames}")
                 
                 # 不复制帧！保持原样，在合成时使用 i % len(frame_list) 循环引用
                 # cache_data['frame_list_cycle'] 保持 [single_frame] (1个元素)
@@ -816,6 +818,11 @@ class UltraFastMuseTalkService:
                 with torch.cuda.device(target_device):
                     torch.cuda.empty_cache()
                 
+                # 🔒 获取GPU锁，保护VAE解码（VAE不是线程安全的）
+                gpu_lock = self.gpu_locks.get(target_device)
+                if gpu_lock is None:
+                    print(f"⚠️ 警告：GPU {target_device} 没有对应的锁")
+                
                 # 关键：数据移动到目标GPU
                 with torch.cuda.device(target_device):
                     whisper_batch = whisper_batch.to(target_device, dtype=self.weight_dtype, non_blocking=True)
@@ -881,7 +888,27 @@ class UltraFastMuseTalkService:
                         # 立即删除FP16版本，释放显存
                         del pred_latents
                         
-                        recon_frames = gpu_models['vae'].decode_latents(pred_latents_fp32)
+                        # 🔥 关键修复：VAE解码前同步，避免多线程死锁
+                        torch.cuda.synchronize(target_device)
+                        print(f"🎨 批次 {batch_idx} 开始VAE解码（GPU {target_device}）...")
+                        
+                        # VAE解码 - 使用锁保护（VAE在FP32下可能不是线程安全的）
+                        if gpu_lock:
+                            with gpu_lock:
+                                try:
+                                    recon_frames = gpu_models['vae'].decode_latents(pred_latents_fp32)
+                                    print(f"✅ 批次 {batch_idx} VAE解码完成（已锁保护）")
+                                except Exception as vae_error:
+                                    print(f"❌ 批次 {batch_idx} VAE解码失败: {vae_error}")
+                                    raise vae_error
+                        else:
+                            # 无锁版本（不推荐）
+                            try:
+                                recon_frames = gpu_models['vae'].decode_latents(pred_latents_fp32)
+                                print(f"✅ 批次 {batch_idx} VAE解码完成（无锁）")
+                            except Exception as vae_error:
+                                print(f"❌ 批次 {batch_idx} VAE解码失败: {vae_error}")
+                                raise vae_error
                     
                     # 紧急修复：立即删除pred_latents_fp32，避免显存累积
                     del pred_latents_fp32
@@ -963,9 +990,9 @@ class UltraFastMuseTalkService:
         res_frame_list = []
         batch_results = {}
         
-        # 使用更大的并发数，让GPU保持忙碌
-        # 关键优化：增加并发任务数，让每个GPU始终有任务处理
-        max_workers = self.gpu_count * 3  # 每个GPU允许3个并发任务排队
+        # 🔥 修复VAE卡死：限制并发数，避免GPU资源竞争
+        # 每个GPU同时只处理一个批次（VAE解码不是完全线程安全的）
+        max_workers = self.gpu_count  # 每个GPU一个并发任务
         
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             # 直接提交所有批次，让线程池管理调度
@@ -999,9 +1026,45 @@ class UltraFastMuseTalkService:
     def ultra_fast_compose_frames(self, res_frame_list, cache_data):
         """极速并行图像合成 - 32线程"""
         coord_list_cycle = cache_data['coord_list_cycle']
-        frame_list_cycle = cache_data['frame_list_cycle']
+        
+        # 动态加载原始帧 - 仅在合成阶段读取
+        if 'frame_list_cycle' in cache_data:
+            frame_list_cycle = cache_data['frame_list_cycle']
+        else:
+            # 从路径加载
+            image_path = cache_data.get('input_image_path') or cache_data.get('template_path')
+            if not image_path:
+                 print("错误：缓存中缺少frame_list_cycle和image_path")
+                 return []
+            
+            # 读取图像
+            img = cv2.imread(image_path)
+            if img is None:
+                print(f"错误：无法读取图像 {image_path}")
+                return []
+            frame_list_cycle = [img]
+            # 如果latents被double了（preprocessing logic），我们也double frame_list以匹配
+            if len(cache_data['input_latent_list_cycle']) == 2:
+                frame_list_cycle = frame_list_cycle * 2
+        
         mask_coords_list_cycle = cache_data['mask_coords_list_cycle']
         mask_list_cycle = cache_data['mask_list_cycle']
+        
+        # 🔥 关键安全检查：确保列表不为空，避免 ZeroDivisionError
+        if len(coord_list_cycle) == 0:
+            raise ValueError("❌ coord_list_cycle为空！预处理阶段未生成坐标数据。")
+        if len(mask_coords_list_cycle) == 0:
+            raise ValueError("❌ mask_coords_list_cycle为空！预处理阶段未生成遮罩坐标数据。")
+        if len(mask_list_cycle) == 0:
+            raise ValueError("❌ mask_list_cycle为空！预处理阶段未生成遮罩数据。")
+        if len(frame_list_cycle) == 0:
+            raise ValueError("❌ frame_list_cycle为空！预处理阶段未生成帧数据。")
+        
+        print(f"✅ 合成数据检查通过:")
+        print(f"   - coord_list: {len(coord_list_cycle)} 项")
+        print(f"   - mask_coords_list: {len(mask_coords_list_cycle)} 项")
+        print(f"   - mask_list: {len(mask_list_cycle)} 项")
+        print(f"   - frame_list: {len(frame_list_cycle)} 项")
         
         print(f"🎨 开始32线程并行合成 {len(res_frame_list)} 帧...")
         

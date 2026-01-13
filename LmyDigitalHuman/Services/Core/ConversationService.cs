@@ -61,10 +61,16 @@ namespace LmyDigitalHuman.Services.Core
             
             try
             {
+                // #region agent log
+                await System.IO.File.AppendAllTextAsync(@"f:\AICode\Digitalhuman\lmy-DigitalhumanV5\lmy-Digitalhuman\.cursor\debug.log", System.Text.Json.JsonSerializer.Serialize(new{sessionId="debug-session",runId="initial",hypothesisId="A,C",location="ConversationService.cs:64",message="GenerateWelcomeVideoAsync入口",data=new{requestTemplateId=request.TemplateId},timestamp=DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()})+"\n");
+                // #endregion
                 _logger.LogInformation("开始生成欢迎视频: TemplateId={TemplateId}", request.TemplateId);
 
                 // 获取模板信息
                 var template = await _templateService.GetTemplateByIdAsync(request.TemplateId);
+                // #region agent log
+                await System.IO.File.AppendAllTextAsync(@"f:\AICode\Digitalhuman\lmy-DigitalhumanV5\lmy-Digitalhuman\.cursor\debug.log", System.Text.Json.JsonSerializer.Serialize(new{sessionId="debug-session",runId="initial",hypothesisId="A,C",location="ConversationService.cs:74",message="获取模板后",data=new{templateExists=template!=null,templateSystemName=template?.SystemName,templateId=template?.Id,templateTemplateName=template?.TemplateName},timestamp=DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()})+"\n");
+                // #endregion
                 if (template == null)
                 {
                     return new ConversationResponse
@@ -114,6 +120,9 @@ namespace LmyDigitalHuman.Services.Core
                     _logger.LogWarning("模板SystemName为空，从ImagePath提取: {SystemName}", templateSystemName);
                 }
                 
+                // #region agent log
+                await System.IO.File.AppendAllTextAsync(@"f:\AICode\Digitalhuman\lmy-DigitalhumanV5\lmy-Digitalhuman\.cursor\debug.log", System.Text.Json.JsonSerializer.Serialize(new{sessionId="debug-session",runId="initial",hypothesisId="A,B",location="ConversationService.cs:117",message="准备调用MuseTalk推理",data=new{templateSystemName,templateImagePath=template.ImagePath,audioPath=ttsResult.AudioPath,originalTemplateId=request.TemplateId},timestamp=DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()})+"\n");
+                // #endregion
                 _logger.LogInformation("使用模板SystemName: {SystemName}", templateSystemName);
                 
                 var videoResponse = await _museTalkService.SimulateRealtimeInference(new DigitalHumanRequest
@@ -185,6 +194,9 @@ namespace LmyDigitalHuman.Services.Core
             await _concurrencySemaphore.WaitAsync();
             try
             {
+                // #region agent log
+                await System.IO.File.AppendAllTextAsync(@"f:\AICode\Digitalhuman\lmy-DigitalhumanV5\lmy-Digitalhuman\.cursor\debug.log", System.Text.Json.JsonSerializer.Serialize(new{sessionId="debug-session",runId="initial",hypothesisId="A,D",location="ConversationService.cs:188",message="ProcessTextConversationAsync入口",data=new{requestTemplateId=request.TemplateId,textLength=request.Text?.Length},timestamp=DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()})+"\n");
+                // #endregion
                 _logger.LogInformation("开始处理文本对话: TemplateId={TemplateId}, Text={Text}", 
                     request.TemplateId, request.Text[..Math.Min(50, request.Text.Length)]);
 
@@ -286,6 +298,9 @@ namespace LmyDigitalHuman.Services.Core
 
                 // 4. 生成数字人视频
                 metricsStopwatch.Restart();
+                // #region agent log
+                await System.IO.File.AppendAllTextAsync(@"f:\AICode\Digitalhuman\lmy-DigitalhumanV5\lmy-Digitalhuman\.cursor\debug.log", System.Text.Json.JsonSerializer.Serialize(new{sessionId="debug-session",runId="initial",hypothesisId="B",location="ConversationService.cs:289",message="ProcessTextConversation调用GenerateVideoAsync前",data=new{templateSystemName=template.SystemName,templateImagePath=template.ImagePath,originalRequestTemplateId=request.TemplateId},timestamp=DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()})+"\n");
+                // #endregion
                 var videoResponse = await _museTalkService.GenerateVideoAsync(new DigitalHumanRequest
                 {
                     TemplateId = template.SystemName,  // 使用SystemName而不是UUID，因为缓存文件夹使用的是SystemName
@@ -441,6 +456,9 @@ namespace LmyDigitalHuman.Services.Core
 
                 // 5. 生成数字人视频
                 var template = await _templateService.GetTemplateByIdAsync(request.TemplateId);
+                // #region agent log
+                await System.IO.File.AppendAllTextAsync(@"f:\AICode\Digitalhuman\lmy-DigitalhumanV5\lmy-Digitalhuman\.cursor\debug.log", System.Text.Json.JsonSerializer.Serialize(new{sessionId="debug-session",runId="initial",hypothesisId="B,C",location="ConversationService.cs:443",message="ProcessAudioConversation获取模板后",data=new{templateExists=template!=null,templateSystemName=template?.SystemName,requestTemplateId=request.TemplateId},timestamp=DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()})+"\n");
+                // #endregion
                 if (template == null)
                 {
                     return new ConversationResponse
@@ -453,6 +471,9 @@ namespace LmyDigitalHuman.Services.Core
                 }
 
                 metricsStopwatch.Restart();
+                // #region agent log
+                await System.IO.File.AppendAllTextAsync(@"f:\AICode\Digitalhuman\lmy-DigitalhumanV5\lmy-Digitalhuman\.cursor\debug.log", System.Text.Json.JsonSerializer.Serialize(new{sessionId="debug-session",runId="initial",hypothesisId="B",location="ConversationService.cs:458",message="ProcessAudioConversation调用GenerateVideoAsync前-BUG可能在这里",data=new{传递的TemplateId=request.TemplateId,应该传递的SystemName=template.SystemName,requestTemplateId=request.TemplateId},timestamp=DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()})+"\n");
+                // #endregion
                 var videoResponse = await _museTalkService.GenerateVideoAsync(new DigitalHumanRequest
                 {
                     TemplateId = request.TemplateId,  // 传递正确的模板ID

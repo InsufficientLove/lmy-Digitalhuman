@@ -862,8 +862,15 @@
             currentTemplateSystemName = template.systemName || template.templateId;
             updateStatus('processing', '正在初始化数字人...');
             
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/adbefc07-c3d7-4372-a365-273e8cea0d37',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:860',message:'前端选择模板',data:{templateId:template.templateId,systemName:template.systemName,templateName:template.templateName},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'A,D'})}).catch(()=>{});
+            // #endregion
+            
             // 生成欢迎视频
             try {
+                // #region agent log
+                fetch('http://127.0.0.1:7242/ingest/adbefc07-c3d7-4372-a365-273e8cea0d37',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:867',message:'前端发送欢迎视频请求',data:{templateId:template.templateId,systemName:template.systemName},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'A'})}).catch(()=>{});
+                // #endregion
                 const response = await fetch('/api/conversation/welcome', {
                     method: 'POST',
                     headers: {
@@ -1061,6 +1068,9 @@
             updateStatus('processing', '正在生成回复...');
             
             try {
+                // #region agent log
+                fetch('http://127.0.0.1:7242/ingest/adbefc07-c3d7-4372-a365-273e8cea0d37',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:1064',message:'前端发送文本对话请求',data:{currentTemplateId:currentTemplateId,currentTemplateSystemName:currentTemplateSystemName,text:text.substring(0,20)},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'D'})}).catch(()=>{});
+                // #endregion
                 const response = await fetch('/api/conversation/text', {
                     method: 'POST',
                     headers: {
@@ -1175,6 +1185,9 @@
             }
 
             try {
+                // #region agent log
+                fetch('http://127.0.0.1:7242/ingest/adbefc07-c3d7-4372-a365-273e8cea0d37',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:1178',message:'前端发送音频对话请求',data:{currentTemplateId:currentTemplateId,currentTemplateSystemName:currentTemplateSystemName,audioBlobSize:audioBlob.size},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'D'})}).catch(()=>{});
+                // #endregion
                 const formData = new FormData();
                 formData.append('templateId', currentTemplateId);
                 formData.append('audioFile', audioBlob, 'recording.wav');

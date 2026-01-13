@@ -12,20 +12,36 @@ from mmpose.structures import merge_data_samples
 import torch
 from tqdm import tqdm
 
-# initialize the mmpose model
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# Global variables for models
+model = None
+fa = None
 
 # 使用绝对路径或环境变量路径
-import os
 _current_dir = os.path.dirname(os.path.abspath(__file__))
-config_file = os.path.join(_current_dir, 'dwpose', 'rtmpose-l_8xb32-270e_coco-ubody-wholebody-384x288.py')
-checkpoint_file = os.path.join(os.environ.get('MODEL_PATH', '/opt/musetalk/models'), 'dwpose', 'dw-ll_ucoco_384.pth')
 
-model = init_model(config_file, checkpoint_file, device=device)
-
-# initialize the face detection model
-device = "cuda" if torch.cuda.is_available() else "cpu"
-fa = FaceAlignment(LandmarksType._2D, flip_input=False,device=device)
+def init_preprocessing_models(device='cuda'):
+    global model, fa
+    print(f"Initializing preprocessing models on {device}...")
+    
+    config_file = os.path.join(_current_dir, 'dwpose', 'rtmpose-l_8xb32-270e_coco-ubody-wholebody-384x288.py')
+    checkpoint_file = os.path.join(os.environ.get('MODEL_PATH', '/opt/musetalk/models'), 'dwpose', 'dw-ll_ucoco_384.pth')
+    
+    # initialize the mmpose model
+    try:
+        model = init_model(config_file, checkpoint_file, device=device)
+    except Exception as e:
+        print(f"Failed to init mmpose model: {e}")
+        # Fallback or re-raise? Re-raise as it's critical
+        raise e
+    
+    # initialize the face detection model
+    try:
+        fa = FaceAlignment(LandmarksType._2D, flip_input=False, device=device)
+    except Exception as e:
+        print(f"Failed to init FaceAlignment: {e}")
+        raise e
+        
+    print("Preprocessing models initialized successfully.")
 
 # maker if the bbox is not sufficient 
 coord_placeholder = (0.0,0.0,0.0,0.0)
@@ -46,6 +62,11 @@ def read_imgs(img_list):
     return frames
 
 def get_bbox_range(img_list,upperbondrange =0):
+    global model, fa
+    if model is None or fa is None:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        init_preprocessing_models(device)
+        
     frames = read_imgs(img_list)
     batch_size_fa = 1
     batches = [frames[i:i + batch_size_fa] for i in range(0, len(frames), batch_size_fa)]
@@ -86,7 +107,23 @@ def get_bbox_range(img_list,upperbondrange =0):
     return text_range
     
 
-def get_landmark_and_bbox(img_list,upperbondrange =0):
+def get_landmark_and_bbox(img_list, upperbondrange=0, device=None):
+    global model, fa
+    
+    # Initialize models if needed
+    if device is not None:
+        # If device is specified, check if we need to re-init
+        # For simplicity, if model is None, we init.
+        # Ideally we should check if model.device matches, but mmpose model structure varies.
+        # We'll rely on the caller to pass device only if they want to ensure it's set.
+        if model is None:
+            init_preprocessing_models(device)
+    else:
+        # Fallback to default behavior if not initialized
+        if model is None:
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+            init_preprocessing_models(device)
+
     frames = read_imgs(img_list)
     batch_size_fa = 1
     batches = [frames[i:i + batch_size_fa] for i in range(0, len(frames), batch_size_fa)]
@@ -137,7 +174,10 @@ def get_landmark_and_bbox(img_list,upperbondrange =0):
                 coords_list += [f_landmark]
     
     print("********************************************bbox_shift parameter adjustment**********************************************************")
-    print(f"Total frame:「{len(frames)}」 Manually adjust range : [ -{int(sum(average_range_minus) / len(average_range_minus))}~{int(sum(average_range_plus) / len(average_range_plus))} ] , the current value: {upperbondrange}")
+    if len(average_range_minus) > 0 and len(average_range_plus) > 0:
+        print(f"Total frame:「{len(frames)}」 Manually adjust range : [ -{int(sum(average_range_minus) / len(average_range_minus))}~{int(sum(average_range_plus) / len(average_range_plus))} ] , the current value: {upperbondrange}")
+    else:
+        print(f"Total frame:「{len(frames)}」 Manually adjust range : [ N/A ] , the current value: {upperbondrange}")
     print("*************************************************************************************************************************************")
     return coords_list,frames
     

@@ -174,6 +174,9 @@ namespace LmyDigitalHuman.Services.Offline
             try
             {
                 var sessionId = Guid.NewGuid().ToString();
+                // #region agent log
+                await System.IO.File.AppendAllTextAsync(@"f:\AICode\Digitalhuman\lmy-DigitalhumanV5\lmy-Digitalhuman\.cursor\debug.log", System.Text.Json.JsonSerializer.Serialize(new{sessionId="debug-session",runId="initial",hypothesisId="A,B",location="MuseTalkApiClient.cs:176",message="StartSessionAsync准备发送到Python",data=new{templateId,sessionId},timestamp=DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()})+"\n");
+                // #endregion
                 var request = new
                 {
                     session_id = sessionId,

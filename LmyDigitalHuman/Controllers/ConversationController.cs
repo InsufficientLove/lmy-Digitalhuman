@@ -39,6 +39,9 @@ namespace LmyDigitalHuman.Controllers
         {
             try
             {
+                // #region agent log
+                await System.IO.File.AppendAllTextAsync(@"f:\AICode\Digitalhuman\lmy-DigitalhumanV5\lmy-Digitalhuman\.cursor\debug.log", System.Text.Json.JsonSerializer.Serialize(new{sessionId="debug-session",runId="initial",hypothesisId="A",location="ConversationController.cs:42",message="Controller收到欢迎视频请求",data=new{requestTemplateId=request.TemplateId},timestamp=DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()})+"\n");
+                // #endregion
                 if (string.IsNullOrWhiteSpace(request.TemplateId))
                 {
                     return BadRequest(new { error = "模板ID不能为空" });
@@ -72,6 +75,9 @@ namespace LmyDigitalHuman.Controllers
         {
             try
             {
+                // #region agent log
+                await System.IO.File.AppendAllTextAsync(@"f:\AICode\Digitalhuman\lmy-DigitalhumanV5\lmy-Digitalhuman\.cursor\debug.log", System.Text.Json.JsonSerializer.Serialize(new{sessionId="debug-session",runId="initial",hypothesisId="D",location="ConversationController.cs:75",message="Controller收到文本对话请求",data=new{requestTemplateId=request.TemplateId},timestamp=DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()})+"\n");
+                // #endregion
                 if (string.IsNullOrWhiteSpace(request.TemplateId))
                 {
                     return BadRequest(new { error = "模板ID不能为空" });
@@ -111,6 +117,9 @@ namespace LmyDigitalHuman.Controllers
         {
             try
             {
+                // #region agent log
+                await System.IO.File.AppendAllTextAsync(@"f:\AICode\Digitalhuman\lmy-DigitalhumanV5\lmy-Digitalhuman\.cursor\debug.log", System.Text.Json.JsonSerializer.Serialize(new{sessionId="debug-session",runId="initial",hypothesisId="D",location="ConversationController.cs:114",message="Controller收到音频对话请求",data=new{requestTemplateId=request.TemplateId},timestamp=DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()})+"\n");
+                // #endregion
                 if (string.IsNullOrWhiteSpace(request.TemplateId))
                 {
                     return BadRequest(new { error = "模板ID不能为空" });
