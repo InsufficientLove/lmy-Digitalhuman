@@ -70,6 +70,129 @@ print("性能监控已禁用")
 print("Ultra Fast Realtime Inference V2 - 毫秒级响应引擎")
 sys.stdout.flush()
 
+# ==================== 高质量融合函数 ====================
+
+def paste_back_high_quality(pred_img, ori_frame, face_box, mask, crop_box=None, 
+                              use_poisson=True, feather_amount=0.1):
+    """
+    高质量图像融合函数 - 对齐 MuseTalk 原生逻辑
+    
+    Args:
+        pred_img: 预测的面部图像 (BGR, uint8)
+        ori_frame: 原始完整图像 (BGR, uint8)
+        face_box: 面部边界框 [x1, y1, x2, y2]
+        mask: 融合遮罩 (灰度图或3通道, uint8)
+        crop_box: 裁剪框 [x_s, y_s, x_e, y_e]，如果为None则使用face_box
+        use_poisson: 是否尝试使用泊松融合（seamlessClone）
+        feather_amount: 羽化量（0.0-1.0），用于高斯模糊
+    
+    Returns:
+        融合后的完整图像 (BGR, uint8)
+    """
+    try:
+        # 1. 提取坐标
+        x1, y1, x2, y2 = [int(c) for c in face_box]
+        target_w, target_h = x2 - x1, y2 - y1
+        
+        # 验证尺寸有效性
+        if target_w <= 0 or target_h <= 0:
+            print(f"⚠️ paste_back: 无效的 face_box 尺寸 ({target_w}x{target_h})")
+            return ori_frame
+        
+        # 确保坐标在图像范围内
+        h_ori, w_ori = ori_frame.shape[:2]
+        x1 = max(0, min(x1, w_ori))
+        x2 = max(0, min(x2, w_ori))
+        y1 = max(0, min(y1, h_ori))
+        y2 = max(0, min(y2, h_ori))
+        target_w, target_h = x2 - x1, y2 - y1
+        
+        # 2. Auto-Resize：强制将 pred_img 和 mask 调整到目标尺寸
+        if pred_img.shape[0] != target_h or pred_img.shape[1] != target_w:
+            # 使用 LANCZOS4 高质量插值
+            pred_img = cv2.resize(pred_img, (target_w, target_h), interpolation=cv2.INTER_LANCZOS4)
+        
+        # 处理 mask
+        if len(mask.shape) == 3:
+            mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
+        
+        if mask.shape[:2] != (target_h, target_w):
+            mask = cv2.resize(mask, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
+        
+        # 3. 羽化遮罩（Feathering）- 消除硬边缘
+        # 计算模糊核大小（基于图像尺寸的百分比）
+        blur_kernel_size = max(int(feather_amount * min(target_w, target_h)), 3)
+        # 确保核大小是奇数
+        if blur_kernel_size % 2 == 0:
+            blur_kernel_size += 1
+        
+        # 高斯模糊羽化
+        mask_feathered = cv2.GaussianBlur(mask, (blur_kernel_size, blur_kernel_size), 0)
+        
+        # 归一化到 0-1 范围
+        mask_float = mask_feathered.astype(np.float32) / 255.0
+        mask_3ch = np.stack([mask_float] * 3, axis=2)  # 转为3通道
+        
+        # 4. 尝试泊松融合（Poisson Blending）
+        if use_poisson:
+            try:
+                # 创建用于泊松融合的掩码（需要是纯白色的核心区域）
+                # 使用阈值创建二值掩码
+                _, poisson_mask = cv2.threshold(mask, 10, 255, cv2.THRESH_BINARY)
+                
+                # 确保掩码边缘有内缩，避免泊松融合失败
+                kernel = np.ones((5, 5), np.uint8)
+                poisson_mask = cv2.erode(poisson_mask, kernel, iterations=1)
+                
+                # 计算融合中心点
+                center_x = x1 + target_w // 2
+                center_y = y1 + target_h // 2
+                
+                # 检查中心点是否在合理范围内
+                if 0 < center_x < w_ori and 0 < center_y < h_ori:
+                    # 执行泊松融合
+                    # NORMAL_CLONE: 标准克隆，保持源图像纹理
+                    # MIXED_CLONE: 混合克隆，适应目标图像光照
+                    result = cv2.seamlessClone(
+                        pred_img, 
+                        ori_frame, 
+                        poisson_mask, 
+                        (center_x, center_y), 
+                        cv2.MIXED_CLONE  # 使用 MIXED_CLONE 处理光照差异
+                    )
+                    
+                    print(f"✅ paste_back: 泊松融合成功 (size={target_w}x{target_h})")
+                    return result
+                    
+            except Exception as poisson_error:
+                print(f"⚠️ paste_back: 泊松融合失败，回退到羽化融合: {str(poisson_error)[:100]}")
+                # 失败则继续使用下面的羽化融合
+        
+        # 5. 羽化 Alpha Blending（回退方案或主要方案）
+        result = ori_frame.copy()
+        
+        # 提取原始图像的对应区域
+        ori_region = result[y1:y2, x1:x2].astype(np.float32)
+        pred_img_float = pred_img.astype(np.float32)
+        
+        # Alpha 混合：result = foreground * alpha + background * (1 - alpha)
+        blended = pred_img_float * mask_3ch + ori_region * (1.0 - mask_3ch)
+        
+        # 转回 uint8 并粘贴回原图
+        result[y1:y2, x1:x2] = blended.astype(np.uint8)
+        
+        print(f"✅ paste_back: 羽化融合完成 (size={target_w}x{target_h}, feather={blur_kernel_size})")
+        return result
+        
+    except Exception as e:
+        print(f"❌ paste_back: 融合失败 - {str(e)}")
+        import traceback
+        traceback.print_exc()
+        # 完全失败时返回原图
+        return ori_frame
+
+# ==================== End of 高质量融合函数 ====================
+
 class UltraFastMuseTalkService:
     """极致优化的MuseTalk服务 - 毫秒级响应"""
     
@@ -1173,22 +1296,8 @@ class UltraFastMuseTalkService:
                 # 确保crop_box是整数
                 crop_box = [int(x) for x in crop_box]
                 
-                # 紧急修复：强制缩放修复（用户要求的LANCZOS4高质量插值）
-                w = x2 - x1
-                h = y2 - y1
-                
-                # 1. 检查pred_img尺寸
-                if res_frame.shape[0] != h or res_frame.shape[1] != w:
-                    print(f"⚠️ 尺寸不匹配，强制 resize: {res_frame.shape[:2]} -> ({h}, {w})")
-                    # 2. 强制缩放（使用LANCZOS4高质量插值）
-                    res_frame = cv2.resize(res_frame, (w, h), interpolation=cv2.INTER_LANCZOS4)
-                    print(f"✅ resize完成，使用INTER_LANCZOS4")
-                
-                # 确保mask也匹配尺寸（使用LINEAR插值，mask不需要高质量）
-                if mask.shape[:2] != (h, w):
-                    mask = cv2.resize(mask, (w, h), interpolation=cv2.INTER_LINEAR)
-                
-                # 使用mask进行alpha blending（正确的融合方式）
+                # 🎨 使用新的高质量融合函数
+                # 首先尝试使用官方 blending 函数（兼容性）
                 try:
                     combine_frame = get_image_blending(
                         image=ori_frame,
@@ -1197,20 +1306,19 @@ class UltraFastMuseTalkService:
                         mask_array=mask,
                         crop_box=crop_box
                     )
+                    print(f"✅ 帧{i}: 使用官方 blending")
                 except Exception as blend_error:
-                    print(f"❌ blending失败: {blend_error}, 使用mask alpha blending")
-                    # 使用mask进行alpha blending（避免灰色方框）
-                    combine_frame = ori_frame.copy()
-                    if len(mask.shape) == 2:
-                        mask_3ch = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR).astype(np.float32) / 255.0
-                    else:
-                        mask_3ch = mask.astype(np.float32) / 255.0
-                    
-                    # Alpha blending: result = foreground * alpha + background * (1 - alpha)
-                    res_frame_float = res_frame.astype(np.float32)
-                    ori_region = combine_frame[y1:y2, x1:x2].astype(np.float32)
-                    blended = res_frame_float * mask_3ch + ori_region * (1 - mask_3ch)
-                    combine_frame[y1:y2, x1:x2] = blended.astype(np.uint8)
+                    # 回退到高质量融合函数
+                    print(f"⚠️ 帧{i}: 官方 blending 失败，使用高质量融合: {str(blend_error)[:50]}")
+                    combine_frame = paste_back_high_quality(
+                        pred_img=res_frame,
+                        ori_frame=ori_frame,
+                        face_box=[x1, y1, x2, y2],
+                        mask=mask,
+                        crop_box=crop_box,
+                        use_poisson=True,  # 启用泊松融合
+                        feather_amount=0.15  # 15% 羽化
+                    )
                 
                 return i, combine_frame
                 
