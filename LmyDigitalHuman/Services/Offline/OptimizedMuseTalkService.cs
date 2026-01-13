@@ -42,8 +42,8 @@ namespace LmyDigitalHuman.Services.Offline
                 // #region agent log
                 await System.IO.File.AppendAllTextAsync(@"f:\AICode\Digitalhuman\lmy-DigitalhumanV5\lmy-Digitalhuman\.cursor\debug.log", System.Text.Json.JsonSerializer.Serialize(new{sessionId="debug-session",runId="initial",hypothesisId="A,B",location="OptimizedMuseTalkService.cs:40",message="GenerateVideoAsync入口",data=new{requestTemplateId=request.TemplateId,audioPath=request.AudioPath},timestamp=DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()})+"\n");
                 // #endregion
-                var contentRoot = _pathManager.GetContentRootPath();
-                var videosDir = Path.Combine(contentRoot, "wwwroot", "videos");
+                // 🔥 修复：使用配置的 Videos 路径（Docker 环境为 /videos）
+                var videosDir = _configuration["Paths:Videos"] ?? "/videos";
                 Directory.CreateDirectory(videosDir);
 
                 var outputPath = Path.Combine(videosDir, $"musetalk_{Guid.NewGuid():N}.mp4");
@@ -156,19 +156,27 @@ namespace LmyDigitalHuman.Services.Offline
             try
             {
                 // 使用共享目录路径，Python容器可以访问
-                var imagePath = $"/opt/musetalk/templates/{templateId}.jpg";
-                var success = await _apiClient.PreprocessTemplateAsync(templateId, imagePath);
+                // 注意：这里使用 /app/wwwroot/templates 路径，因为 Docker 挂载了 /opt/musetalk/templates 到这里
+                var imagePath = $"/app/wwwroot/templates/{templateId}.jpg";
+                var (success, message) = await _apiClient.PreprocessTemplateAsync(templateId, imagePath);
                 return new PreprocessingResult
                 {
                     Success = success,
                     TemplateId = templateId,
+                    Message = message ?? (success ? "Success" : "Failed"),
                     PreprocessingTime = 1000 // 默认1秒
                 };
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "PreprocessTemplateAsync failed: {TemplateId}", templateId);
-                return new PreprocessingResult { Success = false, TemplateId = templateId, PreprocessingTime = 0 };
+                return new PreprocessingResult 
+                { 
+                    Success = false, 
+                    TemplateId = templateId, 
+                    Message = ex.Message,
+                    PreprocessingTime = 0 
+                };
             }
         }
 

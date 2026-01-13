@@ -19,3 +19,7 @@ Always adhere to the following rules:
 
 ## 4. Immediate Action
 If you are fixing a bug, just fix the code and push it. Report only "Fixed X in file Y".
+
+## 5. Language Protocol
+*   **Commit Messages**: Chinese (中文) is allowed and preferred for detailed descriptions.
+*   **Encoding**: Ensure all operations use **UTF-8** encoding to prevent garbled text on Windows.

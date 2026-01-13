@@ -605,6 +605,7 @@ namespace LmyDigitalHuman.Models
     {
         public bool Success { get; set; }
         public string TemplateId { get; set; } = string.Empty;
+        public string Message { get; set; } = string.Empty;
         public long PreprocessingTime { get; set; }
         public Dictionary<string, object> OptimizedSettings { get; set; } = new();
     }

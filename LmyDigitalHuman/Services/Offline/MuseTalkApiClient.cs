@@ -67,7 +67,7 @@ namespace LmyDigitalHuman.Services.Offline
         /// <summary>
         /// 预处理模板
         /// </summary>
-        public async Task<bool> PreprocessTemplateAsync(string templateId, string imagePath)
+        public async Task<(bool Success, string? Message)> PreprocessTemplateAsync(string templateId, string imagePath)
         {
             try
             {
@@ -80,21 +80,53 @@ namespace LmyDigitalHuman.Services.Offline
                 var json = JsonSerializer.Serialize(request);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
                 
+                _logger.LogInformation("发送模板预处理请求: TemplateId={TemplateId}, ImagePath={ImagePath}", templateId, imagePath);
+                
                 var response = await _httpClient.PostAsync("/api/preprocess_template", content);
+                var responseText = await response.Content.ReadAsStringAsync();
+                
+                _logger.LogInformation("模板预处理响应: StatusCode={StatusCode}, Content={Content}", 
+                    response.StatusCode, responseText);
+                
                 if (response.IsSuccessStatusCode)
                 {
-                    _logger.LogInformation("✅ 模板预处理成功: {TemplateId}", templateId);
-                    return true;
+                    try
+                    {
+                        var result = JsonSerializer.Deserialize<JsonElement>(responseText);
+                        
+                        if (result.TryGetProperty("success", out var successProp) && successProp.GetBoolean())
+                        {
+                            var message = result.TryGetProperty("message", out var msgProp) 
+                                ? msgProp.GetString() 
+                                : "Success";
+                            _logger.LogInformation("✅ 模板预处理成功: {TemplateId}, Message={Message}", templateId, message);
+                            return (true, message);
+                        }
+                        else
+                        {
+                            var message = result.TryGetProperty("message", out var msgProp) 
+                                ? msgProp.GetString() 
+                                : "Unknown error";
+                            _logger.LogError("模板预处理失败: {Message}", message);
+                            return (false, message);
+                        }
+                    }
+                    catch (JsonException)
+                    {
+                        // 如果响应不是JSON格式，返回原始文本
+                        _logger.LogInformation("✅ 模板预处理成功: {TemplateId}", templateId);
+                        return (true, responseText);
+                    }
                 }
                 
-                var error = await response.Content.ReadAsStringAsync();
-                _logger.LogError("模板预处理失败: {Error}", error);
-                return false;
+                _logger.LogError("模板预处理HTTP请求失败: StatusCode={StatusCode}, Response={Response}", 
+                    response.StatusCode, responseText);
+                return (false, $"HTTP {response.StatusCode}: {responseText}");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "预处理模板时发生错误");
-                return false;
+                return (false, ex.Message);
             }
         }
 

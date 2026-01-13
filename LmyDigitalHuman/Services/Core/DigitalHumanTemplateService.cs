@@ -217,7 +217,21 @@ namespace LmyDigitalHuman.Services.Core
                         
                         if (!preprocessSuccess)
                         {
-                            _logger.LogError("MuseTalk图片预处理失败: SystemName={SystemName}", template.SystemName);
+                            var errorMsg = preprocessResult.Message ?? "Unknown error";
+                            _logger.LogError("MuseTalk图片预处理失败: SystemName={SystemName}, Error={Error}", 
+                                template.SystemName, errorMsg);
+                            
+                            template.Status = "error";
+                            template.UpdatedAt = DateTime.Now;
+                            await SaveTemplateToFileAsync(template);
+                            
+                            return new CreateDigitalHumanTemplateResponse
+                            {
+                                Success = false,
+                                Message = $"模板预处理失败: {errorMsg}",
+                                TemplateId = templateId,
+                                ProcessingTime = (DateTime.Now - startTime).TotalMilliseconds.ToString()
+                            };
                         }
                     }
                     else if (resourceType == "video")
@@ -233,24 +247,22 @@ namespace LmyDigitalHuman.Services.Core
                         }
                         else
                         {
-                            _logger.LogError("MuseTalk视频预处理失败: SystemName={SystemName}", template.SystemName);
+                            var errorMsg = preprocessResult.Message ?? "Unknown error";
+                            _logger.LogError("MuseTalk视频预处理失败: SystemName={SystemName}, Error={Error}", 
+                                template.SystemName, errorMsg);
+                            
+                            template.Status = "error";
+                            template.UpdatedAt = DateTime.Now;
+                            await SaveTemplateToFileAsync(template);
+                            
+                            return new CreateDigitalHumanTemplateResponse
+                            {
+                                Success = false,
+                                Message = $"视频模板预处理失败: {errorMsg}",
+                                TemplateId = templateId,
+                                ProcessingTime = (DateTime.Now - startTime).TotalMilliseconds.ToString()
+                            };
                         }
-                    }
-                    
-                    // 检查预处理结果
-                    if (!preprocessSuccess)
-                    {
-                        template.Status = "error";
-                        template.UpdatedAt = DateTime.Now;
-                        await SaveTemplateToFileAsync(template);
-                        
-                        return new CreateDigitalHumanTemplateResponse
-                        {
-                            Success = false,
-                            Message = "模板预处理失败，请检查服务连接",
-                            TemplateId = templateId,
-                            ProcessingTime = (DateTime.Now - startTime).TotalMilliseconds.ToString()
-                        };
                     }
                     
                     _logger.LogInformation("MuseTalk预处理成功: SystemName={SystemName}", template.SystemName);
