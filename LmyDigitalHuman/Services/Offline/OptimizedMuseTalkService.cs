@@ -155,9 +155,15 @@ namespace LmyDigitalHuman.Services.Offline
         {
             try
             {
-                // 使用共享目录路径，Python容器可以访问
-                // 注意：这里使用 /app/wwwroot/templates 路径，因为 Docker 挂载了 /opt/musetalk/templates 到这里
-                var imagePath = $"/app/wwwroot/templates/{templateId}.jpg";
+                // 🔥 路径映射修复：
+                // - C# 容器中文件在: /app/wwwroot/templates/xxx.jpg (挂载自宿主机 /opt/musetalk/templates)
+                // - Python 容器中需要使用: /opt/musetalk/templates/xxx.jpg (同一个宿主机目录)
+                // - 所以传递给 Python 的路径应该是 Python 容器中的路径
+                var imagePath = $"/opt/musetalk/templates/{templateId}.jpg";
+                
+                _logger.LogInformation("预处理模板: C#路径=/app/wwwroot/templates/{TemplateId}.jpg, Python路径={PythonPath}", 
+                    templateId, imagePath);
+                
                 var (success, message) = await _apiClient.PreprocessTemplateAsync(templateId, imagePath);
                 return new PreprocessingResult
                 {
@@ -184,11 +190,16 @@ namespace LmyDigitalHuman.Services.Offline
         {
             try
             {
-                _logger.LogInformation("开始预处理视频模板: TemplateId={TemplateId}, VideoPath={VideoPath}", 
+                _logger.LogInformation("开始预处理视频模板: TemplateId={TemplateId}, C#VideoPath={VideoPath}", 
                     templateId, videoPath);
                 
-                // 使用共享目录路径，Python容器可以访问
+                // 🔥 路径映射修复：
+                // - C# 容器中视频在: /app/wwwroot/templates/xxx.mp4
+                // - Python 容器中需要使用: /opt/musetalk/templates/xxx.mp4
                 var sharedVideoPath = $"/opt/musetalk/templates/{templateId}.mp4";
+                
+                _logger.LogInformation("预处理视频: C#路径={CSharpPath}, Python路径={PythonPath}", 
+                    videoPath, sharedVideoPath);
                 
                 var result = await _apiClient.PreprocessVideoAsync(templateId, sharedVideoPath);
                 
