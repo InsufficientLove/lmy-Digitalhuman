@@ -357,158 +357,119 @@ class OptimizedPreprocessor:
             # image = self.fix_face_shadows(image)
             print("保持原始颜色，跳过阴影修复")
             
-            # 3. 面部检测和关键点提取
-            print("👤 面部检测和关键点提取...")
-            # 保存临时图像文件给get_landmark_and_bbox使用
-            temp_image_path = os.path.join(output_dir, "temp_image.jpg")
-            # 关键修复：保存前转回BGR格式（因为cv2.imwrite期望BGR）
-            image_bgr = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
-            cv2.imwrite(temp_image_path, image_bgr)
+            # 3. 面部检测和关键点提取 - 使用 face_alignment 库
+            print("👤 面部检测和关键点提取（使用 face_alignment）...")
             
-            # 调试：检查图像是否正确保存
-            if os.path.exists(temp_image_path):
-                img_check = cv2.imread(temp_image_path)
-                print(f"临时图像: {img_check.shape if img_check is not None else 'None'}")
+            # 🔥 使用 face_alignment 库进行可靠的人脸检测
+            try:
+                from face_alignment import FaceAlignment, LandmarksType
+                print("✅ 成功导入 face_alignment 库")
+            except ImportError as e:
+                raise ImportError(
+                    "❌ 无法导入 face_alignment 库！\n"
+                    "请安装: pip install face-alignment\n"
+                    f"错误: {e}"
+                )
             
-            coord_list, frame_list = get_landmark_and_bbox([temp_image_path], device=self.device)
+            # 初始化 face_alignment 检测器（S3FD + 2D landmarks）
+            try:
+                fa = FaceAlignment(
+                    LandmarksType.TWO_D, 
+                    flip_input=False, 
+                    device=self.device.split(':')[0]  # 'cuda' or 'cpu'
+                )
+                print(f"✅ face_alignment 检测器初始化成功（设备: {self.device}）")
+            except Exception as e:
+                raise RuntimeError(f"❌ face_alignment 初始化失败: {e}")
+            
+            # 检测人脸关键点
+            # 注意：face_alignment 期望 RGB 格式
+            preds = fa.get_landmarks(image)  # image 已经是 RGB 格式
+            
+            # 🔥 严格验证：如果没有检测到人脸，直接抛出异常
+            if preds is None or len(preds) == 0:
+                raise ValueError(
+                    "❌ 人脸检测失败！未检测到任何人脸。\n"
+                    "可能原因：\n"
+                    "  1. 图片中没有清晰的正面人脸\n"
+                    "  2. 人脸被遮挡或角度过大\n"
+                    "  3. 图片质量过低或光线不足\n"
+                    "请上传包含清晰正面人脸的图片后重试。"
+                )
+            
+            print(f"✅ DEBUG: 检测到 {len(preds)} 个人脸")
+            
+            # 使用第一个检测到的人脸
+            landmarks = preds[0]  # shape: (68, 2) for dlib, (98, 2) for others
+            
+            # 调试：打印关键点信息
+            print(f"✅ DEBUG: landmarks shape = {landmarks.shape}")
+            print(f"✅ DEBUG: X 坐标范围 = {landmarks[:, 0].min():.1f} ~ {landmarks[:, 0].max():.1f}")
+            print(f"✅ DEBUG: Y 坐标范围 = {landmarks[:, 1].min():.1f} ~ {landmarks[:, 1].max():.1f}")
+            print(f"✅ DEBUG: 前5个关键点 = \n{landmarks[:5]}")
+            
+            # 再次验证：确保关键点不是全零或异常值
+            if np.max(landmarks) < 1.0:
+                raise ValueError(
+                    f"❌ 检测到的关键点异常（可能是归一化坐标）：\n"
+                    f"  max value = {np.max(landmarks)}\n"
+                    "这可能是 face_alignment 返回了错误的坐标格式。"
+                )
+            
+            # 构造返回值以兼容后续代码
+            coord_list = [landmarks]  # 列表，包含一个 landmarks 数组
+            frame_list = [image]      # RGB 格式的图像
             
             # 获取原始尺寸
-            if frame_list and len(frame_list) > 0:
-                original_h, original_w = frame_list[0].shape[:2]
-                original_size = (original_w, original_h)
-            else:
-                original_size = (0, 0)
+            original_h, original_w = image.shape[:2]
+            original_size = (original_w, original_h)
             
-            # 调试：打印返回值
-            print(f"coord_list长度: {len(coord_list) if coord_list else 0}")
-            print(f"frame_list长度: {len(frame_list) if frame_list else 0}")
-            if coord_list and len(coord_list) > 0:
-                print(f"第一个coord类型: {type(coord_list[0])}")
-                if hasattr(coord_list[0], 'shape'):
-                    print(f"第一个coord shape: {coord_list[0].shape}")
-                # 打印实际的值看看
-                if isinstance(coord_list[0], np.ndarray):
-                    print(f"前5个关键点: {coord_list[0][:5]}")
-                    print(f"非零值数量: {np.count_nonzero(coord_list[0])}")
-            
-            # 清理临时文件
-            if os.path.exists(temp_image_path):
-                os.remove(temp_image_path)
-            
-            if not coord_list or not frame_list:
-                raise ValueError("面部检测失败")
+            print(f"✅ 面部检测成功: 图像尺寸={original_w}x{original_h}, 关键点数={landmarks.shape[0]}")
             
             # 4. 面部解析和特征提取
             print("🎭 面部解析和特征提取...")
             mask_coords_list, mask_list = [], []
             face_parsing_masks = []  # 存储面部解析的mask
             
-            # 使用coord_list作为bbox_list（从get_landmark_and_bbox返回的）
+            # 处理检测到的人脸
             for i, (frame, landmarks) in enumerate(zip(frame_list, coord_list)):
-                if landmarks is None:
-                    print(f"警告: 第{i}帧没有检测到人脸")
-                    continue
-                    
-                # coord_list返回的是关键点坐标，不是边界框
-                # 需要从关键点计算边界框
-                if isinstance(landmarks, np.ndarray):
-                    print(f"关键点数据: shape={landmarks.shape}, dtype={landmarks.dtype}")
-                    if landmarks.shape[0] > 0:
-                        # 计算边界框 (x_min, y_min, x_max, y_max)
-                        x_coords = landmarks[:, 0]
-                        y_coords = landmarks[:, 1]
-                        
-                        # 检查坐标范围
-                        print(f"X坐标范围: {np.min(x_coords):.2f} - {np.max(x_coords):.2f}")
-                        print(f"Y坐标范围: {np.min(y_coords):.2f} - {np.max(y_coords):.2f}")
-                        
-                        # 如果坐标全是0，使用整个图像作为人脸区域
-                        if np.max(x_coords) == 0 and np.max(y_coords) == 0:
-                            print("警告: 关键点全是0，尝试使用face_alignment重新检测...")
-                            
-                            # 尝试使用face_alignment直接检测
-                            try:
-                                from face_alignment import FaceAlignment, LandmarksType
-                                fa = FaceAlignment(LandmarksType.TWO_D, flip_input=False, device='cuda')
-                                preds = fa.get_landmarks(frame)
-                                
-                                if preds and len(preds) > 0:
-                                    landmarks_new = preds[0]  # 第一个人脸
-                                    x_coords = landmarks_new[:, 0]
-                                    y_coords = landmarks_new[:, 1]
-                                    print(f"face_alignment检测成功: X范围 {np.min(x_coords):.0f}-{np.max(x_coords):.0f}, Y范围 {np.min(y_coords):.0f}-{np.max(y_coords):.0f}")
-                                    
-                                    x_min = int(np.min(x_coords))
-                                    y_min = int(np.min(y_coords))
-                                    x_max = int(np.max(x_coords))
-                                    y_max = int(np.max(y_coords))
-                                    
-                                    # 添加边距
-                                    margin = 50
-                                    x_min = max(0, x_min - margin)
-                                    y_min = max(0, y_min - margin)
-                                    x_max = min(frame.shape[1], x_max + margin)
-                                    y_max = min(frame.shape[0], y_max + margin)
-                                    
-                                    face_box = [x_min, y_min, x_max, y_max]
-                                    print(f"重新检测的边界框: {face_box}")
-                                else:
-                                    raise Exception("face_alignment未检测到人脸")
-                                    
-                            except Exception as fa_error:
-                                print(f"face_alignment检测失败: {fa_error}")
-                                # 使用默认值
-                                h, w = frame.shape[:2]
-                                margin = min(w, h) // 8
-                                x_min = margin
-                                y_min = margin
-                                x_max = w - margin
-                                y_max = h - margin
-                                face_box = [x_min, y_min, x_max, y_max]
-                                print(f"使用默认边界框: {face_box}")
-                        # 如果坐标是归一化的（0-1范围），需要缩放到图像尺寸
-                        elif np.max(x_coords) <= 1.0 and np.max(y_coords) <= 1.0:
-                            h, w = frame.shape[:2]
-                            x_coords = x_coords * w
-                            y_coords = y_coords * h
-                            print(f"检测到归一化坐标，缩放到图像尺寸: {w}x{h}")
-                            
-                            x_min = int(np.min(x_coords))
-                            y_min = int(np.min(y_coords))
-                            x_max = int(np.max(x_coords))
-                            y_max = int(np.max(y_coords))
-                            
-                            # 添加一些边距
-                            margin = 30
-                            x_min = max(0, x_min - margin)
-                            y_min = max(0, y_min - margin)
-                            x_max = min(frame.shape[1], x_max + margin)
-                            y_max = min(frame.shape[0], y_max + margin)
-                            
-                            face_box = [x_min, y_min, x_max, y_max]
-                        else:
-                            # 正常坐标
-                            x_min = int(np.min(x_coords))
-                            y_min = int(np.min(y_coords))
-                            x_max = int(np.max(x_coords))
-                            y_max = int(np.max(y_coords))
-                            
-                            # 添加一些边距
-                            margin = 30
-                            x_min = max(0, x_min - margin)
-                            y_min = max(0, y_min - margin)
-                            x_max = min(frame.shape[1], x_max + margin)
-                            y_max = min(frame.shape[0], y_max + margin)
-                            
-                            face_box = [x_min, y_min, x_max, y_max]
-                        
-                        print(f"计算的边界框: {face_box}")
-                    else:
-                        print(f"警告: 关键点为空")
-                        continue
-                else:
-                    print(f"警告: 关键点类型不正确: {type(landmarks)}")
-                    continue
+                # 🔥 从 landmarks 计算精确的面部边界框
+                print(f"📐 计算面部边界框（帧 {i}）...")
+                
+                # 提取 X, Y 坐标
+                x_coords = landmarks[:, 0]
+                y_coords = landmarks[:, 1]
+                
+                # 计算基础边界框
+                x_min = int(np.min(x_coords))
+                y_min = int(np.min(y_coords))
+                x_max = int(np.max(x_coords))
+                y_max = int(np.max(y_coords))
+                
+                print(f"✅ DEBUG: 原始 BBox = [{x_min}, {y_min}, {x_max}, {y_max}]")
+                print(f"✅ DEBUG: BBox 尺寸 = {x_max - x_min} x {y_max - y_min}")
+                
+                # 添加适当的边距（避免裁剪过紧）
+                h, w = frame.shape[:2]
+                margin_x = int((x_max - x_min) * 0.2)  # 20% 水平边距
+                margin_y = int((y_max - y_min) * 0.3)  # 30% 垂直边距（额外包含额头和下巴）
+                
+                x_min = max(0, x_min - margin_x)
+                y_min = max(0, y_min - margin_y)
+                x_max = min(w, x_max + margin_x)
+                y_max = min(h, y_max + margin_y)
+                
+                face_box = [x_min, y_min, x_max, y_max]
+                
+                print(f"✅ DEBUG: 添加边距后 BBox = {face_box}")
+                print(f"✅ DEBUG: 最终 BBox 尺寸 = {x_max - x_min} x {y_max - y_min}")
+                
+                # 验证边界框有效性
+                if (x_max - x_min) < 50 or (y_max - y_min) < 50:
+                    raise ValueError(
+                        f"❌ 计算的边界框过小: {x_max - x_min}x{y_max - y_min}\n"
+                        "这可能表示人脸检测质量不佳，请使用更清晰的图片。"
+                    )
                 
                 # 面部解析 - 简化逻辑，避免错误
                 try:
