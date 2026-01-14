@@ -108,9 +108,12 @@ def paste_back_high_quality(pred_img, ori_frame, face_box, mask, crop_box=None,
         target_w, target_h = x2 - x1, y2 - y1
         
         # 2. Auto-Resize：强制将 pred_img 和 mask 调整到目标尺寸
+        # 🔥 关键：pred_img.shape[0] 是高度(H)，pred_img.shape[1] 是宽度(W)
+        # target_h = y2 - y1，target_w = x2 - x1
         if pred_img.shape[0] != target_h or pred_img.shape[1] != target_w:
-            # 使用 LANCZOS4 高质量插值
+            # resize 参数：(width, height)，即 (W, H)
             pred_img = cv2.resize(pred_img, (target_w, target_h), interpolation=cv2.INTER_LANCZOS4)
+            print(f"✅ Resize: pred_img {pred_img.shape} -> ({target_h}, {target_w}, 3)")
         
         # 处理 mask
         if len(mask.shape) == 3:
@@ -171,14 +174,20 @@ def paste_back_high_quality(pred_img, ori_frame, face_box, mask, crop_box=None,
         # 5. 羽化 Alpha Blending（回退方案或主要方案）
         result = ori_frame.copy()
         
-        # 提取原始图像的对应区域
+        # 🔥 关键修复：确保使用正确的坐标顺序！
+        # NumPy 数组索引：array[row, col] = array[y, x]
+        # 所以裁剪应该是：image[y1:y2, x1:x2]
         ori_region = result[y1:y2, x1:x2].astype(np.float32)
         pred_img_float = pred_img.astype(np.float32)
+        
+        print(f"✅ 坐标验证: ori_region shape={ori_region.shape}, pred_img shape={pred_img.shape}")
+        print(f"   BBox: x1={x1}, y1={y1}, x2={x2}, y2={y2}")
+        print(f"   计算尺寸: W={x2-x1}, H={y2-y1}")
         
         # Alpha 混合：result = foreground * alpha + background * (1 - alpha)
         blended = pred_img_float * mask_3ch + ori_region * (1.0 - mask_3ch)
         
-        # 转回 uint8 并粘贴回原图
+        # 转回 uint8 并粘贴回原图（同样使用 [y1:y2, x1:x2]）
         result[y1:y2, x1:x2] = blended.astype(np.uint8)
         
         print(f"✅ paste_back: 羽化融合完成 (size={target_w}x{target_h}, feather={blur_kernel_size})")
@@ -1296,12 +1305,31 @@ class UltraFastMuseTalkService:
                 # 确保crop_box是整数
                 crop_box = [int(x) for x in crop_box]
                 
+                # 🔥 关键修复1：颜色空间转换（RGB -> BGR）
+                # VAE 输出的 res_frame 是 RGB 格式，但 OpenCV 和融合函数期望 BGR
+                if res_frame.ndim == 3 and res_frame.shape[2] == 3:
+                    # 检查是否需要转换（如果已经是uint8则直接转，否则先归一化）
+                    if res_frame.dtype != np.uint8:
+                        # 归一化到 0-255
+                        res_frame = np.clip(res_frame * 255, 0, 255).astype(np.uint8)
+                    
+                    # RGB -> BGR 转换（关键！）
+                    res_frame_bgr = cv2.cvtColor(res_frame, cv2.COLOR_RGB2BGR)
+                    print(f"🎨 帧{i}: RGB->BGR 转换完成 (shape={res_frame_bgr.shape})")
+                else:
+                    res_frame_bgr = res_frame.astype(np.uint8)
+                
+                # 🔥 关键修复2：确保坐标使用正确（image[y1:y2, x1:x2]）
+                # 在 paste_back_high_quality 函数中已经使用了正确的顺序
+                # 这里只需要确保 face_box 顺序正确：[x1, y1, x2, y2]
+                print(f"📐 帧{i}: face_box=[{x1}, {y1}, {x2}, {y2}], 尺寸={x2-x1}x{y2-y1}")
+                
                 # 🎨 使用新的高质量融合函数
                 # 首先尝试使用官方 blending 函数（兼容性）
                 try:
                     combine_frame = get_image_blending(
                         image=ori_frame,
-                        face=res_frame, 
+                        face=res_frame_bgr,  # ✅ 使用 BGR 格式
                         face_box=[x1, y1, x2, y2],
                         mask_array=mask,
                         crop_box=crop_box
@@ -1311,7 +1339,7 @@ class UltraFastMuseTalkService:
                     # 回退到高质量融合函数
                     print(f"⚠️ 帧{i}: 官方 blending 失败，使用高质量融合: {str(blend_error)[:50]}")
                     combine_frame = paste_back_high_quality(
-                        pred_img=res_frame,
+                        pred_img=res_frame_bgr,  # ✅ 使用 BGR 格式
                         ori_frame=ori_frame,
                         face_box=[x1, y1, x2, y2],
                         mask=mask,
