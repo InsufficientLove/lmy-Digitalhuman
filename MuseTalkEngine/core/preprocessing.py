@@ -541,19 +541,50 @@ class OptimizedPreprocessor:
                         "这可能表示人脸检测质量不佳，请使用更清晰的图片。"
                     )
                 
-                # 🎯 使用 Landmarks 智能遮罩（不再依赖 FaceParsing）
-                print("✅ 使用 Landmarks 智能遮罩（FaceParsing 已弃用）")
+                # 🎯 生成智能 Landmark 多边形遮罩（用于推理合成）
+                print("✅ 生成智能 Landmark 多边形遮罩（原图尺寸）")
                 
-                # 创建全白 mask（在 VAE 编码时会用 Landmark 多边形替换）
                 h, w = frame.shape[:2]
-                mask = np.ones((h, w), dtype=np.uint8) * 255
-                crop_box = face_box  # 使用 face_box 作为 crop_box
                 
-                # 保存坐标和遮罩
+                # 构建多边形：鼻梁 → 脸颊 → 下巴
+                polygon_points = []
+                
+                # 1. 鼻梁底部（点 30）
+                if landmarks.shape[0] >= 31:
+                    polygon_points.append(landmarks[30])
+                
+                # 2. 右脸颊到下巴（点 2-8）
+                for idx in range(2, 9):
+                    if idx < landmarks.shape[0]:
+                        polygon_points.append(landmarks[idx])
+                
+                # 3. 下巴到左脸颊（点 8-14）
+                for idx in range(8, 15):
+                    if idx < landmarks.shape[0]:
+                        polygon_points.append(landmarks[idx])
+                
+                polygon_points = np.array(polygon_points, dtype=np.int32)
+                
+                # 创建原图尺寸的多边形遮罩
+                smart_mask_full = np.zeros((h, w), dtype=np.uint8)
+                cv2.fillPoly(smart_mask_full, [polygon_points], 255)
+                
+                # 羽化边缘（高斯模糊）
+                blur_kernel = max(int(min(w, h) * 0.03), 15)  # 动态计算，至少15
+                if blur_kernel % 2 == 0:
+                    blur_kernel += 1
+                smart_mask_full = cv2.GaussianBlur(smart_mask_full, (blur_kernel, blur_kernel), 0)
+                
+                print(f"✅ 智能遮罩生成: {smart_mask_full.shape}, 多边形={len(polygon_points)}点, 羽化={blur_kernel}")
+                
+                # 保存智能遮罩（用于推理合成）
+                mask = smart_mask_full
+                crop_box = face_box
+                
                 mask_coords_list.append(list(crop_box))
                 mask_list.append(mask)
                 
-                print(f"✅ 已保存: crop_box={crop_box}, mask shape={mask.shape}")
+                print(f"✅ 已保存智能遮罩: crop_box={crop_box}, mask shape={mask.shape}, unique={np.unique(mask)[:5]}")
             
             # 5. VAE编码 - 并行处理
             print("VAE编码...")
