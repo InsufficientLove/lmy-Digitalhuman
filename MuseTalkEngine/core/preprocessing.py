@@ -96,7 +96,33 @@ class SimpleFaceParsing:
         return self.__call__(image)
 
 class OptimizedPreprocessor:
-    """优化的预处理器 - 修复阴影问题，极速处理"""
+    """
+    优化的预处理器 - 修复阴影问题，极速处理
+    
+    🔥 坐标系统说明（极其重要！）
+    ----------------------------------
+    在整个预处理流程中，必须严格遵守以下坐标规则：
+    
+    1. BBox格式：[x1, y1, x2, y2]
+       - x1, x2: 水平坐标（列，Column，Width方向）
+       - y1, y2: 垂直坐标（行，Row，Height方向）
+    
+    2. Numpy数组索引：array[row, col] = array[y, x]
+       - 第一个索引是 ROW (Y坐标，Height)
+       - 第二个索引是 COL (X坐标，Width)
+    
+    3. 正确的切片方式：
+       ✅ 正确：frame[y1:y2, x1:x2]
+       ❌ 错误：frame[x1:x2, y1:y2] <- 这会导致裁剪出错误区域！
+    
+    4. Landmarks格式：[[x, y], [x, y], ...]
+       - landmarks[:, 0] 是 X坐标
+       - landmarks[:, 1] 是 Y坐标
+    
+    5. cv2.resize参数：resize(image, (width, height))
+       - 第一个参数是 WIDTH (X方向)
+       - 第二个参数是 HEIGHT (Y方向)
+    """
     
     def __init__(self):
         self.vae = None
@@ -608,13 +634,30 @@ class OptimizedPreprocessor:
             # 紧急修复：添加face_box参数，crop到256x256
             def encode_frame(frame, face_box, mask=None):
                 with torch.no_grad():
-                    # 关键修复：Crop人脸区域并resize到256x256（MuseTalk标准输入）
+                    # 🔥 关键修复：确保使用正确的Numpy切片顺序！
+                    # Numpy格式：array[row, col] = array[H, W] = array[y, x]
+                    # BBox格式：[x1, y1, x2, y2]
+                    # 因此切片必须是：frame[y1:y2, x1:x2]
                     x1, y1, x2, y2 = face_box
+                    
+                    # 严格验证坐标合法性
+                    h, w = frame.shape[:2]
+                    if not (0 <= y1 < y2 <= h and 0 <= x1 < x2 <= w):
+                        print(f"❌ 错误：BBox 坐标非法！")
+                        print(f"   Frame shape: {frame.shape} (H={h}, W={w})")
+                        print(f"   BBox: x1={x1}, y1={y1}, x2={x2}, y2={y2}")
+                        print(f"   X range: {x1} to {x2} (width={x2-x1})")
+                        print(f"   Y range: {y1} to {y2} (height={y2-y1})")
+                        raise ValueError("BBox coordinates out of bounds")
+                    
+                    # 🔥 核心裁剪：使用 [y1:y2, x1:x2] 顺序（Row=Y, Col=X）
                     face_crop = frame[y1:y2, x1:x2]
+                    print(f"✅ 裁剪验证: frame[{y1}:{y2}, {x1}:{x2}] → shape={face_crop.shape}")
+                    print(f"   期望尺寸: H={y2-y1}, W={x2-x1} → 实际: H={face_crop.shape[0]}, W={face_crop.shape[1]}")
                     
                     # Resize到256x256（标准MuseTalk输入尺寸）
                     face_256 = cv2.resize(face_crop, (256, 256), interpolation=cv2.INTER_LANCZOS4)
-                    print(f"✅ Face crop: {face_crop.shape} → 256x256")
+                    print(f"✅ Resize完成: {face_crop.shape} → 256x256")
                     
                     # 转换为tensor
                     frame_tensor = torch.from_numpy(face_256).float().to(self.device) / 127.5 - 1.0
@@ -640,8 +683,10 @@ class OptimizedPreprocessor:
                     
                     # 如果有mask，创建masked版本
                     if mask is not None and mask.size > 0:
-                        # 关键修复：Crop mask到人脸区域并resize到256x256
+                        # 🔥 关键修复：Crop mask到人脸区域，使用正确的切片顺序
+                        # mask也是numpy数组，同样遵循 [row, col] = [y, x] 规则
                         mask_crop = mask[y1:y2, x1:x2]
+                        print(f"✅ Mask裁剪: mask[{y1}:{y2}, {x1}:{x2}] → shape={mask_crop.shape}")
                         mask_256 = cv2.resize(mask_crop, (256, 256), interpolation=cv2.INTER_LINEAR)
                         print(f"   Mask crop: {mask_crop.shape} → 256x256")
                         

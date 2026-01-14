@@ -77,6 +77,24 @@ def paste_back_high_quality(pred_img, ori_frame, face_box, mask, crop_box=None,
     """
     高质量图像融合函数 - 对齐 MuseTalk 原生逻辑
     
+    🔥 坐标系统说明（极其重要！）：
+    ----------------------------------
+    1. BBox格式：[x1, y1, x2, y2]
+       - x1, x2: 水平坐标（列，Column，Width方向）
+       - y1, y2: 垂直坐标（行，Row，Height方向）
+    
+    2. Numpy数组索引：array[row, col] = array[y, x]
+       - 第一个索引是 ROW (Y坐标，Height)
+       - 第二个索引是 COL (X坐标，Width)
+    
+    3. 正确的切片方式：
+       ✅ 正确：image[y1:y2, x1:x2]
+       ❌ 错误：image[x1:x2, y1:y2] <- 这会把X当成Y，导致裁剪错误！
+    
+    4. cv2.resize参数：resize(image, (width, height))
+       - 第一个参数是 WIDTH (X方向)
+       - 第二个参数是 HEIGHT (Y方向)
+    
     Args:
         pred_img: 预测的面部图像 (BGR, uint8)
         ori_frame: 原始完整图像 (BGR, uint8)
@@ -177,12 +195,26 @@ def paste_back_high_quality(pred_img, ori_frame, face_box, mask, crop_box=None,
         # 🔥 关键修复：确保使用正确的坐标顺序！
         # NumPy 数组索引：array[row, col] = array[y, x]
         # 所以裁剪应该是：image[y1:y2, x1:x2]
+        # 
+        # 严格验证：
+        print(f"📐 融合坐标验证:")
+        print(f"   ori_frame shape: {ori_frame.shape} (H={ori_frame.shape[0]}, W={ori_frame.shape[1]})")
+        print(f"   face_box: [x1={x1}, y1={y1}, x2={x2}, y2={y2}]")
+        print(f"   计算尺寸: W={x2-x1}, H={y2-y1}")
+        print(f"   切片操作: result[{y1}:{y2}, {x1}:{x2}]")
+        
+        # 执行裁剪（使用正确的 [y, x] 顺序）
         ori_region = result[y1:y2, x1:x2].astype(np.float32)
         pred_img_float = pred_img.astype(np.float32)
         
-        print(f"✅ 坐标验证: ori_region shape={ori_region.shape}, pred_img shape={pred_img.shape}")
-        print(f"   BBox: x1={x1}, y1={y1}, x2={x2}, y2={y2}")
-        print(f"   计算尺寸: W={x2-x1}, H={y2-y1}")
+        print(f"✅ 裁剪结果: ori_region shape={ori_region.shape}, pred_img shape={pred_img.shape}")
+        
+        # 最终验证：确保尺寸匹配
+        if ori_region.shape[:2] != pred_img.shape[:2]:
+            print(f"❌ 错误：尺寸不匹配！")
+            print(f"   ori_region: {ori_region.shape}")
+            print(f"   pred_img: {pred_img.shape}")
+            raise ValueError("Region size mismatch after cropping")
         
         # Alpha 混合：result = foreground * alpha + background * (1 - alpha)
         blended = pred_img_float * mask_3ch + ori_region * (1.0 - mask_3ch)
