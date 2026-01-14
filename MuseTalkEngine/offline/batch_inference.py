@@ -1349,15 +1349,20 @@ class UltraFastMuseTalkService:
                 # 确保crop_box是整数
                 crop_box = [int(x) for x in crop_box]
                 
-                # 🔥 关键修复1：颜色空间转换（RGB -> BGR）
-                # VAE 输出的 res_frame 是 RGB 格式，但 OpenCV 和融合函数期望 BGR
+                # 🔥 关键修复1：VAE 反归一化 + 颜色空间转换
+                # VAE 输出范围：[-1, 1]（标准 Stable Diffusion/MuseTalk VAE）
+                # 目标范围：[0, 255] uint8
                 if res_frame.ndim == 3 and res_frame.shape[2] == 3:
-                    # 检查是否需要转换（如果已经是uint8则直接转，否则先归一化）
                     if res_frame.dtype != np.uint8:
-                        # 归一化到 0-255
-                        res_frame = np.clip(res_frame * 255, 0, 255).astype(np.uint8)
+                        # 🔥 修复颜色异常：正确的 VAE 反归一化
+                        # VAE 输出 [-1, 1] → [0, 1] → [0, 255]
+                        # 公式：(x / 2 + 0.5) * 255 或 (x + 1) / 2 * 255
+                        res_frame = np.clip((res_frame / 2.0 + 0.5) * 255.0, 0, 255).astype(np.uint8)
+                        print(f"✅ VAE 反归一化: [-1,1] → [0,255]")
+                    else:
+                        print(f"⚠️ res_frame 已经是 uint8，跳过归一化")
                     
-                    # RGB -> BGR 转换（关键！）
+                    # RGB -> BGR 转换
                     res_frame_bgr = cv2.cvtColor(res_frame, cv2.COLOR_RGB2BGR)
                     print(f"🎨 帧{i}: RGB->BGR 转换完成 (shape={res_frame_bgr.shape})")
                 else:

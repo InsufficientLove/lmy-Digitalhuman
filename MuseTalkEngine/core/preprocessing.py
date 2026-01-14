@@ -480,8 +480,11 @@ class OptimizedPreprocessor:
                 )
             
             # 构造返回值以兼容后续代码
-            coord_list = [landmarks]  # 列表，包含一个 landmarks 数组
+            # 🔥 关键修复：coord_list 将在后续保存扩展后的 face_box，而不是 landmarks
+            # landmarks 用于计算 face_box，但最终保存的是 face_box
+            coord_list = []  # 暂时为空，后续会添加扩展后的 face_box
             frame_list = [image]      # RGB 格式的图像
+            landmarks_list = [landmarks]  # 保存 landmarks 用于计算 face_box
             
             # 获取原始尺寸
             original_h, original_w = image.shape[:2]
@@ -495,7 +498,7 @@ class OptimizedPreprocessor:
             face_parsing_masks = []  # 存储面部解析的mask
             
             # 处理检测到的人脸
-            for i, (frame, landmarks) in enumerate(zip(frame_list, coord_list)):
+            for i, (frame, landmarks) in enumerate(zip(frame_list, landmarks_list)):
                 # 🔥 从 landmarks 计算精确的面部边界框
                 print(f"📐 计算面部边界框（帧 {i}）...")
                 
@@ -526,6 +529,11 @@ class OptimizedPreprocessor:
                 
                 print(f"✅ DEBUG: 添加边距后 BBox = {face_box}")
                 print(f"✅ DEBUG: 最终 BBox 尺寸 = {x_max - x_min} x {y_max - y_min}")
+                
+                # 🔥 关键修复：将扩展后的 face_box 保存到 coord_list
+                # 这样推理时可以直接使用，确保尺寸一致
+                coord_list.append(face_box)
+                print(f"✅ 保存扩展后的 face_box 到 coord_list: {face_box}")
                 
                 # 验证边界框有效性
                 if (x_max - x_min) < 50 or (y_max - y_min) < 50:
