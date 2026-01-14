@@ -492,10 +492,9 @@ class OptimizedPreprocessor:
             
             print(f"✅ 面部检测成功: 图像尺寸={original_w}x{original_h}, 关键点数={landmarks.shape[0]}")
             
-            # 4. 面部解析和特征提取
-            print("🎭 面部解析和特征提取...")
+            # 4. 面部特征提取（基于 Landmarks）
+            print("🎭 基于 Landmarks 的智能特征提取...")
             mask_coords_list, mask_list = [], []
-            face_parsing_masks = []  # 存储面部解析的mask
             
             # 处理检测到的人脸
             for i, (frame, landmarks) in enumerate(zip(frame_list, landmarks_list)):
@@ -542,111 +541,26 @@ class OptimizedPreprocessor:
                         "这可能表示人脸检测质量不佳，请使用更清晰的图片。"
                     )
                 
-                # 面部解析 - 修复格式不匹配问题
-                try:
-                    mask_out = None
-                    
-                    # 优先使用SimpleFaceParsing（更可靠）
-                    if isinstance(self.fp, SimpleFaceParsing):
-                        mask_out = self.fp(frame)
-                        if mask_out is not None:
-                            print(f"✅ SimpleFaceParsing成功，mask shape: {mask_out.shape}, unique: {np.unique(mask_out)[:5]}")
-                    # 尝试原生FaceParsing
-                    elif self.fp is not None:
-                        try:
-                            # 🔥 修复1：FaceParsing 期望 PIL.Image 输入
-                            from PIL import Image
-                            
-                            # 转换 numpy 数组为 PIL Image
-                            # frame 是 RGB 格式的 numpy 数组
-                            pil_image = Image.fromarray(frame.astype(np.uint8))
-                            
-                            print(f"🔍 DEBUG: 调用 FaceParsing，输入类型={type(pil_image)}, 尺寸={pil_image.size}")
-                            
-                            # 调用 FaceParsing（mode="raw" 用于标准面部解析）
-                            result = self.fp(pil_image, mode="raw")
-                            
-                            print(f"🔍 DEBUG: FaceParsing 返回类型={type(result)}")
-                            
-                            # 🔥 修复2：FaceParsing 返回 PIL.Image，需要转换为 numpy
-                            if hasattr(result, 'size'):  # PIL.Image 对象
-                                mask_out = np.array(result)
-                                print(f"✅ FaceParsing成功（PIL->numpy），mask shape: {mask_out.shape}, unique: {np.unique(mask_out)[:10]}")
-                            elif isinstance(result, np.ndarray):
-                                mask_out = result
-                                print(f"✅ FaceParsing成功（numpy），mask shape: {mask_out.shape}")
-                            elif isinstance(result, tuple) and len(result) > 0:
-                                # 如果返回元组，取第一个元素
-                                if hasattr(result[0], 'size'):
-                                    mask_out = np.array(result[0])
-                                else:
-                                    mask_out = result[0]
-                                print(f"✅ FaceParsing返回tuple，使用第一个元素")
-                            else:
-                                raise ValueError(f"FaceParsing返回未知类型: {type(result)}")
-                                
-                        except Exception as fp_error:
-                            print(f"❌ FaceParsing调用失败: {fp_error}")
-                            print(f"   错误详情: {type(fp_error).__name__}")
-                            import traceback
-                            traceback.print_exc()
-                            
-                            # 降级到 SimpleFaceParsing
-                            print("   降级到 SimpleFaceParsing...")
-                            mask_out = SimpleFaceParsing()(frame)
-                    
-                    # 🔥 修复3：改进 fallback - 使用下半脸渐变遮罩而不是全白
-                    if mask_out is None or not isinstance(mask_out, np.ndarray):
-                        print("⚠️ 面部解析完全失败，使用渐变遮罩（下半脸）")
-                        h, w = frame.shape[:2]
-                        mask_out = self._create_lower_face_gradient_mask(w, h)
-                        
-                except Exception as e:
-                    print(f"❌ 面部解析出错: {e}")
-                    import traceback
-                    traceback.print_exc()
-                    
-                    # 使用渐变遮罩
-                    h, w = frame.shape[:2]
-                    mask_out = self._create_lower_face_gradient_mask(w, h)
+                # 🎯 使用 Landmarks 智能遮罩（不再依赖 FaceParsing）
+                print("✅ 使用 Landmarks 智能遮罩（FaceParsing 已弃用）")
                 
-                # 保存面部解析的mask
-                face_parsing_masks.append(mask_out)
-                
-                # 获取面部区域坐标 - 直接使用默认值，避免错误
-                # 跳过get_image_prepare_material，因为它一直报错
+                # 创建全白 mask（在 VAE 编码时会用 Landmark 多边形替换）
                 h, w = frame.shape[:2]
-                mask = np.ones((h, w), dtype=np.uint8) * 255  # 全白mask
-                crop_box = face_box  # 使用face_box作为crop_box
+                mask = np.ones((h, w), dtype=np.uint8) * 255
+                crop_box = face_box  # 使用 face_box 作为 crop_box
                 
-                # 调试输出
-                print(f"使用默认mask和crop_box: {crop_box}")
-                
-                # 确保crop_box是4个元素的列表
-                if isinstance(crop_box, (list, tuple)):
-                    if len(crop_box) == 4:
-                        mask_coords_list.append(list(crop_box))
-                    else:
-                        print(f"警告: crop_box长度不是4: {len(crop_box)}, 使用face_box")
-                        mask_coords_list.append(list(face_box))
-                elif isinstance(crop_box, np.ndarray):
-                    if crop_box.size >= 4:
-                        mask_coords_list.append(crop_box.flatten()[:4].tolist())
-                    else:
-                        print(f"警告: crop_box太小: {crop_box.shape}, 使用face_box")
-                        mask_coords_list.append(list(face_box))
-                else:
-                    print(f"警告: crop_box类型异常: {type(crop_box)}, 使用face_box")
-                    mask_coords_list.append(list(face_box))
-                    
+                # 保存坐标和遮罩
+                mask_coords_list.append(list(crop_box))
                 mask_list.append(mask)
+                
+                print(f"✅ 已保存: crop_box={crop_box}, mask shape={mask.shape}")
             
             # 5. VAE编码 - 并行处理
             print("VAE编码...")
             input_latent_list = []
             
-            # 紧急修复：添加face_box参数，crop到256x256
-            def encode_frame(frame, face_box, mask=None):
+            # 智能编码：使用 Landmarks 构建精准遮罩
+            def encode_frame(frame, face_box, landmarks_orig):
                 with torch.no_grad():
                     # 🔥 关键修复：确保使用正确的Numpy切片顺序！
                     # Numpy格式：array[row, col] = array[H, W] = array[y, x]
@@ -695,159 +609,132 @@ class OptimizedPreprocessor:
                     else:
                         raise AttributeError(f"VAE对象没有encode方法: {dir(self.vae)}")
                     
-                    # 如果有mask，创建masked版本
-                    if mask is not None and mask.size > 0:
-                        # 🔥 关键修复：mask 尺寸可能与原图不匹配（例如 512x512 vs 1280x1707）
-                        # 需要先将 mask resize 到原图尺寸，然后再裁剪
-                        h_orig, w_orig = frame.shape[:2]
-                        h_mask, w_mask = mask.shape[:2]
-                        
-                        print(f"📐 Mask 尺寸检查: mask={mask.shape}, frame={frame.shape[:2]}")
-                        
-                        if (h_mask, w_mask) != (h_orig, w_orig):
-                            # Resize mask 到原图尺寸
-                            mask_resized = cv2.resize(mask, (w_orig, h_orig), interpolation=cv2.INTER_LINEAR)
-                            print(f"✅ Mask 已 resize: {mask.shape} → {mask_resized.shape}")
+                    # 🔥 核心逻辑：使用 Landmarks 构建智能多边形遮罩（唯一方案）
+                    # 彻底移除 FaceParsing 依赖，只信任 Landmarks
+                    print("🎯 使用智能 Landmark 多边形遮罩（独家方案）")
+                    
+                    # 验证 landmarks 可用性
+                    if landmarks_orig is None or len(landmarks_orig) < 31:
+                        raise ValueError(
+                            f"❌ Landmarks 不可用或不完整（需要至少31个点）\n"
+                            f"   当前 landmarks: {landmarks_orig.shape if landmarks_orig is not None else 'None'}\n"
+                            "无法生成智能遮罩，请确保人脸检测成功。"
+                        )
+                    
+                    # 计算坐标转换比例（将原图坐标转换到 256x256）
+                    scale_x = 256.0 / face_crop.shape[1]  # 256 / 原始宽度
+                    scale_y = 256.0 / face_crop.shape[0]  # 256 / 原始高度
+                    offset_x = x1  # 裁剪起点
+                    offset_y = y1
+                    
+                    # 将 landmarks 转换到 face_256 坐标系
+                    landmarks_256 = landmarks_orig.copy()
+                    landmarks_256[:, 0] = (landmarks_orig[:, 0] - offset_x) * scale_x
+                    landmarks_256[:, 1] = (landmarks_orig[:, 1] - offset_y) * scale_y
+                    
+                    print(f"✅ Landmarks 坐标转换: 原图 → 256x256, scale=({scale_x:.2f}, {scale_y:.2f})")
+                    print(f"   Tensor输入VAE: {frame_tensor.shape}")
+                    
+                    # 编码原始帧得到reference latent (4通道)
+                    if hasattr(self.vae, 'encode_latents'):
+                        reference_latent = self.vae.encode_latents(frame_tensor)
+                    elif hasattr(self.vae, 'encode'):
+                        latent_dist = self.vae.encode(frame_tensor)
+                        if hasattr(latent_dist, 'latent_dist'):
+                            reference_latent = latent_dist.latent_dist.sample() * 0.18215
+                        elif hasattr(latent_dist, 'sample'):
+                            reference_latent = latent_dist.sample() * 0.18215
                         else:
-                            mask_resized = mask
-                        
-                        # 现在使用正确尺寸的 mask 进行裁剪
-                        # mask也是numpy数组，同样遵循 [row, col] = [y, x] 规则
-                        mask_crop = mask_resized[y1:y2, x1:x2]
-                        print(f"✅ Mask裁剪: mask_resized[{y1}:{y2}, {x1}:{x2}] → shape={mask_crop.shape}")
-                        
-                        # 验证裁剪后的尺寸
-                        if mask_crop.shape[0] == 0 or mask_crop.shape[1] == 0:
-                            raise ValueError(f"Mask 裁剪后尺寸为 0: {mask_crop.shape}")
-                        
-                        mask_256 = cv2.resize(mask_crop, (256, 256), interpolation=cv2.INTER_LINEAR)
-                        print(f"   Mask crop: {mask_crop.shape} → 256x256")
-                        
-                        # 处理面部解析mask
-                        binary_mask = (mask_256 > 0).astype(np.float32)
-                        
-                        # 平滑处理
-                        from scipy.ndimage import gaussian_filter
-                        binary_mask = gaussian_filter(binary_mask, sigma=1.0)
-                        
-                        # 将mask转换为tensor
-                        mask_tensor = torch.from_numpy(binary_mask).float().to(self.device)
-                        
-                        # 调整mask维度以匹配frame_tensor
-                        if len(mask_tensor.shape) == 2:  # [H, W]
-                            mask_tensor = mask_tensor.unsqueeze(0).unsqueeze(0)  # [1, 1, H, W]
-                        
-                        # 扩展mask到3通道
-                        mask_tensor = mask_tensor.repeat(1, 3, 1, 1)  # [1, 3, H, W]
-                        
-                        # 创建masked frame（保留面部区域，背景变黑）
-                        masked_frame_tensor = frame_tensor * mask_tensor
-                        masked_latent = self.vae.encode_latents(masked_frame_tensor)
-                        
-                        # 拼接masked和reference latent得到8通道
-                        combined_latent = torch.cat([masked_latent, reference_latent], dim=1)
+                            reference_latent = latent_dist * 0.18215
                     else:
-                        # 🔥 关键修复：使用 Landmarks 构建智能多边形遮罩
-                        # 精准覆盖说话时会动的下半脸区域（鼻子-脸颊-下巴），避开眼睛
-                        print("⚠️ No face parsing mask, 使用智能 Landmark 多边形遮罩")
-                        
-                        # 获取当前帧对应的 landmarks（已经在外层循环中）
-                        # landmarks 是原图坐标，需要转换到 256x256 的 face_256 坐标系
-                        
-                        # 计算坐标转换比例
-                        scale_x = 256.0 / face_crop.shape[1]  # 256 / 原始宽度
-                        scale_y = 256.0 / face_crop.shape[0]  # 256 / 原始高度
-                        offset_x = x1  # 裁剪起点
-                        offset_y = y1
-                        
-                        # 将 landmarks 转换到 face_256 坐标系
-                        landmarks_256 = landmarks.copy()
-                        landmarks_256[:, 0] = (landmarks[:, 0] - offset_x) * scale_x
-                        landmarks_256[:, 1] = (landmarks[:, 1] - offset_y) * scale_y
-                        
-                        # 🎯 构建智能多边形：鼻梁底部 → 脸颊 → 下巴
-                        # 68点 landmark 定义（dlib格式）：
-                        # 0-16: Jaw line (下颌线)
-                        # 27-35: Nose (鼻子，27-30是鼻梁)
-                        # 48-59: Outer lips (外嘴唇)
-                        
-                        polygon_points = []
-                        
-                        # 1. 从鼻梁底部开始（点30，鼻尖上方）
-                        if landmarks_256.shape[0] >= 31:
-                            polygon_points.append(landmarks_256[30])  # 鼻梁底部
-                        
-                        # 2. 沿着脸颊右侧（点 2-8，右脸颊到下巴）
-                        for idx in range(2, 9):  # 2,3,4,5,6,7,8
-                            if idx < landmarks_256.shape[0]:
-                                polygon_points.append(landmarks_256[idx])
-                        
-                        # 3. 沿着脸颊左侧（点 8-14，下巴到左脸颊）
-                        for idx in range(8, 15):  # 8,9,10,11,12,13,14
-                            if idx < landmarks_256.shape[0]:
-                                polygon_points.append(landmarks_256[idx])
-                        
-                        # 转换为 numpy 数组
-                        polygon_points = np.array(polygon_points, dtype=np.int32)
-                        
-                        print(f"✅ 构建智能多边形遮罩: {len(polygon_points)} 个关键点")
-                        print(f"   覆盖区域: 鼻梁(30) → 右脸颊(2-8) → 左脸颊(8-14)")
-                        
-                        # 创建遮罩（256x256，与 face_256 同尺寸）
-                        smart_mask = np.zeros((256, 256), dtype=np.uint8)
-                        
-                        # 填充多边形
-                        cv2.fillPoly(smart_mask, [polygon_points], 255)
-                        
-                        # 🎨 羽化边缘（高斯模糊，防止硬边）
-                        blur_kernel = 15  # 羽化半径
-                        smart_mask = cv2.GaussianBlur(smart_mask, (blur_kernel, blur_kernel), 0)
-                        
-                        print(f"✅ 遮罩羽化完成: kernel={blur_kernel}")
-                        
-                        # 转换为 tensor 并应用遮罩
-                        mask_tensor = torch.from_numpy(smart_mask).float().to(self.device) / 255.0
-                        mask_tensor = mask_tensor.unsqueeze(0).unsqueeze(0)  # [1, 1, 256, 256]
-                        mask_tensor = mask_tensor.repeat(1, 3, 1, 1)  # [1, 3, 256, 256]
-                        
-                        # 应用遮罩：保留遮罩区域，其他部分设为黑色
-                        masked_frame_tensor = frame_tensor * mask_tensor + (-1.0) * (1.0 - mask_tensor)
-                        
-                        print(f"✅ 智能遮罩应用完成: 仅保留下半脸说话区域")
-                        
-                        # 编码 masked frame
-                        if hasattr(self.vae, 'encode_latents'):
-                            masked_latent = self.vae.encode_latents(masked_frame_tensor)
+                        raise AttributeError(f"VAE对象没有encode方法: {dir(self.vae)}")
+                    
+                    print(f"✅ Reference Latent: {reference_latent.shape}")
+                    
+                    # 🎯 构建智能多边形：鼻梁底部 → 脸颊 → 下巴
+                    # 68点 landmark 定义（dlib格式）：
+                    # 0-16: Jaw line (下颌线)
+                    # 27-35: Nose (鼻子，27-30是鼻梁)
+                    # 48-59: Outer lips (外嘴唇)
+                    
+                    polygon_points = []
+                    
+                    # 1. 从鼻梁底部开始（点30，鼻尖上方）
+                    if landmarks_256.shape[0] >= 31:
+                        polygon_points.append(landmarks_256[30])  # 鼻梁底部
+                    
+                    # 2. 沿着脸颊右侧（点 2-8，右脸颊到下巴）
+                    for idx in range(2, 9):  # 2,3,4,5,6,7,8
+                        if idx < landmarks_256.shape[0]:
+                            polygon_points.append(landmarks_256[idx])
+                    
+                    # 3. 沿着脸颊左侧（点 8-14，下巴到左脸颊）
+                    for idx in range(8, 15):  # 8,9,10,11,12,13,14
+                        if idx < landmarks_256.shape[0]:
+                            polygon_points.append(landmarks_256[idx])
+                    
+                    # 转换为 numpy 数组
+                    polygon_points = np.array(polygon_points, dtype=np.int32)
+                    
+                    print(f"✅ 构建智能多边形遮罩: {len(polygon_points)} 个关键点")
+                    print(f"   覆盖区域: 鼻梁(30) → 右脸颊(2-8) → 左脸颊(8-14)")
+                    
+                    # 创建遮罩（256x256，与 face_256 同尺寸）
+                    smart_mask = np.zeros((256, 256), dtype=np.uint8)
+                    
+                    # 填充多边形
+                    cv2.fillPoly(smart_mask, [polygon_points], 255)
+                    
+                    # 🎨 羽化边缘（高斯模糊，防止硬边）
+                    blur_kernel = 15  # 羽化半径
+                    smart_mask = cv2.GaussianBlur(smart_mask, (blur_kernel, blur_kernel), 0)
+                    
+                    print(f"✅ 遮罩羽化完成: kernel={blur_kernel}")
+                    
+                    # 转换为 tensor 并应用遮罩
+                    mask_tensor = torch.from_numpy(smart_mask).float().to(self.device) / 255.0
+                    mask_tensor = mask_tensor.unsqueeze(0).unsqueeze(0)  # [1, 1, 256, 256]
+                    mask_tensor = mask_tensor.repeat(1, 3, 1, 1)  # [1, 3, 256, 256]
+                    
+                    # 应用遮罩：保留遮罩区域，其他部分设为黑色
+                    masked_frame_tensor = frame_tensor * mask_tensor + (-1.0) * (1.0 - mask_tensor)
+                    
+                    print(f"✅ 智能遮罩应用完成: 仅保留下半脸说话区域")
+                    
+                    # 编码 masked frame
+                    if hasattr(self.vae, 'encode_latents'):
+                        masked_latent = self.vae.encode_latents(masked_frame_tensor)
+                    else:
+                        latent_dist = self.vae.encode(masked_frame_tensor)
+                        if hasattr(latent_dist, 'latent_dist'):
+                            masked_latent = latent_dist.latent_dist.sample() * 0.18215
+                        elif hasattr(latent_dist, 'sample'):
+                            masked_latent = latent_dist.sample() * 0.18215
                         else:
-                            latent_dist = self.vae.encode(masked_frame_tensor)
-                            if hasattr(latent_dist, 'latent_dist'):
-                                masked_latent = latent_dist.latent_dist.sample() * 0.18215
-                            elif hasattr(latent_dist, 'sample'):
-                                masked_latent = latent_dist.sample() * 0.18215
-                            else:
-                                masked_latent = latent_dist * 0.18215
-                        
-                        # 拼接 masked 和 reference latent 得到 8 通道
-                        combined_latent = torch.cat([masked_latent, reference_latent], dim=1)
-                        print(f"✅ 生成 Masked Latent: {masked_latent.shape}, Reference: {reference_latent.shape}")
+                            masked_latent = latent_dist * 0.18215
+                    
+                    # 拼接 masked 和 reference latent 得到 8 通道
+                    combined_latent = torch.cat([masked_latent, reference_latent], dim=1)
+                    print(f"✅ 生成 Masked Latent: {masked_latent.shape}, Combined: {combined_latent.shape}")
                     
                     return combined_latent.cpu()
             
-            # 并行编码多帧
+            # 并行编码多帧（使用智能 Landmark 遮罩）
             with ThreadPoolExecutor(max_workers=4) as executor:
-                # 将frame、face_box和对应的face parsing mask一起传递
                 futures = []
                 for i, frame in enumerate(frame_list):
-                    # 获取对应的face_box（从mask_coords_list中）
-                    if i < len(mask_coords_list):
-                        face_box = mask_coords_list[i]
+                    # 获取对应的 face_box 和 landmarks
+                    if i < len(coord_list):
+                        face_box = coord_list[i]
                     else:
                         # 使用默认值（全图的中心区域）
                         h, w = frame.shape[:2]
                         face_box = [w//4, h//4, 3*w//4, 3*h//4]
                     
-                    face_mask = face_parsing_masks[i] if i < len(face_parsing_masks) else None
-                    futures.append(executor.submit(encode_frame, frame, face_box, face_mask))
+                    # 获取对应的 landmarks
+                    landmarks_orig = landmarks_list[i] if i < len(landmarks_list) else None
+                    
+                    futures.append(executor.submit(encode_frame, frame, face_box, landmarks_orig))
                 
                 for future in as_completed(futures):
                     latent = future.result()
