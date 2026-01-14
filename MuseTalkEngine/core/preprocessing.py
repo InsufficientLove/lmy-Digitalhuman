@@ -747,18 +747,73 @@ class OptimizedPreprocessor:
                         # 拼接masked和reference latent得到8通道
                         combined_latent = torch.cat([masked_latent, reference_latent], dim=1)
                     else:
-                        # 🔥 关键修复：如果没有 mask，必须强制遮挡下半脸！
-                        # 否则模型会看到完整的人脸（闭嘴），导致嘴巴不动
-                        print("⚠️ No face parsing mask, 强制遮挡下半脸（Latent Masking）")
+                        # 🔥 关键修复：使用 Landmarks 构建智能多边形遮罩
+                        # 精准覆盖说话时会动的下半脸区域（鼻子-脸颊-下巴），避开眼睛
+                        print("⚠️ No face parsing mask, 使用智能 Landmark 多边形遮罩")
                         
-                        # 复制 frame_tensor 用于遮挡
-                        masked_frame_tensor = frame_tensor.clone()
+                        # 获取当前帧对应的 landmarks（已经在外层循环中）
+                        # landmarks 是原图坐标，需要转换到 256x256 的 face_256 坐标系
                         
-                        # 强制将下半部分置零（遮挡嘴部区域）
-                        h = masked_frame_tensor.shape[2]  # [1, 3, H, W]
-                        masked_frame_tensor[:, :, h//2:, :] = -1.0  # 下半部分设为黑色（归一化后的-1）
+                        # 计算坐标转换比例
+                        scale_x = 256.0 / face_crop.shape[1]  # 256 / 原始宽度
+                        scale_y = 256.0 / face_crop.shape[0]  # 256 / 原始高度
+                        offset_x = x1  # 裁剪起点
+                        offset_y = y1
                         
-                        print(f"✅ 强制遮挡：将 Latent 下半部分 ({h//2}:{h}) 置为 -1.0")
+                        # 将 landmarks 转换到 face_256 坐标系
+                        landmarks_256 = landmarks.copy()
+                        landmarks_256[:, 0] = (landmarks[:, 0] - offset_x) * scale_x
+                        landmarks_256[:, 1] = (landmarks[:, 1] - offset_y) * scale_y
+                        
+                        # 🎯 构建智能多边形：鼻梁底部 → 脸颊 → 下巴
+                        # 68点 landmark 定义（dlib格式）：
+                        # 0-16: Jaw line (下颌线)
+                        # 27-35: Nose (鼻子，27-30是鼻梁)
+                        # 48-59: Outer lips (外嘴唇)
+                        
+                        polygon_points = []
+                        
+                        # 1. 从鼻梁底部开始（点30，鼻尖上方）
+                        if landmarks_256.shape[0] >= 31:
+                            polygon_points.append(landmarks_256[30])  # 鼻梁底部
+                        
+                        # 2. 沿着脸颊右侧（点 2-8，右脸颊到下巴）
+                        for idx in range(2, 9):  # 2,3,4,5,6,7,8
+                            if idx < landmarks_256.shape[0]:
+                                polygon_points.append(landmarks_256[idx])
+                        
+                        # 3. 沿着脸颊左侧（点 8-14，下巴到左脸颊）
+                        for idx in range(8, 15):  # 8,9,10,11,12,13,14
+                            if idx < landmarks_256.shape[0]:
+                                polygon_points.append(landmarks_256[idx])
+                        
+                        # 转换为 numpy 数组
+                        polygon_points = np.array(polygon_points, dtype=np.int32)
+                        
+                        print(f"✅ 构建智能多边形遮罩: {len(polygon_points)} 个关键点")
+                        print(f"   覆盖区域: 鼻梁(30) → 右脸颊(2-8) → 左脸颊(8-14)")
+                        
+                        # 创建遮罩（256x256，与 face_256 同尺寸）
+                        smart_mask = np.zeros((256, 256), dtype=np.uint8)
+                        
+                        # 填充多边形
+                        cv2.fillPoly(smart_mask, [polygon_points], 255)
+                        
+                        # 🎨 羽化边缘（高斯模糊，防止硬边）
+                        blur_kernel = 15  # 羽化半径
+                        smart_mask = cv2.GaussianBlur(smart_mask, (blur_kernel, blur_kernel), 0)
+                        
+                        print(f"✅ 遮罩羽化完成: kernel={blur_kernel}")
+                        
+                        # 转换为 tensor 并应用遮罩
+                        mask_tensor = torch.from_numpy(smart_mask).float().to(self.device) / 255.0
+                        mask_tensor = mask_tensor.unsqueeze(0).unsqueeze(0)  # [1, 1, 256, 256]
+                        mask_tensor = mask_tensor.repeat(1, 3, 1, 1)  # [1, 3, 256, 256]
+                        
+                        # 应用遮罩：保留遮罩区域，其他部分设为黑色
+                        masked_frame_tensor = frame_tensor * mask_tensor + (-1.0) * (1.0 - mask_tensor)
+                        
+                        print(f"✅ 智能遮罩应用完成: 仅保留下半脸说话区域")
                         
                         # 编码 masked frame
                         if hasattr(self.vae, 'encode_latents'):
