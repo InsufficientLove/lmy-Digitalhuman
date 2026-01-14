@@ -1312,22 +1312,30 @@ class UltraFastMuseTalkService:
                 y1 = max(0, min(y1, h))
                 y2 = max(0, min(y2, h))
                 
-                # 关键修复 Bug 1：MuseTalk 模型输出是 RGB，需要转换为 BGR（OpenCV 格式）
-                if len(res_frame.shape) == 3 and res_frame.shape[2] == 3:
-                    res_frame = cv2.cvtColor(res_frame.astype(np.uint8), cv2.COLOR_RGB2BGR)
+                # 🔥 Step 1: VAE 反归一化 + RGB→BGR 转换（必须在 resize 之前！）
+                # VAE 输出范围：[-1, 1]，目标范围：[0, 255] uint8
+                if res_frame.ndim == 3 and res_frame.shape[2] == 3:
+                    if res_frame.dtype != np.uint8:
+                        # VAE 反归一化：[-1, 1] → [0, 255]
+                        res_frame = np.clip((res_frame / 2.0 + 0.5) * 255.0, 0, 255).astype(np.uint8)
+                        print(f"✅ 帧{i}: VAE 反归一化 [-1,1]→[0,255]")
+                    
+                    # RGB → BGR 转换
+                    res_frame_bgr = cv2.cvtColor(res_frame, cv2.COLOR_RGB2BGR)
+                    print(f"✅ 帧{i}: RGB→BGR 转换完成")
                 else:
-                    res_frame = res_frame.astype(np.uint8)
+                    res_frame_bgr = res_frame.astype(np.uint8)
                 
-                # 关键修复 Bug 2：强制 resize 推理结果以匹配 bbox 尺寸（避免 blending 失败）
+                # 🔥 Step 2: Resize 到目标尺寸
                 target_w, target_h = x2 - x1, y2 - y1
                 if target_w > 0 and target_h > 0:
-                    # 无论res_frame原始尺寸如何，都强制resize到目标尺寸
-                    res_frame = cv2.resize(res_frame, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
+                    res_frame_bgr = cv2.resize(res_frame_bgr, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
+                    print(f"✅ 帧{i}: Resize {res_frame_bgr.shape} → ({target_w}, {target_h})")
                 else:
-                    print(f"警告: bbox尺寸异常 ({target_w}x{target_h})，使用原始帧")
+                    print(f"❌ 警告: bbox尺寸异常 ({target_w}x{target_h})，使用原始帧")
                     return i, ori_frame
                 
-                # 使用优化的blending
+                # 🔥 Step 3: 准备融合参数
                 mask_coords = mask_coords_list_cycle[i % len(mask_coords_list_cycle)]
                 mask = mask_list_cycle[i % len(mask_list_cycle)]
                 
@@ -1335,38 +1343,16 @@ class UltraFastMuseTalkService:
                 if isinstance(mask_coords, (list, tuple)) and len(mask_coords) == 4:
                     crop_box = mask_coords
                 elif isinstance(mask_coords, np.ndarray):
-                    # 如果是numpy数组，尝试提取前4个值
                     if mask_coords.size >= 4:
                         crop_box = mask_coords.flatten()[:4].tolist()
                     else:
-                        print(f"警告: mask_coords太小 {mask_coords.shape}, 使用face_box")
+                        print(f"⚠️ mask_coords太小 {mask_coords.shape}, 使用face_box")
                         crop_box = [x1, y1, x2, y2]
                 else:
-                    # 使用face_box作为默认值
-                    print(f"警告: mask_coords类型异常 {type(mask_coords)}, 使用face_box")
+                    print(f"⚠️ mask_coords类型异常 {type(mask_coords)}, 使用face_box")
                     crop_box = [x1, y1, x2, y2]
                 
-                # 确保crop_box是整数
                 crop_box = [int(x) for x in crop_box]
-                
-                # 🔥 关键修复1：VAE 反归一化 + 颜色空间转换
-                # VAE 输出范围：[-1, 1]（标准 Stable Diffusion/MuseTalk VAE）
-                # 目标范围：[0, 255] uint8
-                if res_frame.ndim == 3 and res_frame.shape[2] == 3:
-                    if res_frame.dtype != np.uint8:
-                        # 🔥 修复颜色异常：正确的 VAE 反归一化
-                        # VAE 输出 [-1, 1] → [0, 1] → [0, 255]
-                        # 公式：(x / 2 + 0.5) * 255 或 (x + 1) / 2 * 255
-                        res_frame = np.clip((res_frame / 2.0 + 0.5) * 255.0, 0, 255).astype(np.uint8)
-                        print(f"✅ VAE 反归一化: [-1,1] → [0,255]")
-                    else:
-                        print(f"⚠️ res_frame 已经是 uint8，跳过归一化")
-                    
-                    # RGB -> BGR 转换
-                    res_frame_bgr = cv2.cvtColor(res_frame, cv2.COLOR_RGB2BGR)
-                    print(f"🎨 帧{i}: RGB->BGR 转换完成 (shape={res_frame_bgr.shape})")
-                else:
-                    res_frame_bgr = res_frame.astype(np.uint8)
                 
                 # 🔥 关键修复2：确保坐标使用正确（image[y1:y2, x1:x2]）
                 # 在 paste_back_high_quality 函数中已经使用了正确的顺序

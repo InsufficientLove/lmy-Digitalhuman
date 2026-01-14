@@ -747,9 +747,34 @@ class OptimizedPreprocessor:
                         # 拼接masked和reference latent得到8通道
                         combined_latent = torch.cat([masked_latent, reference_latent], dim=1)
                     else:
-                        # 如果没有mask，直接复制reference latent
-                        print("No face parsing mask available, using duplicated reference latent")
-                        combined_latent = torch.cat([reference_latent, reference_latent], dim=1)
+                        # 🔥 关键修复：如果没有 mask，必须强制遮挡下半脸！
+                        # 否则模型会看到完整的人脸（闭嘴），导致嘴巴不动
+                        print("⚠️ No face parsing mask, 强制遮挡下半脸（Latent Masking）")
+                        
+                        # 复制 frame_tensor 用于遮挡
+                        masked_frame_tensor = frame_tensor.clone()
+                        
+                        # 强制将下半部分置零（遮挡嘴部区域）
+                        h = masked_frame_tensor.shape[2]  # [1, 3, H, W]
+                        masked_frame_tensor[:, :, h//2:, :] = -1.0  # 下半部分设为黑色（归一化后的-1）
+                        
+                        print(f"✅ 强制遮挡：将 Latent 下半部分 ({h//2}:{h}) 置为 -1.0")
+                        
+                        # 编码 masked frame
+                        if hasattr(self.vae, 'encode_latents'):
+                            masked_latent = self.vae.encode_latents(masked_frame_tensor)
+                        else:
+                            latent_dist = self.vae.encode(masked_frame_tensor)
+                            if hasattr(latent_dist, 'latent_dist'):
+                                masked_latent = latent_dist.latent_dist.sample() * 0.18215
+                            elif hasattr(latent_dist, 'sample'):
+                                masked_latent = latent_dist.sample() * 0.18215
+                            else:
+                                masked_latent = latent_dist * 0.18215
+                        
+                        # 拼接 masked 和 reference latent 得到 8 通道
+                        combined_latent = torch.cat([masked_latent, reference_latent], dim=1)
+                        print(f"✅ 生成 Masked Latent: {masked_latent.shape}, Reference: {reference_latent.shape}")
                     
                     return combined_latent.cpu()
             
