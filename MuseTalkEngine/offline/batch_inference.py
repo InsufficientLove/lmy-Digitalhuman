@@ -108,13 +108,25 @@ def paste_back_high_quality(pred_img, ori_frame, face_box, mask, crop_box=None,
         融合后的完整图像 (BGR, uint8)
     """
     try:
+        # 🔥 入口验证：打印坐标信息（关键调试）
+        print(f"\n{'='*60}")
+        print(f"🔍 paste_back_high_quality 入口验证:")
+        print(f"  ori_frame shape: {ori_frame.shape} (H={ori_frame.shape[0]}, W={ori_frame.shape[1]})")
+        print(f"  pred_img shape: {pred_img.shape}")
+        print(f"  face_box: {face_box}")
+        
         # 1. 提取坐标
         x1, y1, x2, y2 = [int(c) for c in face_box]
         target_w, target_h = x2 - x1, y2 - y1
         
+        print(f"  解析后: x1={x1}, y1={y1}, x2={x2}, y2={y2}")
+        print(f"  计算尺寸: W={target_w} (x2-x1), H={target_h} (y2-y1)")
+        print(f"  切片将使用: ori_frame[{y1}:{y2}, {x1}:{x2}]")
+        print(f"{'='*60}\n")
+        
         # 验证尺寸有效性
         if target_w <= 0 or target_h <= 0:
-            print(f"⚠️ paste_back: 无效的 face_box 尺寸 ({target_w}x{target_h})")
+            print(f"❌ paste_back: 无效的 face_box 尺寸 ({target_w}x{target_h})")
             return ori_frame
         
         # 确保坐标在图像范围内

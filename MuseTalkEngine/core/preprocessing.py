@@ -374,6 +374,12 @@ class OptimizedPreprocessor:
                 self.pe = pe
                 print("模型重新加载完成")
             
+            # 版本标识
+            print(f"\n{'='*70}")
+            print(f"🔍 预处理版本: v2.0 - 坐标验证增强版")
+            print(f"  包含严格的 Numpy 切片顺序验证（ROW=Y, COL=X）")
+            print(f"{'='*70}\n")
+            
             # 创建输出目录
             template_output_dir = os.path.join(output_dir, template_id)
             os.makedirs(template_output_dir, exist_ok=True)
