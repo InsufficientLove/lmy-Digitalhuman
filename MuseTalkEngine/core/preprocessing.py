@@ -689,10 +689,29 @@ class OptimizedPreprocessor:
                     
                     # 如果有mask，创建masked版本
                     if mask is not None and mask.size > 0:
-                        # 🔥 关键修复：Crop mask到人脸区域，使用正确的切片顺序
+                        # 🔥 关键修复：mask 尺寸可能与原图不匹配（例如 512x512 vs 1280x1707）
+                        # 需要先将 mask resize 到原图尺寸，然后再裁剪
+                        h_orig, w_orig = frame.shape[:2]
+                        h_mask, w_mask = mask.shape[:2]
+                        
+                        print(f"📐 Mask 尺寸检查: mask={mask.shape}, frame={frame.shape[:2]}")
+                        
+                        if (h_mask, w_mask) != (h_orig, w_orig):
+                            # Resize mask 到原图尺寸
+                            mask_resized = cv2.resize(mask, (w_orig, h_orig), interpolation=cv2.INTER_LINEAR)
+                            print(f"✅ Mask 已 resize: {mask.shape} → {mask_resized.shape}")
+                        else:
+                            mask_resized = mask
+                        
+                        # 现在使用正确尺寸的 mask 进行裁剪
                         # mask也是numpy数组，同样遵循 [row, col] = [y, x] 规则
-                        mask_crop = mask[y1:y2, x1:x2]
-                        print(f"✅ Mask裁剪: mask[{y1}:{y2}, {x1}:{x2}] → shape={mask_crop.shape}")
+                        mask_crop = mask_resized[y1:y2, x1:x2]
+                        print(f"✅ Mask裁剪: mask_resized[{y1}:{y2}, {x1}:{x2}] → shape={mask_crop.shape}")
+                        
+                        # 验证裁剪后的尺寸
+                        if mask_crop.shape[0] == 0 or mask_crop.shape[1] == 0:
+                            raise ValueError(f"Mask 裁剪后尺寸为 0: {mask_crop.shape}")
+                        
                         mask_256 = cv2.resize(mask_crop, (256, 256), interpolation=cv2.INTER_LINEAR)
                         print(f"   Mask crop: {mask_crop.shape} → 256x256")
                         
