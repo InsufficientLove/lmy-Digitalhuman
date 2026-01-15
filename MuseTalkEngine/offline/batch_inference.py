@@ -310,6 +310,9 @@ def paste_back_high_quality(
         # Alpha 混合：result = foreground * alpha + background * (1 - alpha)
         blended = pred_img_float * mask_3ch + ori_region * (1.0 - mask_3ch)
         
+        # 🔥 关键修复：强制裁剪到 [0, 255] 防止溢出（惨白色块）
+        blended = np.clip(blended, 0, 255)
+        
         # 转回 uint8 并粘贴回原图（同样使用 [y1:y2, x1:x2]）
         result[y1:y2, x1:x2] = blended.astype(np.uint8)
         

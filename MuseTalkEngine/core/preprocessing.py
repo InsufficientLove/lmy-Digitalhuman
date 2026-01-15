@@ -678,18 +678,43 @@ class OptimizedPreprocessor:
                             "无法生成智能遮罩，请确保人脸检测成功。"
                         )
                     
-                    # 计算坐标转换比例（将原图坐标转换到 256x256）
-                    scale_x = 256.0 / face_crop.shape[1]  # 256 / 原始宽度
-                    scale_y = 256.0 / face_crop.shape[0]  # 256 / 原始高度
-                    offset_x = x1  # 裁剪起点
-                    offset_y = y1
+                    # 🔥 关键修复：坐标转换必须基于 Expanded BBox！
+                    # face_box 是 expanded bbox：[x1, y1, x2, y2]
+                    # face_crop 是从 frame[y1:y2, x1:x2] 裁剪得到的
+                    # 因此 offset 必须使用 face_box 的 x1, y1
                     
-                    # 将 landmarks 转换到 face_256 坐标系
+                    print(f"📐 坐标系统验证:")
+                    print(f"   face_box (expanded): [{x1}, {y1}, {x2}, {y2}]")
+                    print(f"   face_crop.shape: {face_crop.shape} (H={face_crop.shape[0]}, W={face_crop.shape[1]})")
+                    print(f"   期望尺寸: H={y2-y1}, W={x2-x1}")
+                    
+                    # 计算坐标转换比例（基于裁剪后的实际尺寸）
+                    scale_x = 256.0 / face_crop.shape[1]  # 256 / 裁剪宽度
+                    scale_y = 256.0 / face_crop.shape[0]  # 256 / 裁剪高度
+                    
+                    # offset 必须是 face_box 的左上角（expanded bbox 的起点）
+                    offset_x = x1  # expanded bbox 起点X
+                    offset_y = y1  # expanded bbox 起点Y
+                    
+                    print(f"   scale: ({scale_x:.3f}, {scale_y:.3f})")
+                    print(f"   offset: ({offset_x}, {offset_y})")
+                    
+                    # 将 landmarks 从原图坐标转换到 face_256 坐标系
+                    # 公式：(原图坐标 - expanded_bbox左上角) * 缩放比例
                     landmarks_256 = landmarks_orig.copy()
                     landmarks_256[:, 0] = (landmarks_orig[:, 0] - offset_x) * scale_x
                     landmarks_256[:, 1] = (landmarks_orig[:, 1] - offset_y) * scale_y
                     
-                    print(f"✅ Landmarks 坐标转换: 原图 → 256x256, scale=({scale_x:.2f}, {scale_y:.2f})")
+                    # 验证转换后的坐标范围
+                    print(f"✅ Landmarks 坐标转换完成:")
+                    print(f"   原图范围: X=[{landmarks_orig[:, 0].min():.1f}, {landmarks_orig[:, 0].max():.1f}], Y=[{landmarks_orig[:, 1].min():.1f}, {landmarks_orig[:, 1].max():.1f}]")
+                    print(f"   256x256范围: X=[{landmarks_256[:, 0].min():.1f}, {landmarks_256[:, 0].max():.1f}], Y=[{landmarks_256[:, 1].min():.1f}, {landmarks_256[:, 1].max():.1f}]")
+                    
+                    # 检查转换后的坐标是否在合理范围内 [0, 256]
+                    if landmarks_256[:, 0].min() < -10 or landmarks_256[:, 0].max() > 266 or \
+                       landmarks_256[:, 1].min() < -10 or landmarks_256[:, 1].max() > 266:
+                        print(f"⚠️ 警告：转换后的 landmarks 超出 [0, 256] 范围！")
+                        print(f"   这可能表示坐标变换基准不一致（原始bbox vs expanded bbox）")
                     print(f"   Tensor输入VAE: {frame_tensor.shape}")
                     
                     # 编码原始帧得到reference latent (4通道)
