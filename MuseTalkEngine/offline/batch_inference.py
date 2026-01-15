@@ -72,8 +72,18 @@ sys.stdout.flush()
 
 # ==================== 高质量融合函数 ====================
 
-def paste_back_high_quality(pred_img, ori_frame, face_box, mask, crop_box=None, 
-                              use_poisson=True, feather_amount=0.1):
+def paste_back_high_quality(
+    pred_img,
+    ori_frame,
+    face_box,
+    mask,
+    crop_box=None,
+    use_poisson=True,
+    feather_amount=0.1,
+    frame_idx: int | None = None,
+    debug_pred_raw_rgb: "np.ndarray | None" = None,
+    debug_dir: str = "/videos/debug",
+):
     """
     高质量图像融合函数 - 对齐 MuseTalk 原生逻辑
     
@@ -108,6 +118,13 @@ def paste_back_high_quality(pred_img, ori_frame, face_box, mask, crop_box=None,
         融合后的完整图像 (BGR, uint8)
     """
     try:
+        # ==================== Debug 保存（仅第0帧）====================
+        debug_enabled = (frame_idx == 0)
+        if debug_enabled:
+            try:
+                os.makedirs(debug_dir, exist_ok=True)
+            except Exception as _mk_err:
+                print(f"⚠️ debug目录创建失败: {debug_dir}, err={_mk_err}")
         # 🔥 入口验证：打印坐标信息（关键调试）
         print(f"\n{'='*60}")
         print(f"🔍 paste_back_high_quality 入口验证:")
@@ -137,6 +154,28 @@ def paste_back_high_quality(pred_img, ori_frame, face_box, mask, crop_box=None,
         y2 = max(0, min(y2, h_ori))
         target_w, target_h = x2 - x1, y2 - y1
         
+        # Debug 0: 输入裁剪区域（检查是否裁到了正确的人脸）
+        if debug_enabled:
+            try:
+                crop_input = ori_frame[y1:y2, x1:x2]
+                cv2.imwrite(os.path.join(debug_dir, "debug_0_crop_input.jpg"), crop_input)
+            except Exception as _dbg_err:
+                print(f"⚠️ debug_0_crop_input 保存失败: {_dbg_err}")
+
+        # Debug 1: 模型原始输出（不做任何颜色转换，只做 (x+1)/2*255）
+        if debug_enabled and debug_pred_raw_rgb is not None:
+            try:
+                from PIL import Image
+
+                raw = debug_pred_raw_rgb
+                if raw.dtype != np.uint8:
+                    raw_u8 = np.clip((raw + 1.0) * 0.5 * 255.0, 0, 255).astype(np.uint8)
+                else:
+                    raw_u8 = raw
+                Image.fromarray(raw_u8).save(os.path.join(debug_dir, "debug_1_pred_raw.jpg"))
+            except Exception as _dbg_err:
+                print(f"⚠️ debug_1_pred_raw 保存失败: {_dbg_err}")
+
         # 2. Auto-Resize：强制将 pred_img 和 mask 调整到目标尺寸
         # 🔥 关键：pred_img.shape[0] 是高度(H)，pred_img.shape[1] 是宽度(W)
         # target_h = y2 - y1，target_w = x2 - x1
@@ -145,12 +184,21 @@ def paste_back_high_quality(pred_img, ori_frame, face_box, mask, crop_box=None,
             pred_img = cv2.resize(pred_img, (target_w, target_h), interpolation=cv2.INTER_LANCZOS4)
             print(f"✅ Resize: pred_img {pred_img.shape} -> ({target_h}, {target_w}, 3)")
         
-        # 处理 mask
+        # 处理 mask（内部会转换到 target_h/target_w）
         if len(mask.shape) == 3:
             mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
         
         if mask.shape[:2] != (target_h, target_w):
             mask = cv2.resize(mask, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
+
+        # Debug 2: 遮罩图（放回原图位置，便于检查形状/位置）
+        if debug_enabled:
+            try:
+                mask_full = np.zeros((h_ori, w_ori), dtype=np.uint8)
+                mask_full[y1:y2, x1:x2] = mask
+                cv2.imwrite(os.path.join(debug_dir, "debug_2_mask.jpg"), mask_full)
+            except Exception as _dbg_err:
+                print(f"⚠️ debug_2_mask 保存失败: {_dbg_err}")
         
         # 3. 羽化遮罩（Feathering）- 消除硬边缘
         # 计算模糊核大小（基于图像尺寸的百分比）
@@ -167,6 +215,7 @@ def paste_back_high_quality(pred_img, ori_frame, face_box, mask, crop_box=None,
         mask_3ch = np.stack([mask_float] * 3, axis=2)  # 转为3通道
         
         # 4. 尝试泊松融合（Poisson Blending）
+        result = None
         if use_poisson:
             try:
                 # 创建用于泊松融合的掩码（需要是纯白色的核心区域）
@@ -195,6 +244,12 @@ def paste_back_high_quality(pred_img, ori_frame, face_box, mask, crop_box=None,
                     )
                     
                     print(f"✅ paste_back: 泊松融合成功 (size={target_w}x{target_h})")
+                    # Debug 3: 最终合成帧
+                    if debug_enabled:
+                        try:
+                            cv2.imwrite(os.path.join(debug_dir, "debug_3_final.jpg"), result)
+                        except Exception as _dbg_err:
+                            print(f"⚠️ debug_3_final 保存失败: {_dbg_err}")
                     return result
                     
             except Exception as poisson_error:
@@ -235,6 +290,14 @@ def paste_back_high_quality(pred_img, ori_frame, face_box, mask, crop_box=None,
         result[y1:y2, x1:x2] = blended.astype(np.uint8)
         
         print(f"✅ paste_back: 羽化融合完成 (size={target_w}x{target_h}, feather={blur_kernel_size})")
+
+        # Debug 3: 最终合成帧
+        if debug_enabled:
+            try:
+                cv2.imwrite(os.path.join(debug_dir, "debug_3_final.jpg"), result)
+            except Exception as _dbg_err:
+                print(f"⚠️ debug_3_final 保存失败: {_dbg_err}")
+
         return result
         
     except Exception as e:
@@ -1312,15 +1375,22 @@ class UltraFastMuseTalkService:
                 y1 = max(0, min(y1, h))
                 y2 = max(0, min(y2, h))
                 
-                # 🔥 Step 1: VAE 反归一化 + RGB→BGR 转换（必须在 resize 之前！）
-                # VAE 输出范围：[-1, 1]，目标范围：[0, 255] uint8
+                # 🔥 Step 1: Debug 捕获“原始模型输出”（仅第0帧）
+                # 需求：debug_1_pred_raw.jpg 直接保存 (tensor+1)/2*255 的结果，不做颜色转换
+                debug_pred_raw_rgb = None
+                if i == 0 and res_frame is not None and res_frame.ndim == 3 and res_frame.shape[2] == 3:
+                    # 这里不做任何颜色转换，保持 RGB 语义
+                    if res_frame.dtype != np.uint8:
+                        debug_pred_raw_rgb = np.clip((res_frame + 1.0) * 0.5 * 255.0, 0, 255).astype(np.uint8)
+                    else:
+                        debug_pred_raw_rgb = res_frame
+
+                # 🔥 Step 2: VAE 反归一化 + RGB→BGR 转换（用于合成）
+                # 这里保持现有合成链路：[-1,1] → [0,255]，再 RGB→BGR
                 if res_frame.ndim == 3 and res_frame.shape[2] == 3:
                     if res_frame.dtype != np.uint8:
-                        # VAE 反归一化：[-1, 1] → [0, 255]
                         res_frame = np.clip((res_frame / 2.0 + 0.5) * 255.0, 0, 255).astype(np.uint8)
                         print(f"✅ 帧{i}: VAE 反归一化 [-1,1]→[0,255]")
-                    
-                    # RGB → BGR 转换
                     res_frame_bgr = cv2.cvtColor(res_frame, cv2.COLOR_RGB2BGR)
                     print(f"✅ 帧{i}: RGB→BGR 转换完成")
                 else:
@@ -1359,29 +1429,43 @@ class UltraFastMuseTalkService:
                 # 这里只需要确保 face_box 顺序正确：[x1, y1, x2, y2]
                 print(f"📐 帧{i}: face_box=[{x1}, {y1}, {x2}, {y2}], 尺寸={x2-x1}x{y2-y1}")
                 
-                # 🎨 使用新的高质量融合函数
-                # 首先尝试使用官方 blending 函数（兼容性）
-                try:
-                    combine_frame = get_image_blending(
-                        image=ori_frame,
-                        face=res_frame_bgr,  # ✅ 使用 BGR 格式
-                        face_box=[x1, y1, x2, y2],
-                        mask_array=mask,
-                        crop_box=crop_box
-                    )
-                    print(f"✅ 帧{i}: 使用官方 blending")
-                except Exception as blend_error:
-                    # 回退到高质量融合函数
-                    print(f"⚠️ 帧{i}: 官方 blending 失败，使用高质量融合: {str(blend_error)[:50]}")
+                # 🎨 合成（第0帧强制走 paste_back_high_quality，以便落盘 debug 图）
+                if i == 0:
                     combine_frame = paste_back_high_quality(
-                        pred_img=res_frame_bgr,  # ✅ 使用 BGR 格式
+                        pred_img=res_frame_bgr,  # BGR
                         ori_frame=ori_frame,
                         face_box=[x1, y1, x2, y2],
                         mask=mask,
                         crop_box=crop_box,
-                        use_poisson=True,  # 启用泊松融合
-                        feather_amount=0.15  # 15% 羽化
+                        use_poisson=True,
+                        feather_amount=0.15,
+                        frame_idx=i,
+                        debug_pred_raw_rgb=debug_pred_raw_rgb,
+                        debug_dir="/videos/debug",
                     )
+                else:
+                    # 其他帧保持原逻辑：先尝试官方 blending，失败再回退
+                    try:
+                        combine_frame = get_image_blending(
+                            image=ori_frame,
+                            face=res_frame_bgr,
+                            face_box=[x1, y1, x2, y2],
+                            mask_array=mask,
+                            crop_box=crop_box
+                        )
+                        print(f"✅ 帧{i}: 使用官方 blending")
+                    except Exception as blend_error:
+                        print(f"⚠️ 帧{i}: 官方 blending 失败，使用高质量融合: {str(blend_error)[:50]}")
+                        combine_frame = paste_back_high_quality(
+                            pred_img=res_frame_bgr,
+                            ori_frame=ori_frame,
+                            face_box=[x1, y1, x2, y2],
+                            mask=mask,
+                            crop_box=crop_box,
+                            use_poisson=True,
+                            feather_amount=0.15,
+                            frame_idx=None,
+                        )
                 
                 return i, combine_frame
                 
