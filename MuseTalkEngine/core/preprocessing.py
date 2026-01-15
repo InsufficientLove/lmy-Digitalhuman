@@ -549,8 +549,10 @@ class OptimizedPreprocessor:
                 # 构建多边形：鼻梁 → 脸颊 → 下巴
                 polygon_points = []
                 
-                # 1. 鼻梁底部（点 30）
-                if landmarks.shape[0] >= 31:
+                # 1. 鼻梁底部（点 30）-> 改为鼻下点（点 33），避免遮挡鼻子
+                if landmarks.shape[0] >= 34:
+                    polygon_points.append(landmarks[33])
+                elif landmarks.shape[0] >= 31:
                     polygon_points.append(landmarks[30])
                 
                 # 2. 右脸颊到下巴（点 2-8）
@@ -741,9 +743,11 @@ class OptimizedPreprocessor:
                     
                     polygon_points = []
                     
-                    # 1. 从鼻梁底部开始（点30，鼻尖上方）
-                    if landmarks_256.shape[0] >= 31:
-                        polygon_points.append(landmarks_256[30])  # 鼻梁底部
+                    # 1. 从鼻梁底部开始（点30，鼻尖上方）-> 改为鼻下点（点 33）
+                    if landmarks_256.shape[0] >= 34:
+                        polygon_points.append(landmarks_256[33])  # 鼻下点
+                    elif landmarks_256.shape[0] >= 31:
+                        polygon_points.append(landmarks_256[30])
                     
                     # 2. 沿着脸颊右侧（点 2-8，右脸颊到下巴）
                     for idx in range(2, 9):  # 2,3,4,5,6,7,8
