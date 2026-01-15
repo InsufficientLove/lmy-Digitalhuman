@@ -618,11 +618,23 @@ class OptimizedPreprocessor:
                     face_256 = cv2.resize(face_crop, (256, 256), interpolation=cv2.INTER_LANCZOS4)
                     print(f"✅ Resize完成: {face_crop.shape} → 256x256")
                     
-                    # 转换为tensor
-                    frame_tensor = torch.from_numpy(face_256).float().to(self.device) / 127.5 - 1.0
-                    frame_tensor = frame_tensor.permute(2, 0, 1).unsqueeze(0)
+                    # 🔥 关键修复：确保输入数据类型和范围正确
+                    print(f"📊 归一化前: dtype={face_256.dtype}, range=[{face_256.min()}, {face_256.max()}]")
                     
-                    print(f"   Tensor输入VAE: {frame_tensor.shape}")
+                    # Step 1: 转换为 float32（必须在归一化之前）
+                    face_256_float = face_256.astype(np.float32)
+                    
+                    # Step 2: 归一化到 [-1, 1]
+                    # [0, 255] → / 127.5 → [0, 2] → -1.0 → [-1, 1]
+                    face_256_norm = face_256_float / 127.5 - 1.0
+                    
+                    print(f"📊 归一化后: dtype={face_256_norm.dtype}, range=[{face_256_norm.min():.3f}, {face_256_norm.max():.3f}]")
+                    
+                    # Step 3: 转换为 tensor 并调整维度
+                    # (H, W, C) → (C, H, W) → (1, C, H, W)
+                    frame_tensor = torch.from_numpy(face_256_norm).permute(2, 0, 1).unsqueeze(0).to(self.device)
+                    
+                    print(f"✅ Tensor输入VAE: shape={frame_tensor.shape}, range=[{frame_tensor.min():.3f}, {frame_tensor.max():.3f}]")
                     
                     # 编码原始帧得到reference latent (4通道)
                     # VAE可能有不同的编码方法名
@@ -680,7 +692,7 @@ class OptimizedPreprocessor:
                     else:
                         raise AttributeError(f"VAE对象没有encode方法: {dir(self.vae)}")
                     
-                    print(f"✅ Reference Latent: {reference_latent.shape}")
+                    print(f"✅ Reference Latent: shape={reference_latent.shape}, range=[{reference_latent.min():.3f}, {reference_latent.max():.3f}]")
                     
                     # 🎯 构建智能多边形：鼻梁底部 → 脸颊 → 下巴
                     # 68点 landmark 定义（dlib格式）：
@@ -727,10 +739,14 @@ class OptimizedPreprocessor:
                     mask_tensor = mask_tensor.unsqueeze(0).unsqueeze(0)  # [1, 1, 256, 256]
                     mask_tensor = mask_tensor.repeat(1, 3, 1, 1)  # [1, 3, 256, 256]
                     
-                    # 应用遮罩：保留遮罩区域，其他部分设为黑色
+                    # 应用遮罩：保留遮罩区域，其他部分设为黑色（-1.0 对应 VAE 的黑色）
+                    # frame_tensor 范围: [-1, 1]
+                    # mask_tensor 范围: [0, 1]
+                    # 公式: masked = original * mask + background * (1 - mask)
                     masked_frame_tensor = frame_tensor * mask_tensor + (-1.0) * (1.0 - mask_tensor)
                     
                     print(f"✅ 智能遮罩应用完成: 仅保留下半脸说话区域")
+                    print(f"   masked_frame_tensor: range=[{masked_frame_tensor.min():.3f}, {masked_frame_tensor.max():.3f}]")
                     
                     # 编码 masked frame
                     if hasattr(self.vae, 'encode_latents'):
@@ -746,7 +762,8 @@ class OptimizedPreprocessor:
                     
                     # 拼接 masked 和 reference latent 得到 8 通道
                     combined_latent = torch.cat([masked_latent, reference_latent], dim=1)
-                    print(f"✅ 生成 Masked Latent: {masked_latent.shape}, Combined: {combined_latent.shape}")
+                    print(f"✅ Masked Latent: shape={masked_latent.shape}, range=[{masked_latent.min():.3f}, {masked_latent.max():.3f}]")
+                    print(f"✅ Combined Latent (8ch): shape={combined_latent.shape}, range=[{combined_latent.min():.3f}, {combined_latent.max():.3f}]")
                     
                     return combined_latent.cpu()
             
