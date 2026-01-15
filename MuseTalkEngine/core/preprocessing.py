@@ -742,77 +742,13 @@ class OptimizedPreprocessor:
                     
                     print(f"✅ Reference Latent: shape={reference_latent.shape}, range=[{reference_latent.min():.3f}, {reference_latent.max():.3f}]")
                     
-                    # 🎯 构建智能多边形：鼻梁底部 → 脸颊 → 下巴
-                    # 68点 landmark 定义（dlib格式）：
-                    # 0-16: Jaw line (下颌线)
-                    # 27-35: Nose (鼻子，27-30是鼻梁)
-                    # 48-59: Outer lips (外嘴唇)
+                    # 🔥 关键修复：VAE 输入遮罩必须匹配训练分布
+                    # MuseTalk 原始训练：直接遮挡下半脸（h//2:）而不是自定义口型多边形
+                    # 自定义遮罩会导致模型分布偏移，出现蓝脸、变形、静态嘴
+                    masked_frame_tensor = frame_tensor.clone()
+                    masked_frame_tensor[:, :, 128:, :] = -1.0
                     
-                    polygon_points = []
-                    
-                    # 1. 从鼻梁底部开始（点30，鼻尖上方）-> 改为鼻下点（点 33）
-                    if landmarks_256.shape[0] >= 34:
-                        polygon_points.append(landmarks_256[33])  # 鼻下点
-                    elif landmarks_256.shape[0] >= 31:
-                        polygon_points.append(landmarks_256[30])
-                    
-                    # 2. 沿着脸颊右侧（点 2-8，右脸颊到下巴）
-                    for idx in range(2, 9):  # 2,3,4,5,6,7,8
-                        if idx < landmarks_256.shape[0]:
-                            polygon_points.append(landmarks_256[idx])
-                    
-                    # 3. 沿着脸颊左侧（点 8-14，下巴到左脸颊）
-                    for idx in range(8, 15):  # 8,9,10,11,12,13,14
-                        if idx < landmarks_256.shape[0]:
-                            polygon_points.append(landmarks_256[idx])
-                    
-                    # 转换为 numpy 数组
-                    polygon_points = np.array(polygon_points, dtype=np.int32)
-                    
-                    print(f"✅ 构建智能多边形遮罩: {len(polygon_points)} 个关键点")
-                    print(f"   覆盖区域: 鼻梁(30) → 右脸颊(2-8) → 左脸颊(8-14)")
-                    
-                    # 创建遮罩（256x256，与 face_256 同尺寸）
-                    smart_mask = np.zeros((256, 256), dtype=np.uint8)
-                    
-                    # 填充多边形
-                    cv2.fillPoly(smart_mask, [polygon_points], 255)
-                    
-                    # 🎨 羽化边缘（高斯模糊，防止硬边）
-                    blur_kernel = 15  # 羽化半径
-                    smart_mask = cv2.GaussianBlur(smart_mask, (blur_kernel, blur_kernel), 0)
-                    
-                    print(f"✅ 遮罩羽化完成: kernel={blur_kernel}")
-                    
-                    # 转换为 tensor 并应用遮罩
-                    # 🔥 关键修复：VAE输入使用二值化Mask，避免羽化导致的边缘黑晕
-                    # 之前使用羽化Mask计算 masked = frame * keep + (-1) * (1-keep)
-                    # 在边缘处（如0.5），结果 = 0.5*frame - 0.5，会导致严重的变暗/黑斑
-                    
-                    # 1. 准备 VAE 用的硬遮罩 (Hard Mask)
-                    # 只要大于0就视为遮挡区域，确保嘴巴完全被覆盖
-                    mask_binary = smart_mask.copy()
-                    mask_binary[mask_binary > 0] = 255
-                    
-                    mask_tensor_binary = torch.from_numpy(mask_binary).float().to(self.device) / 255.0
-                    mask_tensor_binary = mask_tensor_binary.unsqueeze(0).unsqueeze(0)
-                    mask_tensor_binary = mask_tensor_binary.repeat(1, 3, 1, 1)
-                    
-                    # 2. 准备推理用的软遮罩 (Soft Mask) - 保持羽化以用于融合
-                    # 注意：smart_mask 已经被 GaussianBlur 过
-                    mask_tensor_soft = torch.from_numpy(smart_mask).float().to(self.device) / 255.0
-                    
-                    # 🔥 VAE输入逻辑：
-                    # keep_mask: 1.0 = 保留脸部, 0.0 = 遮挡嘴巴
-                    # 使用二值化遮罩，边缘清晰，无黑晕
-                    keep_mask_tensor = 1.0 - mask_tensor_binary
-                    
-                    # 应用遮罩：
-                    # 嘴巴区域 (keep=0): frame * 0 + (-1) * 1 = -1 (黑色)
-                    # 脸部区域 (keep=1): frame * 1 + (-1) * 0 = frame (原图)
-                    masked_frame_tensor = frame_tensor * keep_mask_tensor + (-1.0) * (1.0 - keep_mask_tensor)
-                    
-                    print(f"✅ 智能遮罩应用完成: 已遮挡嘴巴区域 (Inpainting模式, Hard Mask)")
+                    print("✅ VAE输入遮罩: 使用下半脸硬遮挡 (h//2:)")
                     print(f"   masked_frame_tensor: range=[{masked_frame_tensor.min():.3f}, {masked_frame_tensor.max():.3f}]")
                     
                     # 编码 masked frame
