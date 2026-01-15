@@ -789,13 +789,18 @@ class OptimizedPreprocessor:
                     mask_tensor = mask_tensor.unsqueeze(0).unsqueeze(0)  # [1, 1, 256, 256]
                     mask_tensor = mask_tensor.repeat(1, 3, 1, 1)  # [1, 3, 256, 256]
                     
-                    # 应用遮罩：保留遮罩区域，其他部分设为黑色（-1.0 对应 VAE 的黑色）
-                    # frame_tensor 范围: [-1, 1]
-                    # mask_tensor 范围: [0, 1]
-                    # 公式: masked = original * mask + background * (1 - mask)
-                    masked_frame_tensor = frame_tensor * mask_tensor + (-1.0) * (1.0 - mask_tensor)
+                    # 🔥 关键修复：Mask逻辑反转
+                    # smart_mask 定义：1.0 (白色) = 嘴巴区域，0.0 (黑色) = 脸部其他区域
+                    # VAE输入要求：1.0 = 保留区域 (Keep)，0.0 = 遮挡区域 (Drop/Inpaint)
+                    # 因此我们需要反转 mask：keep_mask = 1.0 - mask_tensor
                     
-                    print(f"✅ 智能遮罩应用完成: 仅保留下半脸说话区域")
+                    keep_mask_tensor = 1.0 - mask_tensor
+                    
+                    # 应用遮罩：保留区域保持原样，遮挡区域(嘴巴)设为-1.0 (黑色)
+                    # masked = frame * keep + (-1) * (1 - keep)
+                    masked_frame_tensor = frame_tensor * keep_mask_tensor + (-1.0) * (1.0 - keep_mask_tensor)
+                    
+                    print(f"✅ 智能遮罩应用完成: 已遮挡嘴巴区域 (Inpainting模式)")
                     print(f"   masked_frame_tensor: range=[{masked_frame_tensor.min():.3f}, {masked_frame_tensor.max():.3f}]")
                     
                     # 编码 masked frame
