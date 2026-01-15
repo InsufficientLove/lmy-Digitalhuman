@@ -593,8 +593,15 @@ class OptimizedPreprocessor:
                 print(f"   DEBUG: Mask unique values AFTER normalization: {np.unique(mask_normalized)[:10]}")
                 print(f"   DEBUG: Mask range: [{mask_normalized.min():.3f}, {mask_normalized.max():.3f}]")
                 
-                # 保存归一化后的智能遮罩（用于推理合成）
-                mask = mask_normalized
+                # 🔥 关键修复：保存的遮罩必须是裁剪后的（与 face_box 对应）！
+                # 之前的 Bug 是保存了全图遮罩，导致推理时被强制缩放到 face_box 大小，完全错位
+                x1, y1, x2, y2 = face_box
+                mask_cropped = mask_normalized[y1:y2, x1:x2]
+                
+                print(f"✅ Mask裁剪: 全图 {mask_normalized.shape} -> 裁剪 {mask_cropped.shape} (Box: {face_box})")
+                
+                # 保存归一化且裁剪后的智能遮罩（用于推理合成）
+                mask = mask_cropped
                 crop_box = face_box
                 
                 mask_coords_list.append(list(crop_box))
