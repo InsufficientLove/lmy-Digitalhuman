@@ -785,22 +785,34 @@ class OptimizedPreprocessor:
                     print(f"✅ 遮罩羽化完成: kernel={blur_kernel}")
                     
                     # 转换为 tensor 并应用遮罩
-                    mask_tensor = torch.from_numpy(smart_mask).float().to(self.device) / 255.0
-                    mask_tensor = mask_tensor.unsqueeze(0).unsqueeze(0)  # [1, 1, 256, 256]
-                    mask_tensor = mask_tensor.repeat(1, 3, 1, 1)  # [1, 3, 256, 256]
+                    # 🔥 关键修复：VAE输入使用二值化Mask，避免羽化导致的边缘黑晕
+                    # 之前使用羽化Mask计算 masked = frame * keep + (-1) * (1-keep)
+                    # 在边缘处（如0.5），结果 = 0.5*frame - 0.5，会导致严重的变暗/黑斑
                     
-                    # 🔥 关键修复：Mask逻辑反转
-                    # smart_mask 定义：1.0 (白色) = 嘴巴区域，0.0 (黑色) = 脸部其他区域
-                    # VAE输入要求：1.0 = 保留区域 (Keep)，0.0 = 遮挡区域 (Drop/Inpaint)
-                    # 因此我们需要反转 mask：keep_mask = 1.0 - mask_tensor
+                    # 1. 准备 VAE 用的硬遮罩 (Hard Mask)
+                    # 只要大于0就视为遮挡区域，确保嘴巴完全被覆盖
+                    mask_binary = smart_mask.copy()
+                    mask_binary[mask_binary > 0] = 255
                     
-                    keep_mask_tensor = 1.0 - mask_tensor
+                    mask_tensor_binary = torch.from_numpy(mask_binary).float().to(self.device) / 255.0
+                    mask_tensor_binary = mask_tensor_binary.unsqueeze(0).unsqueeze(0)
+                    mask_tensor_binary = mask_tensor_binary.repeat(1, 3, 1, 1)
                     
-                    # 应用遮罩：保留区域保持原样，遮挡区域(嘴巴)设为-1.0 (黑色)
-                    # masked = frame * keep + (-1) * (1 - keep)
+                    # 2. 准备推理用的软遮罩 (Soft Mask) - 保持羽化以用于融合
+                    # 注意：smart_mask 已经被 GaussianBlur 过
+                    mask_tensor_soft = torch.from_numpy(smart_mask).float().to(self.device) / 255.0
+                    
+                    # 🔥 VAE输入逻辑：
+                    # keep_mask: 1.0 = 保留脸部, 0.0 = 遮挡嘴巴
+                    # 使用二值化遮罩，边缘清晰，无黑晕
+                    keep_mask_tensor = 1.0 - mask_tensor_binary
+                    
+                    # 应用遮罩：
+                    # 嘴巴区域 (keep=0): frame * 0 + (-1) * 1 = -1 (黑色)
+                    # 脸部区域 (keep=1): frame * 1 + (-1) * 0 = frame (原图)
                     masked_frame_tensor = frame_tensor * keep_mask_tensor + (-1.0) * (1.0 - keep_mask_tensor)
                     
-                    print(f"✅ 智能遮罩应用完成: 已遮挡嘴巴区域 (Inpainting模式)")
+                    print(f"✅ 智能遮罩应用完成: 已遮挡嘴巴区域 (Inpainting模式, Hard Mask)")
                     print(f"   masked_frame_tensor: range=[{masked_frame_tensor.min():.3f}, {masked_frame_tensor.max():.3f}]")
                     
                     # 编码 masked frame
