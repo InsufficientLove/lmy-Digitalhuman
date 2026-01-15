@@ -194,8 +194,13 @@ def paste_back_high_quality(
         # Debug 2: 遮罩图（放回原图位置，便于检查形状/位置）
         if debug_enabled:
             try:
+                # mask 现在是 float32 [0.0, 1.0]，需要转换为 uint8 [0, 255] 用于保存
+                mask_for_save = mask
+                if mask_for_save.dtype != np.uint8:
+                    mask_for_save = np.clip(mask_for_save * 255.0, 0, 255).astype(np.uint8)
+                
                 mask_full = np.zeros((h_ori, w_ori), dtype=np.uint8)
-                mask_full[y1:y2, x1:x2] = mask
+                mask_full[y1:y2, x1:x2] = mask_for_save
                 cv2.imwrite(os.path.join(debug_dir, "debug_2_mask.jpg"), mask_full)
             except Exception as _dbg_err:
                 print(f"⚠️ debug_2_mask 保存失败: {_dbg_err}")
@@ -210,8 +215,22 @@ def paste_back_high_quality(
         # 高斯模糊羽化
         mask_feathered = cv2.GaussianBlur(mask, (blur_kernel_size, blur_kernel_size), 0)
         
-        # 归一化到 0-1 范围
-        mask_float = mask_feathered.astype(np.float32) / 255.0
+        # 🔥 关键修复：自适应归一化到 [0.0, 1.0] 范围
+        # 现在 preprocessing.py 保存的 mask 已经是 float32 [0.0, 1.0]
+        # 但为了兼容旧数据，我们自动判断类型和范围
+        if mask_feathered.dtype == np.uint8:
+            # 旧格式：[0, 255] uint8
+            mask_float = mask_feathered.astype(np.float32) / 255.0
+            print(f"🔄 Mask归一化: uint8 [0-255] → float32 [0.0-1.0]")
+        elif mask_feathered.max() > 1.5:
+            # float 但范围 > 1.5（可能是 [0, 255]）
+            mask_float = mask_feathered.astype(np.float32) / 255.0
+            print(f"🔄 Mask归一化: float [0-255] → [0.0-1.0]")
+        else:
+            # 新格式：已经是 [0.0, 1.0] float32
+            mask_float = mask_feathered.astype(np.float32)
+            print(f"✅ Mask已归一化: range=[{mask_float.min():.3f}, {mask_float.max():.3f}]")
+        
         mask_3ch = np.stack([mask_float] * 3, axis=2)  # 转为3通道
         
         # 4. 尝试泊松融合（Poisson Blending）
@@ -220,7 +239,12 @@ def paste_back_high_quality(
             try:
                 # 创建用于泊松融合的掩码（需要是纯白色的核心区域）
                 # 使用阈值创建二值掩码
-                _, poisson_mask = cv2.threshold(mask, 10, 255, cv2.THRESH_BINARY)
+                # 🔥 修复：mask 现在是 float32 [0.0, 1.0]，需要先转换为 uint8
+                mask_for_poisson = mask
+                if mask_for_poisson.dtype != np.uint8:
+                    mask_for_poisson = np.clip(mask_for_poisson * 255.0, 0, 255).astype(np.uint8)
+                
+                _, poisson_mask = cv2.threshold(mask_for_poisson, 10, 255, cv2.THRESH_BINARY)
                 
                 # 确保掩码边缘有内缩，避免泊松融合失败
                 kernel = np.ones((5, 5), np.uint8)

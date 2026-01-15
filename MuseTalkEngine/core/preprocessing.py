@@ -576,15 +576,29 @@ class OptimizedPreprocessor:
                 smart_mask_full = cv2.GaussianBlur(smart_mask_full, (blur_kernel, blur_kernel), 0)
                 
                 print(f"✅ 智能遮罩生成: {smart_mask_full.shape}, 多边形={len(polygon_points)}点, 羽化={blur_kernel}")
+                print(f"   DEBUG: Mask unique values BEFORE normalization: {np.unique(smart_mask_full)[:10]}")
                 
-                # 保存智能遮罩（用于推理合成）
-                mask = smart_mask_full
+                # 🔥 关键修复：将 Mask 归一化到 [0.0, 1.0] 范围（必须！）
+                # 原因：cv2.fillPoly 填充值是 255，GaussianBlur 后是 0~255
+                # 如果直接用于 pred * mask，会导致像素值爆炸（> 255）产生惨白色块
+                
+                # Step 1: 转换为 float32
+                mask_normalized = smart_mask_full.astype(np.float32)
+                
+                # Step 2: 归一化到 [0.0, 1.0]
+                mask_normalized = mask_normalized / 255.0
+                
+                print(f"   DEBUG: Mask unique values AFTER normalization: {np.unique(mask_normalized)[:10]}")
+                print(f"   DEBUG: Mask range: [{mask_normalized.min():.3f}, {mask_normalized.max():.3f}]")
+                
+                # 保存归一化后的智能遮罩（用于推理合成）
+                mask = mask_normalized
                 crop_box = face_box
                 
                 mask_coords_list.append(list(crop_box))
                 mask_list.append(mask)
                 
-                print(f"✅ 已保存智能遮罩: crop_box={crop_box}, mask shape={mask.shape}, unique={np.unique(mask)[:5]}")
+                print(f"✅ 已保存归一化智能遮罩: crop_box={crop_box}, mask shape={mask.shape}, dtype={mask.dtype}")
             
             # 5. VAE编码 - 并行处理
             print("VAE编码...")
@@ -809,11 +823,12 @@ class OptimizedPreprocessor:
             
             if len(mask_list) == 0:
                 print("⚠️ 警告: mask_list为空，添加默认mask")
-                # 使用全白mask
+                # 🔥 关键修复：默认 mask 也必须归一化到 [0.0, 1.0]
                 h, w = frame_list[0].shape[:2]
-                default_mask = np.ones((h, w), dtype=np.uint8) * 255
+                # 直接创建 float32 的全 1.0 mask
+                default_mask = np.ones((h, w), dtype=np.float32)
                 mask_list.append(default_mask)
-                print(f"   添加默认mask: {default_mask.shape}")
+                print(f"   添加默认mask: shape={default_mask.shape}, dtype={default_mask.dtype}, range=[{default_mask.min()}, {default_mask.max()}]")
             
             if len(coord_list) == 0:
                 print("⚠️ 警告: coord_list为空，添加默认值")
