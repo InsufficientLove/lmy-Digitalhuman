@@ -184,12 +184,33 @@ def paste_back_high_quality(
             pred_img = cv2.resize(pred_img, (target_w, target_h), interpolation=cv2.INTER_LANCZOS4)
             print(f"✅ Resize: pred_img {pred_img.shape} -> ({target_h}, {target_w}, 3)")
         
-        # 处理 mask（内部会转换到 target_h/target_w）
+        # 🔥 关键修复1：处理 mask（强制二值化 + 尺寸对齐）
+        # Bug: Mask 可能是分类标签图 (0-9)，导致归一化后数值过小
+        
+        # Step 1: 转换为灰度图（如果是3通道）
         if len(mask.shape) == 3:
             mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
         
+        # Step 2: 强制二值化（将所有非背景像素都视为前景）
+        # 这会将分类标签图 (0-9) 转换为二值图 (0 或 1.0)
+        print(f"📊 Mask 二值化前: dtype={mask.dtype}, unique={np.unique(mask)[:10]}, range=[{mask.min():.3f}, {mask.max():.3f}]")
+        
+        mask = mask.astype(np.float32)
+        if mask.max() > 1.5:
+            # 如果 max > 1.5，说明是 [0, 255] 或分类标签，先归一化
+            mask = mask / mask.max()
+        
+        # 强制二值化：所有 > 0 的部分设为 1.0
+        mask[mask > 0] = 1.0
+        mask[mask <= 0] = 0.0
+        
+        print(f"📊 Mask 二值化后: unique={np.unique(mask)}, range=[{mask.min():.3f}, {mask.max():.3f}]")
+        
+        # Step 3: 强制对齐尺寸到 pred_img（必须严丝合缝！）
         if mask.shape[:2] != (target_h, target_w):
-            mask = cv2.resize(mask, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
+            print(f"⚠️ Mask 尺寸不匹配: {mask.shape[:2]} vs pred_img ({target_h}, {target_w}), 强制 resize")
+            mask = cv2.resize(mask, (target_w, target_h), interpolation=cv2.INTER_NEAREST)  # 使用 NEAREST 保持二值特性
+            print(f"✅ Mask resize 完成: {mask.shape}")
 
         # Debug 2: 遮罩图（放回原图位置，便于检查形状/位置）
         if debug_enabled:
@@ -1434,7 +1455,28 @@ class UltraFastMuseTalkService:
                 
                 # 🔥 Step 3: 准备融合参数
                 mask_coords = mask_coords_list_cycle[i % len(mask_coords_list_cycle)]
-                mask = mask_list_cycle[i % len(mask_list_cycle)]
+                mask_raw = mask_list_cycle[i % len(mask_list_cycle)]
+                
+                # 🔥 关键修复：预处理 Mask（强制二值化 + 尺寸对齐）
+                # Bug: Mask 可能是分类标签图 (0-9)，需要强制转换为二值图
+                mask = mask_raw.copy() if isinstance(mask_raw, np.ndarray) else np.array(mask_raw)
+                
+                # Step 1: 转换为灰度图（如果是3通道）
+                if len(mask.shape) == 3:
+                    mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
+                
+                # Step 2: 强制二值化
+                mask = mask.astype(np.float32)
+                if mask.max() > 1.5:
+                    # 如果 max > 1.5，说明是 [0, 255] 或分类标签，先归一化
+                    mask = mask / mask.max()
+                
+                # 强制二值化：所有 > 0 的部分设为 1.0
+                mask_binary = np.zeros_like(mask, dtype=np.float32)
+                mask_binary[mask > 0] = 1.0
+                mask = mask_binary
+                
+                print(f"📊 帧{i}: Mask 预处理完成, unique={np.unique(mask)}, shape={mask.shape}")
                 
                 # 确保mask_coords是4个值
                 if isinstance(mask_coords, (list, tuple)) and len(mask_coords) == 4:
